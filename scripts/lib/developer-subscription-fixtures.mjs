@@ -55,6 +55,8 @@ const VALID_PAYMENT_METHODS = new Set([
   "other",
 ]);
 const DEMO_PAYMENT_METHODS = ["credit_card", "paypal", "apple_pay", "google_pay", "bank_transfer", "debit_card"];
+const MAX_LOGO_REFERENCE_LENGTH = 64 * 1024;
+const PRIVATE_ASSET_PATH_PATTERN = /^\/api\/app\/assets\/[A-Za-z0-9_-]+$/;
 
 /**
  * 统一执行 fixture 校验和 demo-only 字段补全。
@@ -92,6 +94,14 @@ export function buildDemoSubscriptions(fixtures) {
     }
     if (item.iconSlug !== null && item.iconSlug !== undefined && typeof item.iconSlug !== "string") {
       errors.push(`${label}: iconSlug must be a string, null, or undefined`);
+    }
+    const normalizedLogoUrl = normalizeOptionalLogoReference(item.logoUrl);
+    if (normalizedLogoUrl === false) {
+      errors.push(`${label}: logoUrl must be an HTTP(S) URL, /api/app/assets/{id}, or data:image reference`);
+    } else if (normalizedLogoUrl) {
+      item.logoUrl = normalizedLogoUrl;
+    } else {
+      delete item.logoUrl;
     }
     if (!Number.isFinite(item.price) || item.price < 0) {
       errors.push(`${label}: price must be a finite non-negative number`);
@@ -173,4 +183,15 @@ function isHttpUrl(value) {
   } catch {
     return false;
   }
+}
+
+function normalizeOptionalLogoReference(value) {
+  if (value === null || value === undefined) return undefined;
+  if (typeof value !== "string") return false;
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  if ([...trimmed].length > MAX_LOGO_REFERENCE_LENGTH) return false;
+  if (trimmed.startsWith("data:image/")) return trimmed;
+  if (PRIVATE_ASSET_PATH_PATTERN.test(trimmed)) return trimmed;
+  return isHttpUrl(trimmed) ? trimmed : false;
 }

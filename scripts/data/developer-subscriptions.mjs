@@ -18,7 +18,9 @@ export const PRICE_CHECKED_AT = "2026-05-18";
 
 export const DEVELOPER_SUBSCRIPTION_FIXTURES = [
   sub("chatgpt-plus", "ChatGPT Plus", "openai", 20, "USD", "monthly", "ai_tools", "https://chatgpt.com", "https://help.openai.com/en/articles/6950777-chatgpt-plus", ["AI", "Writing", "Research"], "Plus", "monthly public plan price"),
-  sub("claude-pro", "Claude Pro", "anthropic", 20, "USD", "monthly", "ai_tools", "https://claude.ai", "https://www.anthropic.com/pricing", ["AI", "Coding"], "Pro", "monthly public plan price"),
+  sub("claude-pro", "Claude Pro", "anthropic", 20, "USD", "monthly", "ai_tools", "https://claude.ai", "https://www.anthropic.com/pricing", ["AI", "Coding"], "Pro", "monthly public plan price", {
+    logoUrl: 'https://testingcf.jsdelivr.net/gh/glincker/thesvg@main/public/icons/claude/default.svg'
+  }),
   sub("perplexity-pro", "Perplexity Pro", "perplexity", 20, "USD", "monthly", "ai_tools", "https://www.perplexity.ai", "https://www.perplexity.ai/pricing", ["AI", "Search"], "Pro", "monthly public plan price"),
   sub("github-copilot-pro", "GitHub Copilot Pro", "github", 10, "USD", "monthly", "developer_tools", "https://github.com/features/copilot", "https://github.com/features/copilot/plans", ["Code", "AI"], "Pro", "monthly individual plan price"),
   sub("github-copilot-pro-plus", "GitHub Copilot Pro+", "github", 39, "USD", "monthly", "developer_tools", "https://github.com/features/copilot", "https://github.com/features/copilot/plans", ["Code", "AI"], "Pro+", "monthly individual plan price"),
@@ -31,12 +33,20 @@ export const DEVELOPER_SUBSCRIPTION_FIXTURES = [
   sub("jetbrains-ai-pro", "JetBrains AI Pro", "jetbrains", 10, "USD", "monthly", "developer_tools", "https://www.jetbrains.com/ai/", "https://www.jetbrains.com/ai/", ["IDE", "AI"], "AI Pro", "personal monthly plan price"),
   sub("raycast-pro", "Raycast Pro", "raycast", 96, "USD", "annual", "productivity", "https://www.raycast.com", "https://www.raycast.com/pricing", ["Launcher", "Mac", "AI"], "Pro", "annual total based on the public USD 8/month annual-billing price"),
   sub("sourcegraph-cody-pro", "Sourcegraph Cody Pro", "sourcegraph", 16, "USD", "monthly", "developer_tools", "https://sourcegraph.com", "https://sourcegraph.com/pricing", ["Code", "AI"], "Cody Pro", "per-user monthly plan price"),
-  sub("tabnine-dev", "Tabnine Dev", null, 12, "USD", "monthly", "developer_tools", "https://www.tabnine.com", "https://www.tabnine.com/pricing", ["Code", "AI"], "Dev", "per-user monthly plan price"),
+  sub("tabnine-dev", "Tabnine Dev", null, 12, "USD", "monthly", "developer_tools", "https://www.tabnine.com", "https://www.tabnine.com/pricing", ["Code", "AI"], "Dev", "per-user monthly plan price", {
+    logoUrl: 'https://tabnine.com/favicon.ico'
+  }),
   sub("replit-core", "Replit Core", "replit", 25, "USD", "monthly", "developer_tools", "https://replit.com", "https://replit.com/pricing", ["IDE", "Cloud", "AI"], "Core", "monthly public plan price"),
-  sub("windsurf-pro", "Windsurf Pro", null, 15, "USD", "monthly", "developer_tools", "https://windsurf.com", "https://windsurf.com/pricing", ["Editor", "AI"], "Pro", "monthly public plan price"),
-  sub("windsurf-teams", "Windsurf Teams", null, 40, "USD", "monthly", "developer_tools", "https://windsurf.com", "https://windsurf.com/pricing", ["Editor", "AI", "Team"], "Teams", "per-user monthly plan price"),
+  sub("windsurf-pro", "Windsurf Pro", null, 15, "USD", "monthly", "developer_tools", "https://windsurf.com", "https://windsurf.com/pricing", ["Editor", "AI"], "Pro", "monthly public plan price", {
+    logoUrl: 'https://windsurf.com/favicon.ico'
+  }),
+  sub("windsurf-teams", "Windsurf Teams", null, 40, "USD", "monthly", "developer_tools", "https://windsurf.com", "https://windsurf.com/pricing", ["Editor", "AI", "Team"], "Teams", "per-user monthly plan price", {
+    logoUrl: 'https://windsurf.com/favicon.ico'
+  }),
   sub("v0-premium", "v0 Premium", "vercel", 20, "USD", "monthly", "ai_tools", "https://v0.dev", "https://v0.dev/pricing", ["AI", "Frontend"], "Premium", "monthly public plan price"),
-  sub("lovable-pro", "Lovable Pro", null, 25, "USD", "monthly", "ai_tools", "https://lovable.dev", "https://lovable.dev/pricing", ["AI", "Frontend"], "Pro", "monthly public plan price"),
+  sub("lovable-pro", "Lovable Pro", null, 25, "USD", "monthly", "ai_tools", "https://lovable.dev", "https://lovable.dev/pricing", ["AI", "Frontend"], "Pro", "monthly public plan price", {
+    logoUrl: 'https://testingcf.jsdelivr.net/gh/glincker/thesvg@main/public/icons/lovable/default.svg'
+  }),
 
   sub("vercel-pro", "Vercel Pro", "vercel", 20, "USD", "monthly", "hosting_domains", "https://vercel.com", "https://vercel.com/pricing", ["Hosting", "Frontend"], "Pro", "per-user monthly plan price"),
   sub("netlify-pro", "Netlify Pro", "netlify", 20, "USD", "monthly", "hosting_domains", "https://www.netlify.com", "https://www.netlify.com/pricing/", ["Hosting", "Frontend"], "Pro", "per-member monthly plan price"),
@@ -60,8 +70,12 @@ export const DEVELOPER_SUBSCRIPTION_FIXTURES = [
   sub("aws-developer-support", "AWS Developer Support", "amazon-web-services", 29, "USD", "monthly", "hosting_domains", "https://aws.amazon.com", "https://aws.amazon.com/premiumsupport/pricing/", ["Cloud", "Support"], "Developer Support", "minimum monthly support plan price"),
 
   sub("upstash-redis-select", "Upstash Redis Pay As You Go", "upstash", 10, "USD", "monthly", "hosting_domains", "https://upstash.com", "https://upstash.com/pricing", ["Redis", "Serverless"], "Pay As You Go", "monthly account plan price"),
-  sub("turso-starter", "Turso Starter", null, 8, "USD", "monthly", "hosting_domains", "https://turso.tech", "https://turso.tech/pricing", ["Database", "SQLite"], "Starter", "monthly public plan price"),
-  sub("turso-scaler", "Turso Scaler", null, 19, "USD", "monthly", "hosting_domains", "https://turso.tech", "https://turso.tech/pricing", ["Database", "SQLite"], "Scaler", "monthly public plan price"),
+  sub("turso-starter", "Turso Starter", null, 8, "USD", "monthly", "hosting_domains", "https://turso.tech", "https://turso.tech/pricing", ["Database", "SQLite"], "Starter", "monthly public plan price", {
+    logoUrl: 'https://testingcf.jsdelivr.net/gh/glincker/thesvg@main/public/icons/turso/default.svg'
+  }),
+  sub("turso-scaler", "Turso Scaler", null, 19, "USD", "monthly", "hosting_domains", "https://turso.tech", "https://turso.tech/pricing", ["Database", "SQLite"], "Scaler", "monthly public plan price", {
+    logoUrl: 'https://testingcf.jsdelivr.net/gh/glincker/thesvg@main/public/icons/turso/default.svg'
+  }),
   sub("meilisearch-build", "Meilisearch Build", "meilisearch", 19, "USD", "monthly", "hosting_domains", "https://www.meilisearch.com", "https://www.meilisearch.com/pricing", ["Search", "Database"], "Build", "monthly public plan price"),
   sub("meilisearch-pro", "Meilisearch Pro", "meilisearch", 26, "USD", "monthly", "hosting_domains", "https://www.meilisearch.com", "https://www.meilisearch.com/pricing", ["Search", "Database"], "Pro", "monthly public plan price"),
   sub("neon-launch", "Neon Launch", "neon", 19, "USD", "monthly", "hosting_domains", "https://neon.tech", "https://neon.tech/pricing", ["Postgres", "Database"], "Launch", "monthly public plan price"),
@@ -88,16 +102,24 @@ export const DEVELOPER_SUBSCRIPTION_FIXTURES = [
   sub("resend-pro", "Resend Pro", "resend", 20, "USD", "monthly", "developer_tools", "https://resend.com", "https://resend.com/pricing", ["Email", "API"], "Pro", "monthly public plan price"),
   sub("pusher-channels-startup", "Pusher Channels Startup", "pusher", 49, "USD", "monthly", "developer_tools", "https://pusher.com", "https://pusher.com/channels/pricing", ["Realtime", "API"], "Startup", "monthly public plan price"),
   sub("pusher-beams-startup", "Pusher Beams Startup", "pusher", 99, "USD", "monthly", "developer_tools", "https://pusher.com", "https://pusher.com/beams/pricing", ["Push", "API"], "Startup", "monthly public plan price"),
-  sub("svix-startup", "Svix Startup", null, 490, "USD", "monthly", "developer_tools", "https://www.svix.com", "https://www.svix.com/pricing/", ["Webhooks", "API"], "Startup", "monthly public plan price"),
-  sub("workos-production", "WorkOS Production", null, 125, "USD", "monthly", "security_vpn", "https://workos.com", "https://workos.com/pricing", ["Auth", "Enterprise"], "Production", "monthly public plan price"),
+  sub("svix-startup", "Svix Startup", null, 490, "USD", "monthly", "developer_tools", "https://www.svix.com", "https://www.svix.com/pricing/", ["Webhooks", "API"], "Startup", "monthly public plan price", {
+    logoUrl: 'https://svix.com/apple-touch-icon.png'
+  }),
+  sub("workos-production", "WorkOS Production", null, 125, "USD", "monthly", "security_vpn", "https://workos.com", "https://workos.com/pricing", ["Auth", "Enterprise"], "Production", "monthly public plan price", {
+    logoUrl: 'https://www.google.com/s2/favicons?domain=workos.com&sz=128'
+  }),
 
   sub("sentry-team", "Sentry Team", "sentry", 26, "USD", "monthly", "developer_tools", "https://sentry.io", "https://sentry.io/pricing/", ["Observability", "Errors"], "Team", "monthly team plan price"),
   sub("sentry-business", "Sentry Business", "sentry", 80, "USD", "monthly", "developer_tools", "https://sentry.io", "https://sentry.io/pricing/", ["Observability", "Errors"], "Business", "monthly business plan price"),
   sub("datadog-infrastructure-pro", "Datadog Infrastructure Pro", "datadog", 15, "USD", "monthly", "developer_tools", "https://www.datadoghq.com", "https://www.datadoghq.com/pricing/", ["Observability", "Infra"], "Infrastructure Pro", "per-host monthly plan price"),
   sub("datadog-apm-pro", "Datadog APM Pro", "datadog", 31, "USD", "monthly", "developer_tools", "https://www.datadoghq.com", "https://www.datadoghq.com/pricing/", ["Observability", "APM"], "APM Pro", "per-host monthly plan price"),
   sub("grafana-cloud-pro", "Grafana Cloud Pro", "grafana", 19, "USD", "monthly", "developer_tools", "https://grafana.com", "https://grafana.com/pricing/", ["Observability", "Metrics"], "Pro", "monthly public plan price"),
-  sub("new-relic-core-user", "New Relic Core User", null, 49, "USD", "monthly", "developer_tools", "https://newrelic.com", "https://newrelic.com/pricing", ["Observability", "APM"], "Core User", "per-user monthly plan price"),
-  sub("new-relic-pro-user", "New Relic Pro User", null, 99, "USD", "monthly", "developer_tools", "https://newrelic.com", "https://newrelic.com/pricing", ["Observability", "APM"], "Pro User", "per-user monthly plan price"),
+  sub("new-relic-core-user", "New Relic Core User", null, 49, "USD", "monthly", "developer_tools", "https://newrelic.com", "https://newrelic.com/pricing", ["Observability", "APM"], "Core User", "per-user monthly plan price", {
+    logoUrl: 'https://testingcf.jsdelivr.net/gh/glincker/thesvg@main/public/icons/new-relic/default.svg'
+  }),
+  sub("new-relic-pro-user", "New Relic Pro User", null, 99, "USD", "monthly", "developer_tools", "https://newrelic.com", "https://newrelic.com/pricing", ["Observability", "APM"], "Pro User", "per-user monthly plan price", {
+    logoUrl: 'https://testingcf.jsdelivr.net/gh/glincker/thesvg@main/public/icons/new-relic/default.svg'
+  }),
   sub("honeycomb-pro", "Honeycomb Pro", "honeycomb", 130, "USD", "monthly", "developer_tools", "https://www.honeycomb.io", "https://www.honeycomb.io/pricing", ["Observability", "Tracing"], "Pro", "monthly public plan price"),
   sub("better-stack-uptime-team", "Better Stack Uptime Team", "better-stack", 34, "USD", "monthly", "developer_tools", "https://betterstack.com", "https://betterstack.com/pricing", ["Observability", "Uptime"], "Team", "monthly public plan price"),
   sub("honeybadger-team", "Honeybadger Team", "honeybadger", 59, "USD", "monthly", "developer_tools", "https://www.honeybadger.io", "https://www.honeybadger.io/pricing/", ["Observability", "Errors"], "Team", "monthly public plan price"),
@@ -108,7 +130,9 @@ export const DEVELOPER_SUBSCRIPTION_FIXTURES = [
   sub("bitwarden-teams", "Bitwarden Teams", "bitwarden", 47.88, "USD", "annual", "security_vpn", "https://bitwarden.com", "https://bitwarden.com/pricing/", ["Security", "Passwords"], "Teams", "per-user annual total based on the public USD 3.99/month annual-billing price"),
   sub("snyk-team", "Snyk Team", "snyk", 25, "USD", "monthly", "security_vpn", "https://snyk.io", "https://snyk.io/plans/", ["Security", "SCA"], "Team", "per-user monthly plan price"),
   sub("sonarqube-cloud-team", "SonarQube Cloud Team", "sonarqube", 32, "EUR", "monthly", "security_vpn", "https://www.sonarsource.com", "https://www.sonarsource.com/plans-and-pricing/sonarqube-cloud/", ["Quality", "Security"], "Team", "monthly public plan price"),
-  sub("semgrep-team", "Semgrep Team", null, 30, "USD", "monthly", "security_vpn", "https://semgrep.dev", "https://semgrep.dev/pricing", ["Security", "SAST"], "Team", "per-user monthly plan price"),
+  sub("semgrep-team", "Semgrep Team", null, 30, "USD", "monthly", "security_vpn", "https://semgrep.dev", "https://semgrep.dev/pricing", ["Security", "SAST"], "Team", "per-user monthly plan price", {
+    logoUrl: 'https://www.google.com/s2/favicons?domain=semgrep.com&sz=128'
+  }),
   sub("tailscale-starter", "Tailscale Starter", "tailscale", 5, "USD", "monthly", "security_vpn", "https://tailscale.com", "https://tailscale.com/pricing", ["VPN", "Networking"], "Starter", "per-user monthly plan price"),
   sub("tailscale-premium", "Tailscale Premium", "tailscale", 10, "USD", "monthly", "security_vpn", "https://tailscale.com", "https://tailscale.com/pricing", ["VPN", "Networking"], "Premium", "per-user monthly plan price"),
   sub("cloudflare-zero-trust-payg", "Cloudflare Zero Trust Pay-as-you-go", "cloudflare", 7, "USD", "monthly", "security_vpn", "https://www.cloudflare.com", "https://www.cloudflare.com/plans/zero-trust-services/", ["Security", "Zero Trust"], "Pay-as-you-go", "per-user monthly plan price"),
@@ -118,9 +142,13 @@ export const DEVELOPER_SUBSCRIPTION_FIXTURES = [
   sub("browserstack-desktop-mobile", "BrowserStack Desktop & Mobile", "browserstack", 39, "USD", "monthly", "developer_tools", "https://www.browserstack.com", "https://www.browserstack.com/pricing", ["Testing", "Browsers"], "Desktop & Mobile", "monthly public plan price"),
   sub("browserstack-automate", "BrowserStack Automate", "browserstack", 149, "USD", "monthly", "developer_tools", "https://www.browserstack.com", "https://www.browserstack.com/pricing", ["Testing", "Automation"], "Automate", "monthly public plan price"),
   sub("sauce-labs-live-testing", "Sauce Labs Live Testing", "sauce-labs", 39, "USD", "monthly", "developer_tools", "https://saucelabs.com", "https://saucelabs.com/pricing", ["Testing", "Browsers"], "Live Testing", "monthly public plan price"),
-  sub("lambdatest-live", "LambdaTest Live", null, 15, "USD", "monthly", "developer_tools", "https://www.lambdatest.com", "https://www.lambdatest.com/pricing", ["Testing", "Browsers"], "Live", "monthly public plan price"),
+  sub("lambdatest-live", "LambdaTest Live", null, 15, "USD", "monthly", "developer_tools", "https://www.lambdatest.com", "https://www.lambdatest.com/pricing", ["Testing", "Browsers"], "Live", "monthly public plan price", {
+    logoUrl: 'https://www.google.com/s2/favicons?domain=lambdatest.com&sz=128'
+  }),
   sub("cypress-cloud-team", "Cypress Cloud Team", "cypress", 799, "USD", "annual", "developer_tools", "https://www.cypress.io", "https://www.cypress.io/pricing", ["Testing", "E2E"], "Team", "annual public plan price"),
-  sub("testrail-professional-cloud", "TestRail Professional Cloud", null, 37, "USD", "monthly", "developer_tools", "https://www.testrail.com", "https://www.testrail.com/pricing", ["Testing", "QA"], "Professional Cloud", "per-user monthly plan price"),
+  sub("testrail-professional-cloud", "TestRail Professional Cloud", null, 37, "USD", "monthly", "developer_tools", "https://www.testrail.com", "https://www.testrail.com/pricing", ["Testing", "QA"], "Professional Cloud", "per-user monthly plan price", {
+    logoUrl: 'https://testingcf.jsdelivr.net/gh/glincker/thesvg@main/public/icons/testrail/default.svg'
+  }),
   sub("linear-basic", "Linear Basic", "linear", 10, "USD", "monthly", "business", "https://linear.app", "https://linear.app/pricing", ["Issues", "Planning"], "Basic", "per-user monthly plan price"),
   sub("linear-business", "Linear Business", "linear", 16, "USD", "monthly", "business", "https://linear.app", "https://linear.app/pricing", ["Issues", "Planning"], "Business", "per-user monthly plan price"),
 ];
@@ -130,6 +158,7 @@ export const DEVELOPER_SUBSCRIPTION_FIXTURES = [
  *
  * 注意：这里牺牲了一点参数自解释性来换取数据表可扫描性；调整字段顺序时必须同步
  * `buildDemoSubscriptions()` 的校验字段和 `toSubscriptionPayload()` 的写入字段。
+ * 第三个参数是 TheSVG slug；需要完全自定义 logo 时，在 overrides 里传 `logoUrl`。
  */
 function sub(slug, name, iconSlug, price, currency, billingCycle, category, website, pricingSource, tags, planLabel, priceBasis, overrides = {}) {
   return {

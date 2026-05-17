@@ -294,7 +294,7 @@ function toSubscriptionPayload(item, order, userId) {
   return {
     user: userId,
     name: item.name,
-    logo: item.iconSlug ? `${LOGO_CDN}/${item.iconSlug}/default.svg` : null,
+    logo: logoForSubscription(item),
     price: item.price,
     currency: item.currency,
     billingCycle: item.billingCycle,
@@ -331,6 +331,12 @@ function toSubscriptionPayload(item, order, userId) {
       updatedAt: new Date().toISOString(),
     },
   };
+}
+
+function logoForSubscription(item) {
+  // 自定义 logoUrl 是维护者显式选择，优先级高于 TheSVG；未设置时保持既有 iconSlug/null 行为。
+  if (item.logoUrl) return item.logoUrl;
+  return item.iconSlug ? `${LOGO_CDN}/${item.iconSlug}/default.svg` : null;
 }
 
 /**
