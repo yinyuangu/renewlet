@@ -58,7 +58,6 @@ export interface SubscriptionFormFieldsProps {
   setFormData: Dispatch<SetStateAction<SubscriptionFormState>>;
   onLogoUploadStatusChange: (status: LogoUploadStatus) => void;
   onFieldChange?: <K extends keyof SubscriptionFormState>(key: K, value: SubscriptionFormState[K]) => void;
-  showWebsiteAndNotes?: boolean;
   errors?: SubscriptionFormErrors | undefined;
   onClearFieldError?: ((field: keyof SubscriptionFormErrors) => void) | undefined;
 }
@@ -89,7 +88,6 @@ export const SubscriptionFormFields = memo(function SubscriptionFormFields({
   setFormData,
   onLogoUploadStatusChange,
   onFieldChange,
-  showWebsiteAndNotes = false,
   errors = {},
   onClearFieldError,
 }: SubscriptionFormFieldsProps) {
@@ -545,35 +543,31 @@ export const SubscriptionFormFields = memo(function SubscriptionFormFields({
         )}
       </div>
 
-      {showWebsiteAndNotes && (
-        <div className="grid gap-2">
-          <Label htmlFor={id("website")}>{t("subscription.field.website")}</Label>
-          <Input
-            id={id("website")}
-            type="url"
-            placeholder="https://example.com"
-            value={formData.website}
-            onChange={(e) => update("website", e.target.value)}
-            aria-invalid={Boolean(errors.website)}
-            aria-describedby={errors.website ? id("website-error") : undefined}
-            className="border-border bg-secondary"
-          />
-          <FieldError id={id("website-error")} message={errors.website} />
-        </div>
-      )}
+      <div className="grid gap-2">
+        <Label htmlFor={id("website")}>{t("subscription.field.website")}</Label>
+        <Input
+          id={id("website")}
+          type="url"
+          placeholder="https://example.com"
+          value={formData.website}
+          onChange={(e) => update("website", e.target.value)}
+          aria-invalid={Boolean(errors.website)}
+          aria-describedby={errors.website ? id("website-error") : undefined}
+          className="border-border bg-secondary"
+        />
+        <FieldError id={id("website-error")} message={errors.website} />
+      </div>
 
-      {showWebsiteAndNotes && (
-        <div className="grid gap-2">
-          <Label htmlFor={id("notes")}>{t("subscription.field.notes")}</Label>
-          <Input
-            id={id("notes")}
-            placeholder={t("subscription.placeholder.notes")}
-            value={formData.notes}
-            onChange={(e) => update("notes", e.target.value)}
-            className="border-border bg-secondary"
-          />
-        </div>
-      )}
+      <div className="grid gap-2">
+        <Label htmlFor={id("notes")}>{t("subscription.field.notes")}</Label>
+        <Input
+          id={id("notes")}
+          placeholder={t("subscription.placeholder.notes")}
+          value={formData.notes}
+          onChange={(e) => update("notes", e.target.value)}
+          className="border-border bg-secondary"
+        />
+      </div>
 
       <div className="grid gap-2">
         <Label htmlFor={id("tags")}>{t("subscription.field.tags")}</Label>

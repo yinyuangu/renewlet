@@ -168,6 +168,59 @@ describe("SubscriptionDialog", () => {
     expect(screen.getByRole("button", { name: /2026年4月16日.*selected/ })).toBeInTheDocument();
   });
 
+  it("shows website and notes fields for an edited subscription", () => {
+    render(
+      <TooltipProvider delayDuration={0}>
+        <SubscriptionDialog
+          mode="edit"
+          open
+          onOpenChange={vi.fn()}
+          onSubmit={vi.fn()}
+          subscription={makeSubscription({
+            website: "https://billing.example.com",
+            notes: "团队年度订阅",
+          })}
+        />
+      </TooltipProvider>,
+    );
+
+    expect(screen.getByLabelText("网站")).toHaveValue("https://billing.example.com");
+    expect(screen.getByLabelText("备注")).toHaveValue("团队年度订阅");
+  });
+
+  it("submits edited website and notes while preserving the subscription id", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+
+    render(
+      <TooltipProvider delayDuration={0}>
+        <SubscriptionDialog
+          mode="edit"
+          open
+          onOpenChange={vi.fn()}
+          onSubmit={onSubmit}
+          subscription={makeSubscription({
+            id: "sub-edit-website-notes",
+            website: "https://old.example.com",
+            notes: "旧备注",
+          })}
+        />
+      </TooltipProvider>,
+    );
+
+    await user.clear(screen.getByLabelText("网站"));
+    await user.type(screen.getByLabelText("网站"), "https://new.example.com");
+    await user.clear(screen.getByLabelText("备注"));
+    await user.type(screen.getByLabelText("备注"), "新备注");
+    await user.click(screen.getByRole("button", { name: "保存修改" }));
+
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
+      id: "sub-edit-website-notes",
+      website: "https://new.example.com",
+      notes: "新备注",
+    }));
+  });
+
   it("shows repeat reminder controls when enabled for an edited subscription", () => {
     const subscription: Subscription = {
       id: "sub-1",

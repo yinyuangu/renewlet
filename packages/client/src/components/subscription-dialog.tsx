@@ -110,18 +110,7 @@ export function SubscriptionDialog(props: SubscriptionDialogProps) {
 
   const editSubscription = props.mode === "edit" ? props.subscription : null;
 
-  const { idPrefix, showWebsiteAndNotes } = useMemo(() => {
-    if (props.mode === "create") {
-      return {
-        idPrefix: "",
-        showWebsiteAndNotes: true,
-      };
-    }
-    return {
-      idPrefix: "edit-",
-      showWebsiteAndNotes: false,
-    };
-  }, [props.mode]);
+  const idPrefix = props.mode === "edit" ? "edit-" : "";
 
   // 弹窗关闭动画开始后再重置临时状态，避免关闭交互帧叠加额外 setState。
   useEffect(() => {
@@ -324,7 +313,6 @@ export function SubscriptionDialog(props: SubscriptionDialogProps) {
               setFormData={setFormData}
               onLogoUploadStatusChange={setLogoUploadStatus}
               onFieldChange={handleFieldChange}
-              showWebsiteAndNotes={showWebsiteAndNotes}
               errors={formErrors}
               onClearFieldError={clearFieldError}
             />
