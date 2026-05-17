@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { CATEGORIES } from "./subscription";
-import { getDefaultCategories, normalizeCategories, type ConfigItem } from "./config";
+import { CATEGORIES, CURRENCY_OPTIONS } from "./subscription";
+import { getDefaultCategories, getDefaultCurrencies, normalizeCategories, normalizeCurrencies, type ConfigItem } from "./config";
 
 const legacyCategory = (value: string): ConfigItem => ({
   id: value,
@@ -56,5 +56,75 @@ describe("category config defaults", () => {
     ];
 
     expect(normalizeCategories(customItems)).toEqual(customItems);
+  });
+});
+
+const legacyCurrency = (value: string, enabled = true): ConfigItem => ({
+  id: value,
+  value,
+  labels: {
+    "zh-CN": value,
+    "en-US": value,
+  },
+  enabled,
+});
+
+const legacyThirtyCurrencyOrder = [
+  "CNY", "HKD", "JPY", "KRW", "SGD", "INR", "IDR", "MYR", "THB", "PHP",
+  "EUR", "GBP", "CHF", "SEK", "NOK", "DKK", "PLN", "CZK", "HUF", "RON",
+  "ISK", "TRY", "ILS", "USD", "CAD", "MXN", "BRL", "AUD", "NZD", "ZAR",
+];
+const legacyThirtyPriorityOrder = [
+  "CNY", "USD", "EUR", "GBP", "HKD", "JPY", "KRW",
+  ...legacyThirtyCurrencyOrder.filter((value) => !["CNY", "USD", "EUR", "GBP", "HKD", "JPY", "KRW"].includes(value)),
+];
+
+describe("currency config defaults", () => {
+  it("defines the shared 146-currency exchange-rate scope", () => {
+    const currencies = getDefaultCurrencies();
+
+    expect(CURRENCY_OPTIONS).toHaveLength(146);
+    expect(currencies).toHaveLength(146);
+    expect(currencies.slice(0, 7).map((currency) => currency.value)).toEqual([
+      "CNY", "USD", "EUR", "GBP", "HKD", "JPY", "KRW",
+    ]);
+    expect(currencies.every((currency) => currency.enabled === true)).toBe(true);
+    expect(currencies.map((currency) => currency.value)).toContain("TWD");
+    expect(currencies.map((currency) => currency.value)).toContain("VND");
+  });
+
+  it("upgrades the old 30-currency default list to the new full default", () => {
+    const legacyItems = legacyThirtyPriorityOrder.map((value) => legacyCurrency(value, true));
+
+    const normalized = normalizeCurrencies(legacyItems);
+
+    expect(normalized).toEqual(getDefaultCurrencies());
+  });
+
+  it("upgrades the older partially enabled 30-currency default list to the new full default", () => {
+    const legacyEnabled = new Set(["CNY", "USD", "EUR", "JPY", "GBP"]);
+    const legacyItems = legacyThirtyCurrencyOrder.map((value) => legacyCurrency(value, legacyEnabled.has(value)));
+
+    const normalized = normalizeCurrencies(legacyItems);
+
+    expect(normalized).toEqual(getDefaultCurrencies());
+  });
+
+  it("preserves customized currency order and toggles while appending newly supported currencies", () => {
+    const customItems = [
+      legacyCurrency("USD", true),
+      legacyCurrency("CNY", false),
+      legacyCurrency("EUR", true),
+    ];
+
+    const normalized = normalizeCurrencies(customItems);
+
+    expect(normalized).toHaveLength(146);
+    expect(normalized.slice(0, 3).map((currency) => [currency.value, currency.enabled])).toEqual([
+      ["USD", true],
+      ["CNY", false],
+      ["EUR", true],
+    ]);
+    expect(normalized.find((currency) => currency.value === "TWD")?.enabled).toBe(true);
   });
 });

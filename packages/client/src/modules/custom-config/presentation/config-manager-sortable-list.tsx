@@ -59,6 +59,7 @@ export interface ConfigManagerSortableListProps {
   handleAdd: () => void;
   resetAddForm: () => void;
   handleToggle: (id: string) => void;
+  emptyMessage?: string | undefined;
 }
 
 export const ConfigManagerSortableList = memo(function ConfigManagerSortableList({
@@ -99,6 +100,7 @@ export const ConfigManagerSortableList = memo(function ConfigManagerSortableList
   handleAdd,
   resetAddForm,
   handleToggle,
+  emptyMessage,
 }: ConfigManagerSortableListProps) {
   const { t } = useI18n();
   const sensors = useSensors(
@@ -175,7 +177,7 @@ export const ConfigManagerSortableList = memo(function ConfigManagerSortableList
 
       {items.length === 0 && !isAdding && (
         <div className="text-center py-8 text-muted-foreground text-sm">
-          {t("customConfig.empty")}
+          {emptyMessage ?? t("customConfig.empty")}
         </div>
       )}
     </>

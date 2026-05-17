@@ -114,7 +114,7 @@ function mockResolvedDashboardData() {
   mocks.useSettings.mockReturnValue({
     data: {
       defaultCurrency: "CNY",
-      exchangeRateProvider: "frankfurter",
+      exchangeRateProvider: "exchange-api",
       timezone: "Asia/Shanghai",
     },
     isPending: false,
@@ -151,7 +151,7 @@ describe("Dashboard page loading state", () => {
         ? undefined
         : {
             defaultCurrency: "CNY",
-            exchangeRateProvider: "frankfurter",
+            exchangeRateProvider: "exchange-api",
             timezone: "Asia/Shanghai",
           },
       isPending: state.settingsPending,

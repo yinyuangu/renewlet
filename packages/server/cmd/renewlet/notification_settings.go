@@ -71,7 +71,10 @@ func sanitizeSettings(settings appSettings) appSettings {
 	if !isSupportedAppLocale(settings.Locale) {
 		settings.Locale = string(normalizeAppLocale(settings.Locale))
 	}
-	if settings.ExchangeRateProvider != "floatrates" && settings.ExchangeRateProvider != "frankfurter" {
+	if settings.ExchangeRateProvider == "frankfurter" {
+		settings.ExchangeRateProvider = "exchange-api"
+	}
+	if settings.ExchangeRateProvider != "floatrates" && settings.ExchangeRateProvider != "exchange-api" {
 		settings.ExchangeRateProvider = "floatrates"
 	}
 	if _, err := time.LoadLocation(settings.Timezone); err != nil {

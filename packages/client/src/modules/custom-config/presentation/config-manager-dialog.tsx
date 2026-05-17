@@ -17,8 +17,9 @@
  * Caveat: 不要在本组件里直接调用 API 或 toast，否则会重新把展示层和应用层耦合。
  */
 
-import type { ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   Dialog,
   DialogContent,
@@ -37,11 +38,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, ChevronRight } from 'lucide-react';
+import { Plus, ChevronRight, Search } from 'lucide-react';
 import type { ConfigItem } from '@/types/config';
 import { useConfigManagerController } from '@/modules/custom-config/application/use-config-manager-controller';
 import { ConfigManagerSortableList } from '@/modules/custom-config/presentation/config-manager-sortable-list';
 import { useI18n } from '@/i18n/I18nProvider';
+import { rankSearchText } from '@/lib/searchable-options';
 
 const DEFAULT_COLORS = [
   'hsl(160 84% 45%)',
@@ -92,6 +94,14 @@ interface ConfigManagerDialogProps {
    * - 分类：若该分类被订阅使用中，则阻止删除并提示先调整订阅
    */
   getDeleteBlockReason?: (item: ConfigItem) => string | null;
+  /** 是否展示列表筛选输入框（货币数量较多时使用）。 */
+  searchable?: boolean;
+  /** 筛选输入框占位文案。 */
+  searchPlaceholder?: string;
+  /** 筛选无结果文案。 */
+  searchEmptyMessage?: string;
+  /** 自定义搜索关键词。 */
+  getSearchKeywords?: (item: ConfigItem) => string[];
 }
 
 /** 配置管理弹窗组件。 */
@@ -109,8 +119,13 @@ export const ConfigManagerDialog = ({
   toggleMode = false,
   isItemReadOnly,
   getDeleteBlockReason,
+  searchable = false,
+  searchPlaceholder,
+  searchEmptyMessage,
+  getSearchKeywords,
 }: ConfigManagerDialogProps) => {
   const { t, label } = useI18n();
+  const [searchQuery, setSearchQuery] = useState("");
   // controller 统一维护编辑/新增/删除的互斥状态，presentation 只做事件转发。
   const controller = useConfigManagerController({
     items,
@@ -165,9 +180,25 @@ export const ConfigManagerDialog = ({
     handleOpenChange,
     getDeleteReason,
   } = controller;
+  const filteredItems = useMemo(() => {
+    const query = searchQuery.trim();
+    if (!searchable || !query) return items;
+    return items.filter((item) => {
+      const keywords = getSearchKeywords?.(item) ?? [
+        item.value,
+        item.labels["zh-CN"],
+        item.labels["en-US"],
+      ];
+      return rankSearchText(keywords, query) > 0;
+    });
+  }, [getSearchKeywords, items, searchable, searchQuery]);
+  const handleDialogOpenChange = (nextOpen: boolean) => {
+    handleOpenChange(nextOpen);
+    if (!nextOpen) setSearchQuery("");
+  };
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog open={open} onOpenChange={handleDialogOpenChange}>
       <DialogTrigger asChild>
         <button
           className="flex items-center justify-between w-full p-4 rounded-lg border border-border bg-secondary/30 hover:bg-secondary/50 transition-colors text-left group"
@@ -201,9 +232,22 @@ export const ConfigManagerDialog = ({
           )}
         </DialogHeader>
 
+        {searchable && (
+          <div className="relative mt-2">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder={searchPlaceholder ?? t("common.searchPlaceholder")}
+              aria-label={searchPlaceholder ?? t("common.searchPlaceholder")}
+              className="border-border bg-secondary pl-9"
+            />
+          </div>
+        )}
+
         <div className="min-h-0 min-w-0 flex-1 grid gap-2 overflow-y-auto py-4 pr-1 sm:pr-2">
           <ConfigManagerSortableList
-            items={items}
+            items={filteredItems}
             showColor={showColor}
             showIcon={showIcon}
             colorOptions={colorOptions}
@@ -240,6 +284,7 @@ export const ConfigManagerDialog = ({
             handleAdd={handleAdd}
             resetAddForm={resetAddForm}
             handleToggle={handleToggle}
+            emptyMessage={searchQuery.trim() ? searchEmptyMessage : undefined}
           />
         </div>
 

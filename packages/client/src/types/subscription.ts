@@ -1,6 +1,7 @@
 import type { CustomThemeColor, ThemeMode, ThemeVariant } from './theme';
 import { DEFAULT_CUSTOM_THEME_COLOR } from './theme';
 import { getInitialLocale, labels, type Locale, type LocalizedLabels } from '@/i18n/locales';
+import { SUPPORTED_EXCHANGE_RATE_CURRENCIES, getIntlCurrencyOptionLabel } from '@/lib/currency-data';
 import type { ExchangeRateProvider } from '@/lib/api/schemas/exchange-rates';
 import type { DateOnly } from '@/lib/time/date-only';
 import type { LocalTime } from '@/lib/time/local-time';
@@ -314,8 +315,8 @@ export const PAYMENT_METHOD_LABELS: Record<BuiltInPaymentMethod, LocalizedLabels
   other: labels('其他', 'Other'),
 };
 
-/** 货币选项所属地区（仅用于 UI 分组展示）。 */
-export type CurrencyRegion = 'asia' | 'europe' | 'americas' | 'oceania' | 'africa';
+/** 货币选项所属地区（仅用于 UI 搜索关键词）。 */
+export type CurrencyRegion = 'asia' | 'europe' | 'americas' | 'oceania' | 'africa' | 'global';
 
 /** 货币下拉选项（用于新增/编辑订阅，以及自定义货币配置）。 */
 export interface CurrencyOption {
@@ -343,44 +344,15 @@ export interface ReminderDaysOption {
   labels: LocalizedLabels;
 }
 
-/** 汇率来源共同支持的 30 种货币（用于默认列表与下拉选项）。 */
-export const CURRENCY_OPTIONS = [
-  // 🌏 亚洲 (10个)
-  { value: 'CNY', labels: labels('人民币 (¥)', 'Chinese yuan (¥)'), region: 'asia' },
-  { value: 'HKD', labels: labels('港币 (HK$)', 'Hong Kong dollar (HK$)'), region: 'asia' },
-  { value: 'JPY', labels: labels('日元 (¥)', 'Japanese yen (¥)'), region: 'asia' },
-  { value: 'KRW', labels: labels('韩元 (₩)', 'South Korean won (₩)'), region: 'asia' },
-  { value: 'SGD', labels: labels('新加坡元 (S$)', 'Singapore dollar (S$)'), region: 'asia' },
-  { value: 'INR', labels: labels('印度卢比 (₹)', 'Indian rupee (₹)'), region: 'asia' },
-  { value: 'IDR', labels: labels('印尼卢比 (Rp)', 'Indonesian rupiah (Rp)'), region: 'asia' },
-  { value: 'MYR', labels: labels('马来西亚林吉特 (RM)', 'Malaysian ringgit (RM)'), region: 'asia' },
-  { value: 'THB', labels: labels('泰铢 (฿)', 'Thai baht (฿)'), region: 'asia' },
-  { value: 'PHP', labels: labels('菲律宾比索 (₱)', 'Philippine peso (₱)'), region: 'asia' },
-  // 🇪🇺 欧洲 (13个)
-  { value: 'EUR', labels: labels('欧元 (€)', 'Euro (€)'), region: 'europe' },
-  { value: 'GBP', labels: labels('英镑 (£)', 'British pound (£)'), region: 'europe' },
-  { value: 'CHF', labels: labels('瑞士法郎 (CHF)', 'Swiss franc (CHF)'), region: 'europe' },
-  { value: 'SEK', labels: labels('瑞典克朗 (kr)', 'Swedish krona (kr)'), region: 'europe' },
-  { value: 'NOK', labels: labels('挪威克朗 (kr)', 'Norwegian krone (kr)'), region: 'europe' },
-  { value: 'DKK', labels: labels('丹麦克朗 (kr)', 'Danish krone (kr)'), region: 'europe' },
-  { value: 'PLN', labels: labels('波兰兹罗提 (zł)', 'Polish zloty (zł)'), region: 'europe' },
-  { value: 'CZK', labels: labels('捷克克朗 (Kč)', 'Czech koruna (Kč)'), region: 'europe' },
-  { value: 'HUF', labels: labels('匈牙利福林 (Ft)', 'Hungarian forint (Ft)'), region: 'europe' },
-  { value: 'RON', labels: labels('罗马尼亚列伊 (lei)', 'Romanian leu (lei)'), region: 'europe' },
-  { value: 'ISK', labels: labels('冰岛克朗 (kr)', 'Icelandic krona (kr)'), region: 'europe' },
-  { value: 'TRY', labels: labels('土耳其里拉 (₺)', 'Turkish lira (₺)'), region: 'europe' },
-  { value: 'ILS', labels: labels('以色列谢克尔 (₪)', 'Israeli new shekel (₪)'), region: 'europe' },
-  // 🌎 美洲 (4个)
-  { value: 'USD', labels: labels('美元 ($)', 'US dollar ($)'), region: 'americas' },
-  { value: 'CAD', labels: labels('加元 (C$)', 'Canadian dollar (C$)'), region: 'americas' },
-  { value: 'MXN', labels: labels('墨西哥比索 (MX$)', 'Mexican peso (MX$)'), region: 'americas' },
-  { value: 'BRL', labels: labels('巴西雷亚尔 (R$)', 'Brazilian real (R$)'), region: 'americas' },
-  // 🇦🇺 大洋洲 (2个)
-  { value: 'AUD', labels: labels('澳元 (A$)', 'Australian dollar (A$)'), region: 'oceania' },
-  { value: 'NZD', labels: labels('新西兰元 (NZ$)', 'New Zealand dollar (NZ$)'), region: 'oceania' },
-  // 🌍 非洲 (1个)
-  { value: 'ZAR', labels: labels('南非兰特 (R)', 'South African rand (R)'), region: 'africa' },
-] as const satisfies readonly CurrencyOption[];
+/** 两个远端汇率来源共同支持的 146 种货币（用于默认列表与下拉选项）。 */
+export const CURRENCY_OPTIONS = SUPPORTED_EXCHANGE_RATE_CURRENCIES.map((value) => ({
+  value,
+  labels: labels(
+    getIntlCurrencyOptionLabel(value, 'zh-CN'),
+    getIntlCurrencyOptionLabel(value, 'en-US'),
+  ),
+  region: 'global',
+})) satisfies readonly CurrencyOption[];
 
 export const TIMEZONE_OPTIONS = [
   { value: 'UTC', label: 'UTC' },

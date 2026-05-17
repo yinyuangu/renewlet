@@ -100,14 +100,27 @@ func TestMergeSettingsSanitizesNotificationFields(t *testing.T) {
 
 func TestMergeSettingsPreservesSupportedExchangeRateProvider(t *testing.T) {
 	settings, err := mergeSettings(defaultAppSettings(), json.RawMessage(`{
-		"exchangeRateProvider": "floatrates"
+		"exchangeRateProvider": "exchange-api"
 	}`))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if settings.ExchangeRateProvider != "floatrates" {
+	if settings.ExchangeRateProvider != "exchange-api" {
 		t.Fatalf("expected exchange-rate provider to be preserved, got %q", settings.ExchangeRateProvider)
+	}
+}
+
+func TestMergeSettingsMapsLegacyFrankfurterProvider(t *testing.T) {
+	settings, err := mergeSettings(defaultAppSettings(), json.RawMessage(`{
+		"exchangeRateProvider": "frankfurter"
+	}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if settings.ExchangeRateProvider != "exchange-api" {
+		t.Fatalf("expected legacy provider to map to exchange-api, got %q", settings.ExchangeRateProvider)
 	}
 }
 

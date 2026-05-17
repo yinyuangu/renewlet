@@ -62,7 +62,7 @@ Renewlet 是一个自托管的订阅管理工具。它把 SaaS、AI 工具、云
 - 提醒续费：按用户设置的时区和提醒天数生成通知，保留发送历史，失败后可重试。
 - 发送通知：支持 Telegram、Notifyx、Webhook、企业微信机器人、SMTP 邮件和 Bark。
 - 查看支出：把不同周期折算成月度成本，展示预算使用、分类占比、付款方式占比和停用订阅节省。
-- 处理多币种：可选择 Frankfurter 或 FloatRates 汇率来源；远端不可用时，会使用备用汇率。
+- 处理多币种：可选择 Exchange API 或 FloatRates JSON Feeds 汇率来源；远端不可用时，会使用备用汇率。
 - 自托管运行：单容器部署，SQLite 数据可放在本地目录或 Docker volume 里。
 - 切换语言：应用内支持简体中文和 English。
 

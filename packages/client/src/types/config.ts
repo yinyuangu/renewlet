@@ -151,6 +151,15 @@ const DEFAULT_CURRENCY_PRIORITY = ['CNY', 'USD', 'EUR', 'GBP', 'HKD', 'JPY', 'KR
 
 /** 旧版本默认启用的常用币种（用于兼容升级：检测到“旧默认”才自动迁移）。 */
 const LEGACY_DEFAULT_ENABLED_CURRENCIES = new Set<string>(['CNY', 'USD', 'EUR', 'JPY', 'GBP']);
+const LEGACY_30_CURRENCY_ORDER = [
+  'CNY', 'HKD', 'JPY', 'KRW', 'SGD', 'INR', 'IDR', 'MYR', 'THB', 'PHP',
+  'EUR', 'GBP', 'CHF', 'SEK', 'NOK', 'DKK', 'PLN', 'CZK', 'HUF', 'RON',
+  'ISK', 'TRY', 'ILS', 'USD', 'CAD', 'MXN', 'BRL', 'AUD', 'NZD', 'ZAR',
+] as const;
+const LEGACY_30_CURRENCY_PRIORITY_ORDER = [
+  ...DEFAULT_CURRENCY_PRIORITY,
+  ...LEGACY_30_CURRENCY_ORDER.filter((code) => !DEFAULT_CURRENCY_PRIORITY.includes(code as (typeof DEFAULT_CURRENCY_PRIORITY)[number])),
+];
 
 /**
  * 获取默认货币配置（用于新用户初始化/重置兜底）。
@@ -271,19 +280,30 @@ export function normalizePaymentMethods(items: ConfigItem[]): ConfigItem[] {
   return normalized;
 }
 
-/** 判断当前 currencies 是否为“旧版本默认列表”（用于升级到“全部默认启用 + 新置顶排序”）。 */
-function isLegacyDefaultCurrencies(items: ConfigItem[], options: readonly CurrencyOption[]): boolean {
-  if (items.length !== options.length) return false;
+function matchesCurrencySnapshot(
+  items: ConfigItem[],
+  values: readonly string[],
+  isEnabled: (value: string) => boolean,
+): boolean {
+  if (items.length !== values.length) return false;
 
-  for (let i = 0; i < options.length; i += 1) {
-    const option = options[i];
+  for (let i = 0; i < values.length; i += 1) {
+    const value = values[i];
     const item = items[i];
-    if (!option || !item) return false;
-    if (item.value !== option.value) return false;
-    if (item.enabled !== LEGACY_DEFAULT_ENABLED_CURRENCIES.has(option.value)) return false;
+    if (!value || !item) return false;
+    if (item.value !== value) return false;
+    if ((item.enabled !== false) !== isEnabled(value)) return false;
   }
 
   return true;
+}
+
+/** 判断当前 currencies 是否为旧版本默认列表（用于升级到 146 币种默认范围）。 */
+function isLegacyDefaultCurrencies(items: ConfigItem[], options: readonly CurrencyOption[]): boolean {
+  return matchesCurrencySnapshot(items, getDefaultCurrencies(options).map((item) => item.value), () => true)
+    || matchesCurrencySnapshot(items, LEGACY_30_CURRENCY_PRIORITY_ORDER, () => true)
+    || matchesCurrencySnapshot(items, LEGACY_30_CURRENCY_ORDER, (value) => LEGACY_DEFAULT_ENABLED_CURRENCIES.has(value))
+    || matchesCurrencySnapshot(items, LEGACY_30_CURRENCY_PRIORITY_ORDER, (value) => LEGACY_DEFAULT_ENABLED_CURRENCIES.has(value));
 }
 
 /**

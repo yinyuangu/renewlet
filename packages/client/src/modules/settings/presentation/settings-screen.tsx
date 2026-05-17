@@ -347,6 +347,9 @@ export function SettingsScreen() {
                 onUpdate={handleUpdateCurrencies}
                 icon={<Coins className="h-4 w-4" />}
                 toggleMode={true}
+                searchable={true}
+                searchPlaceholder={t("settings.currencySearch")}
+                searchEmptyMessage={t("settings.currencyEmpty")}
               />
             </div>
           </section>

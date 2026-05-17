@@ -127,7 +127,7 @@ func staticWithSecurityHeaders(staticFS fs.FS) func(*core.RequestEvent) error {
 			"style-src 'self' 'unsafe-inline'",
 			"font-src 'self' data:",
 			"img-src 'self' data: blob: https:",
-			"connect-src 'self' https://api.frankfurter.dev https://www.floatrates.com https://testingcf.jsdelivr.net https://www.google.com https://icons.duckduckgo.com",
+			"connect-src 'self' https://cdn.jsdelivr.net https://latest.currency-api.pages.dev https://www.floatrates.com https://testingcf.jsdelivr.net https://www.google.com https://icons.duckduckgo.com",
 			"object-src 'none'",
 			"base-uri 'self'",
 			"frame-ancestors 'none'",

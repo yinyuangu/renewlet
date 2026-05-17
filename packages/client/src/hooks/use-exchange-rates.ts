@@ -1,5 +1,5 @@
 /**
- * 汇率 Hook（Frankfurter / FloatRates）。
+ * 汇率 Hook（exchange-api / FloatRates）。
  *
  * 作用：
  * - 为统计/仪表盘提供实时汇率换算（统一到默认币种）
@@ -26,38 +26,55 @@ import { getApiLocale } from '@/i18n/api-locale';
 import { translate } from '@/i18n/messages';
 import {
   cachedExchangeRateDataSchema,
+  exchangeApiUsdResponseSchema,
   floatRatesResponseSchema,
-  frankfurterV2RatesResponseSchema,
   type CachedExchangeRateData,
   type ExchangeRateData,
   type ExchangeRateProvider,
   type ExchangeRates,
 } from '@/lib/api/schemas/exchange-rates';
+import {
+  SUPPORTED_EXCHANGE_RATE_CURRENCIES,
+  getIntlCurrencySymbol,
+  isSupportedExchangeRateCurrency,
+} from '@/lib/currency-data';
 
-const CACHE_KEY = 'exchange_rates_cache_v2';
+const CACHE_KEY = 'exchange_rates_cache_v3';
 /** 缓存有效期：24 小时（毫秒）。 */
 const CACHE_DURATION = 24 * 60 * 60 * 1000;
 const FETCH_TIMEOUT_MS = 10_000;
 
-/** 远端汇率来源共同支持的货币列表（本项目以 USD 作为基准）。 */
-const SUPPORTED_CURRENCIES = [
-  'AUD', 'BRL', 'CAD', 'CHF', 'CNY', 'CZK', 'DKK', 'EUR', 'GBP', 'HKD',
-  'HUF', 'IDR', 'ILS', 'INR', 'ISK', 'JPY', 'KRW', 'MXN', 'MYR', 'NOK',
-  'NZD', 'PHP', 'PLN', 'RON', 'SEK', 'SGD', 'THB', 'TRY', 'ZAR'
-];
-
-/** 回退汇率：当 API 失败时使用（以 USD 为 base）。 */
+/** 回退汇率：当 API 失败时使用（以 USD 为 base，快照来自 exchange-api，2026-05-17）。 */
 const FALLBACK_RATES: ExchangeRates = {
-  USD: 1,
-  AUD: 1.50, BRL: 5.39, CAD: 1.39, CHF: 0.80, CNY: 6.98,
-  CZK: 20.90, DKK: 6.42, EUR: 0.86, GBP: 0.75, HKD: 7.80,
-  HUF: 331.58, IDR: 16860, ILS: 3.16, INR: 90.22, ISK: 126.61,
-  JPY: 157.64, KRW: 1459.84, MXN: 18.03, MYR: 4.07, NOK: 10.12,
-  NZD: 1.75, PHP: 59.21, PLN: 3.62, RON: 4.37, SEK: 9.23,
-  SGD: 1.29, THB: 31.47, TRY: 43.11, ZAR: 16.58
+  AED: 3.6725000, AFN: 63.658356, ALL: 82.049317, AMD: 368.26261, AOA: 927.89052, ARS: 1394.9049,
+  AUD: 1.3990788, AWG: 1.7900000, AZN: 1.7018910, BAM: 1.6824426, BBD: 2, BDT: 122.76805,
+  BHD: 0.37600000, BIF: 2977.6097, BND: 1.2804094, BOB: 6.9277967, BRL: 5.0541011, BSD: 1,
+  BWP: 14.150296, BYN: 2.7815765, BZD: 2.0124111, CAD: 1.3750033, CDF: 2240.4135, CHF: 0.78756477,
+  CLP: 909.78596, CNY: 6.8102395, COP: 3793.3717, CRC: 452.90696, CUP: 23.942409, CVE: 94.856376,
+  CZK: 20.918924, DJF: 178.53764, DKK: 6.4287998, DOP: 59.294146, DZD: 132.63320, EGP: 52.896417,
+  ERN: 15, ETB: 157.67443, EUR: 0.86021924, FJD: 2.2038675, GBP: 0.75036482, GEL: 2.6727088,
+  GHS: 11.420097, GIP: 0.75036482, GMD: 74.387435, GNF: 8775.3083, GTQ: 7.6239521, GYD: 209.17509,
+  HKD: 7.8322861, HNL: 26.655286, HTG: 131.85968, HUF: 311.42641, IDR: 17520.102, ILS: 2.9195183,
+  INR: 96.092713, IQD: 1310.2693, IRR: 1318130.4, ISK: 123.53707, JMD: 157.78473, JOD: 0.70900000,
+  JPY: 158.76500, KES: 129.33193, KGS: 87.476084, KHR: 4004.7397, KMF: 423.20012, KRW: 1497.9907,
+  KWD: 0.30745534, KZT: 469.57870, LAK: 21845.013, LBP: 89850.857, LKR: 326.70390, LRD: 183.23841,
+  LSL: 16.685385, LYD: 6.3389662, MAD: 9.2476793, MDL: 17.213349, MGA: 4195.4209, MKD: 52.843551,
+  MMK: 2099.5143, MNT: 3577.8783, MOP: 8.0672547, MRU: 40.060138, MUR: 47.168339, MVR: 15.443861,
+  MWK: 1734.4546, MXN: 17.338153, MYR: 3.9555973, MZN: 63.811576, NAD: 16.685385, NGN: 1371.4380,
+  NIO: 36.669477, NOK: 9.3090038, NPR: 153.82041, NZD: 1.7117580, OMR: 0.38504301, PAB: 1,
+  PEN: 3.4340260, PGK: 4.3657103, PHP: 61.642886, PKR: 278.48796, PLN: 3.6524299, PYG: 6093.4983,
+  QAR: 3.6400000, RON: 4.4360943, RSD: 100.97878, RUB: 72.871048, RWF: 1463.2286, SAR: 3.7500000,
+  SBD: 8.0160156, SCR: 14.816184, SDG: 600.22335, SEK: 9.4480011, SGD: 1.2804094, SOS: 571.46575,
+  SRD: 37.164242, SSP: 4708.0623, STN: 21.177571, SVC: 8.7500000, SYP: 110.52498, SZL: 16.685385,
+  THB: 32.589042, TJS: 9.3438338, TMT: 3.5035881, TND: 2.9092984, TOP: 2.3635045, TRY: 45.490536,
+  TTD: 6.7639706, TWD: 31.587183, TZS: 2599.9078, UAH: 44.030585, UGX: 3754.7311, USD: 1,
+  UYU: 40.220808, UZS: 11985.338, VES: 514.46503, VND: 26355.251, VUV: 118.20420, WST: 2.7063800,
+  XAF: 564.26683, XCD: 2.6999999, XCG: 1.7948790, XOF: 564.26683, XPF: 102.65146, YER: 238.59917,
+  ZAR: 16.685385, ZMW: 18.909888,
 };
 
-const FRANKFURTER_API = 'https://api.frankfurter.dev';
+const EXCHANGE_API_PRIMARY_USD_FEED = 'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.min.json';
+const EXCHANGE_API_FALLBACK_USD_FEED = 'https://latest.currency-api.pages.dev/v1/currencies/usd.min.json';
 const FLOATRATES_USD_FEED = 'https://www.floatrates.com/daily/usd.json';
 const DEFAULT_EXCHANGE_RATE_PROVIDER: ExchangeRateProvider = "floatrates";
 
@@ -94,29 +111,27 @@ class ExchangeRateProviderError extends Error {
   }
 }
 
-const SUPPORTED_CURRENCY_SET = new Set(SUPPORTED_CURRENCIES);
+function hasAllSupportedRates(rates: ExchangeRates): boolean {
+  return SUPPORTED_EXCHANGE_RATE_CURRENCIES.every((currency) => rates[currency] !== undefined);
+}
 
-function normalizeFrankfurterV2Response(value: unknown): ExchangeRateData | null {
-  // 外部 API 不受本仓库类型约束，必须在 hook 边界 parse 后再进入统计计算。
-  const parsed = frankfurterV2RatesResponseSchema.safeParse(value);
+function normalizeExchangeApiUsdResponse(value: unknown): ExchangeRateData | null {
+  const parsed = exchangeApiUsdResponseSchema.safeParse(value);
   if (!parsed.success) return null;
 
-  const rates: ExchangeRates = {};
-  let date: string | null = null;
-
-  for (const row of parsed.data) {
-    if (!SUPPORTED_CURRENCY_SET.has(row.quote)) continue;
-    if (rates[row.quote] !== undefined) return null;
-    rates[row.quote] = row.rate;
-    date ??= row.date;
+  const rates: ExchangeRates = { USD: 1 };
+  for (const [key, rate] of Object.entries(parsed.data.usd)) {
+    const code = key.toUpperCase();
+    if (!isSupportedExchangeRateCurrency(code)) continue;
+    if (rates[code] !== undefined && code !== "USD") return null;
+    rates[code] = rate;
   }
 
-  const hasAllSupportedCurrencies = SUPPORTED_CURRENCIES.every((currency) => rates[currency] !== undefined);
-  if (!date || !hasAllSupportedCurrencies) return null;
+  if (!hasAllSupportedRates(rates)) return null;
 
   return {
     base: "USD",
-    date,
+    date: parsed.data.date,
     rates,
   };
 }
@@ -125,12 +140,12 @@ function normalizeFloatRatesResponse(value: unknown): ExchangeRateData | null {
   const parsed = floatRatesResponseSchema.safeParse(value);
   if (!parsed.success) return null;
 
-  const rates: ExchangeRates = {};
+  const rates: ExchangeRates = { USD: 1 };
   let date: string | null = null;
 
   for (const [key, row] of Object.entries(parsed.data)) {
     const keyCode = key.toUpperCase();
-    if (!SUPPORTED_CURRENCY_SET.has(keyCode) && !SUPPORTED_CURRENCY_SET.has(row.alphaCode)) continue;
+    if (!isSupportedExchangeRateCurrency(keyCode) && !isSupportedExchangeRateCurrency(row.alphaCode)) continue;
     if (keyCode !== row.alphaCode) return null;
     if (rates[row.alphaCode] !== undefined) return null;
 
@@ -138,8 +153,7 @@ function normalizeFloatRatesResponse(value: unknown): ExchangeRateData | null {
     date ??= row.date;
   }
 
-  const hasAllSupportedCurrencies = SUPPORTED_CURRENCIES.every((currency) => rates[currency] !== undefined);
-  if (!date || !hasAllSupportedCurrencies) return null;
+  if (!date || !hasAllSupportedRates(rates)) return null;
 
   return {
     base: "USD",
@@ -156,8 +170,8 @@ function normalizeCachedExchangeRateData(value: unknown): CachedExchangeRateData
 
 function getProviderOrder(preferredProvider: ExchangeRateProvider): ExchangeRateProvider[] {
   return preferredProvider === "floatrates"
-    ? ["floatrates", "frankfurter"]
-    : ["frankfurter", "floatrates"];
+    ? ["floatrates", "exchange-api"]
+    : ["exchange-api", "floatrates"];
 }
 
 function errorKindFromProviderError(error: unknown): ExchangeRateErrorKind {
@@ -208,20 +222,31 @@ async function fetchJsonWithTimeout(url: string, parentSignal: AbortSignal): Pro
   }
 }
 
+async function fetchExchangeApiRates(signal: AbortSignal): Promise<ExchangeRateData> {
+  const failures: unknown[] = [];
+  for (const url of [EXCHANGE_API_PRIMARY_USD_FEED, EXCHANGE_API_FALLBACK_USD_FEED]) {
+    try {
+      const payload = await fetchJsonWithTimeout(url, signal);
+      const data = normalizeExchangeApiUsdResponse(payload);
+      if (!data) throw new ExchangeRateContractError();
+      return data;
+    } catch (e) {
+      if (signal.aborted && !(e instanceof ExchangeRateTimeoutError)) throw e;
+      failures.push(e);
+      console.warn(`Failed to fetch exchange rates from exchange-api endpoint ${url}:`, e);
+    }
+  }
+
+  throw failures[0] ?? new Error("No exchange-api endpoint returned data");
+}
+
 async function fetchProviderRates(
   provider: ExchangeRateProvider,
   signal: AbortSignal,
 ): Promise<ExchangeRateData> {
   try {
-    if (provider === "frankfurter") {
-      const params = new URLSearchParams({
-        base: "USD",
-        quotes: SUPPORTED_CURRENCIES.join(","),
-      });
-      const payload = await fetchJsonWithTimeout(`${FRANKFURTER_API}/v2/rates?${params.toString()}`, signal);
-      const data = normalizeFrankfurterV2Response(payload);
-      if (!data) throw new ExchangeRateContractError();
-      return data;
+    if (provider === "exchange-api") {
+      return await fetchExchangeApiRates(signal);
     }
 
     const payload = await fetchJsonWithTimeout(FLOATRATES_USD_FEED, signal);
@@ -287,7 +312,7 @@ export const useExchangeRates = (preferredProvider: ExchangeRateProvider = DEFAU
   /**
    * 拉取汇率（可选强制刷新）。
    *
-   * - 默认优先使用缓存
+   * - 默认优先读缓存
    * - forceRefresh=true 时跳过缓存直接请求
    */
   const fetchRates = useCallback((
@@ -398,10 +423,10 @@ export const useExchangeRates = (preferredProvider: ExchangeRateProvider = DEFAU
     };
   }, [fetchRates]);
 
-  /** 金额换算：fromCurrency → toCurrency（先转 USD，再转目标币种）。 */
+  /** 金额换算：fromCurrency -> toCurrency（先转 USD，再转目标币种）。 */
   const convert = useCallback((
-    amount: number, 
-    fromCurrency: string, 
+    amount: number,
+    fromCurrency: string,
     toCurrency: string
   ): number => {
     if (fromCurrency === toCurrency) return amount;
@@ -416,21 +441,13 @@ export const useExchangeRates = (preferredProvider: ExchangeRateProvider = DEFAU
 
   /** 获取货币符号（用于 UI 展示）。 */
   const getCurrencySymbol = useCallback((currency: string): string => {
-    const symbols: Record<string, string> = {
-      USD: '$', EUR: '€', GBP: '£', JPY: '¥', CNY: '¥',
-      AUD: 'A$', CAD: 'C$', CHF: 'CHF', HKD: 'HK$', NZD: 'NZ$',
-      SGD: 'S$', KRW: '₩', INR: '₹', MXN: 'MX$', BRL: 'R$',
-      ZAR: 'R', SEK: 'kr', NOK: 'kr', DKK: 'kr', PLN: 'zł',
-      CZK: 'Kč', HUF: 'Ft', TRY: '₺', ILS: '₪', THB: '฿',
-      PHP: '₱', MYR: 'RM', IDR: 'Rp', RON: 'lei', ISK: 'kr'
-    };
-    return symbols[currency] || currency;
+    return getIntlCurrencySymbol(currency);
   }, []);
 
   /** 格式化金额：加货币符号 + “最多 N 位小数”（展示层使用，避免强制补 0）。 */
   const formatAmount = useCallback((
-    amount: number, 
-    currency: string, 
+    amount: number,
+    currency: string,
     maxFractionDigits = 3
   ): string => {
     const symbol = getCurrencySymbol(currency);

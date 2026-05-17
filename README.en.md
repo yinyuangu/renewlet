@@ -62,7 +62,7 @@ Current architecture:
 - Get renewal reminders: generate notifications from each user's time zone and reminder window, keep delivery history, and retry failed sends.
 - Send notifications: use Telegram, Notifyx, Webhook, WeCom Bot, SMTP email, or Bark.
 - Review spending: normalize costs by month and show budget usage, category breakdowns, payment-method breakdowns, and inactive-subscription savings.
-- Handle currencies: choose Frankfurter or FloatRates for exchange rates; if remote sources fail, Renewlet uses fallback rates.
+- Handle currencies: choose Exchange API or FloatRates JSON Feeds for exchange rates; if remote sources fail, Renewlet uses fallback rates.
 - Self-host it: run one container and persist SQLite data through a local directory or Docker volume.
 - Switch languages: Simplified Chinese and English are supported in the app.
 

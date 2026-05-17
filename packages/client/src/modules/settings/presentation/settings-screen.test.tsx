@@ -195,7 +195,7 @@ describe("SettingsScreen SMTP email settings", () => {
     const user = userEvent.setup();
     const controller = createControllerState({
       settings: {
-        exchangeRateProvider: "frankfurter",
+        exchangeRateProvider: "exchange-api",
       },
     });
     mocks.useSettingsFormController.mockReturnValue(controller);
@@ -203,7 +203,7 @@ describe("SettingsScreen SMTP email settings", () => {
     renderSettingsScreen();
 
     await user.click(screen.getByRole("combobox", { name: "汇率来源" }));
-    await user.click(screen.getByRole("option", { name: "FloatRates" }));
+    await user.click(screen.getByRole("option", { name: "FloatRates JSON Feeds" }));
 
     expect(controller.handleExchangeRateProviderChange).toHaveBeenCalledWith("floatrates");
   });
@@ -218,7 +218,7 @@ describe("SettingsScreen SMTP email settings", () => {
     renderSettingsScreen();
 
     const select = screen.getByRole("combobox", { name: "汇率来源" });
-    expect(select).toHaveTextContent("FloatRates");
+    expect(select).toHaveTextContent("FloatRates JSON Feeds");
     expect(select).toBeEnabled();
   });
 

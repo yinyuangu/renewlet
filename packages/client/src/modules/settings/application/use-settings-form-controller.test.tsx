@@ -164,10 +164,10 @@ describe("useSettingsFormController", () => {
     expect(result.current.hasUnsavedChanges).toBe(false);
 
     act(() => {
-      result.current.handleExchangeRateProviderChange("frankfurter");
+      result.current.handleExchangeRateProviderChange("exchange-api");
     });
 
-    expect(result.current.settings.exchangeRateProvider).toBe("frankfurter");
+    expect(result.current.settings.exchangeRateProvider).toBe("exchange-api");
     expect(result.current.hasUnsavedChanges).toBe(true);
     expect(mocks.updateSettingsMutateAsync).not.toHaveBeenCalled();
     expect(mocks.refreshRates).not.toHaveBeenCalled();
@@ -177,7 +177,7 @@ describe("useSettingsFormController", () => {
     const { result } = renderHook(() => useSettingsFormController());
 
     act(() => {
-      result.current.handleExchangeRateProviderChange("frankfurter");
+      result.current.handleExchangeRateProviderChange("exchange-api");
     });
 
     await act(async () => {
@@ -185,10 +185,10 @@ describe("useSettingsFormController", () => {
     });
 
     expect(mocks.updateSettingsMutateAsync).toHaveBeenCalledWith(expect.objectContaining({
-      exchangeRateProvider: "frankfurter",
+      exchangeRateProvider: "exchange-api",
     }));
-    expect(mocks.refreshRates).toHaveBeenCalledWith("frankfurter");
-    expect(result.current.settings.exchangeRateProvider).toBe("frankfurter");
+    expect(mocks.refreshRates).toHaveBeenCalledWith("exchange-api");
+    expect(result.current.settings.exchangeRateProvider).toBe("exchange-api");
     expect(result.current.hasUnsavedChanges).toBe(false);
     expect(mocks.toast).toHaveBeenCalledWith({
       title: "设置已保存",
@@ -209,7 +209,7 @@ describe("useSettingsFormController", () => {
     const { result } = renderHook(() => useSettingsFormController());
 
     act(() => {
-      result.current.handleExchangeRateProviderChange("frankfurter");
+      result.current.handleExchangeRateProviderChange("exchange-api");
     });
 
     await act(async () => {
@@ -217,7 +217,7 @@ describe("useSettingsFormController", () => {
     });
 
     expect(mocks.refreshRates).not.toHaveBeenCalled();
-    expect(result.current.settings.exchangeRateProvider).toBe("frankfurter");
+    expect(result.current.settings.exchangeRateProvider).toBe("exchange-api");
     expect(result.current.hasUnsavedChanges).toBe(true);
     expect(mocks.toast).toHaveBeenCalledWith({
       title: "保存失败",

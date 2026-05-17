@@ -9,7 +9,7 @@
  */
 import { z } from "zod";
 import { NOTIFICATION_CHANNELS, type AppSettings } from "@/types/subscription";
-import { exchangeRateProviderSchema } from "@/lib/api/schemas/exchange-rates";
+import { exchangeRateProviderSchema, normalizeExchangeRateProvider } from "@/lib/api/schemas/exchange-rates";
 import { THEME_MODES, THEME_VARIANTS } from "@/types/theme";
 import { SUPPORTED_LOCALES } from "@/i18n/locales";
 import { isValidLocalTime, type LocalTime } from "@/lib/time/local-time";
@@ -75,7 +75,10 @@ export const appSettingsSchema = z
 
     showExpired: z.boolean().describe("通知中是否包含已过期订阅。"),
     defaultCurrency: z.string().trim().regex(/^[A-Z]{3}$/).describe("默认货币代码（用于统计/展示换算）。"),
-    exchangeRateProvider: exchangeRateProviderSchema.describe("首选汇率来源。"),
+    exchangeRateProvider: z.preprocess(
+      normalizeExchangeRateProvider,
+      exchangeRateProviderSchema,
+    ).describe("首选汇率来源。"),
 
     monthlyBudget: z.number().finite().nonnegative().max(1_000_000_000).describe("月度预算（用于统计页预算占比）。"),
 

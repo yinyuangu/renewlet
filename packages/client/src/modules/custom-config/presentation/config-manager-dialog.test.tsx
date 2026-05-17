@@ -100,4 +100,47 @@ describe("ConfigManagerDialog", () => {
     expect(dialog).toHaveAccessibleDescription("自定义订阅分类的名称、颜色和排序。");
     expect(within(dialog).getByText("自定义订阅分类的名称、颜色和排序。")).toBeInTheDocument();
   });
+
+  it("filters currency options by code, localized label, and symbol", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <TooltipProvider delayDuration={0}>
+        <ConfigManagerDialog
+          title="货币管理"
+          items={[
+            { id: "CNY", value: "CNY", labels: { "zh-CN": "人民币 (¥)", "en-US": "Chinese Yuan (¥)" }, enabled: true },
+            { id: "USD", value: "USD", labels: { "zh-CN": "美元 ($)", "en-US": "US Dollar ($)" }, enabled: true },
+            { id: "EUR", value: "EUR", labels: { "zh-CN": "欧元 (€)", "en-US": "Euro (€)" }, enabled: true },
+          ]}
+          onUpdate={vi.fn()}
+          toggleMode
+          searchable
+          searchPlaceholder="搜索货币、代码或符号..."
+          searchEmptyMessage="未找到货币"
+        />
+      </TooltipProvider>,
+    );
+
+    await user.click(screen.getByRole("button", { name: /货币管理/ }));
+    const dialog = screen.getByRole("dialog", { name: "货币管理" });
+    const search = within(dialog).getByPlaceholderText("搜索货币、代码或符号...");
+
+    await user.type(search, "eur");
+    expect(within(dialog).getByText("EUR")).toBeInTheDocument();
+    expect(within(dialog).queryByText("CNY")).not.toBeInTheDocument();
+
+    await user.clear(search);
+    await user.type(search, "人民币");
+    expect(within(dialog).getByText("CNY")).toBeInTheDocument();
+    expect(within(dialog).queryByText("EUR")).not.toBeInTheDocument();
+
+    await user.clear(search);
+    await user.type(search, "$");
+    expect(within(dialog).getByText("USD")).toBeInTheDocument();
+
+    await user.clear(search);
+    await user.type(search, "zzzz");
+    expect(within(dialog).getByText("未找到货币")).toBeInTheDocument();
+  });
 });

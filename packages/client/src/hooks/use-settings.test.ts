@@ -32,4 +32,12 @@ describe("normalizeSettings", () => {
 
     expect(settings.exchangeRateProvider).toBe("floatrates");
   });
+
+  it("maps the legacy Frankfurter provider to Exchange API", () => {
+    const settings = normalizeSettings({
+      exchangeRateProvider: "frankfurter",
+    });
+
+    expect(settings.exchangeRateProvider).toBe("exchange-api");
+  });
 });

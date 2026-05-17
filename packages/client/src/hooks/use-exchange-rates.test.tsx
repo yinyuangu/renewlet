@@ -2,63 +2,44 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { StrictMode, type ReactNode } from "react";
 import { useExchangeRates } from "./use-exchange-rates";
+import { SUPPORTED_EXCHANGE_RATE_CURRENCIES } from "@/lib/currency-data";
 
-const supportedRates = {
-  AUD: 1.39,
-  BRL: 5.01,
-  CAD: 1.37,
-  CHF: 0.78,
-  CNY: 6.8,
-  CZK: 20.87,
-  DKK: 6.4,
-  EUR: 0.86,
-  GBP: 0.75,
-  HKD: 7.84,
-  HUF: 308.22,
-  IDR: 17513,
-  ILS: 2.91,
-  INR: 95.85,
-  ISK: 123.24,
-  JPY: 158.48,
-  KRW: 1496.42,
-  MXN: 17.33,
-  MYR: 3.94,
-  NOK: 9.27,
-  NZD: 1.7,
-  PHP: 61.67,
-  PLN: 3.64,
-  RON: 4.46,
-  SEK: 9.39,
-  SGD: 1.27,
-  THB: 32.54,
-  TRY: 45.5,
-  ZAR: 16.58,
-};
+const supportedRates = Object.fromEntries(
+  SUPPORTED_EXCHANGE_RATE_CURRENCIES.map((code, index) => [
+    code,
+    code === "USD" ? 1 : Number((index + 1.25).toFixed(4)),
+  ]),
+) as Record<string, number>;
 
-function makeFrankfurterV2Rows() {
-  return Object.entries(supportedRates).map(([quote, rate]) => ({
-    date: "2026-05-16",
-    base: "USD",
-    quote,
-    rate,
-  }));
+function makeExchangeApiUsdResponse(overrides: Record<string, unknown> = {}) {
+  return {
+    date: "2026-05-17",
+    usd: {
+      ...Object.fromEntries(
+        Object.entries(supportedRates).map(([code, rate]) => [code.toLowerCase(), rate]),
+      ),
+      ...overrides,
+    },
+  };
 }
 
 function makeFloatRatesResponse(overrides: Record<string, unknown> = {}) {
   return {
     ...Object.fromEntries(
-      Object.entries(supportedRates).map(([alphaCode, rate]) => [
-        alphaCode.toLowerCase(),
-        {
-          code: `USD/${alphaCode}`,
-          alphaCode,
-          numericCode: "000",
-          name: alphaCode,
-          rate,
-          date: "Fri, 15 May 2026 23:55:05 GMT",
-          inverseRate: 1 / rate,
-        },
-      ]),
+      Object.entries(supportedRates)
+        .filter(([alphaCode]) => alphaCode !== "USD")
+        .map(([alphaCode, rate]) => [
+          alphaCode.toLowerCase(),
+          {
+            code: alphaCode,
+            alphaCode,
+            numericCode: "000",
+            name: alphaCode,
+            rate,
+            date: "Fri, 15 May 2026 23:55:05 GMT",
+            inverseRate: 1 / rate,
+          },
+        ]),
     ),
     ...overrides,
   };
@@ -80,57 +61,43 @@ function requestPath(callIndex: number) {
 
 describe("useExchangeRates", () => {
   beforeEach(() => {
+    localStorage.clear();
     vi.stubGlobal("fetch", vi.fn());
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllGlobals();
+    localStorage.clear();
   });
 
   it("uses a valid localStorage cache for the requested provider without calling the network", async () => {
-    localStorage.setItem("exchange_rates_cache_v2", JSON.stringify({
+    localStorage.setItem("exchange_rates_cache_v3", JSON.stringify({
       base: "USD",
       date: "2026-01-01",
-      rates: { EUR: 0.9, CNY: 7, USD: 1 },
+      rates: { ...supportedRates, CNY: 7, USD: 1 },
       cachedAt: Date.now(),
-      requestedProvider: "frankfurter",
+      requestedProvider: "exchange-api",
       provider: "floatrates",
     }));
 
-    const { result } = renderHook(() => useExchangeRates("frankfurter"));
+    const { result } = renderHook(() => useExchangeRates("exchange-api"));
 
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(result.current.rates["EUR"]).toBe(0.9);
+    expect(result.current.rates["CNY"]).toBe(7);
     expect(result.current.rates["USD"]).toBe(1);
     expect(result.current.activeProvider).toBe("floatrates");
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it("ignores cache written for another requested provider", async () => {
+  it("ignores the old v2 cache key and fetches current default rates", async () => {
     localStorage.setItem("exchange_rates_cache_v2", JSON.stringify({
       base: "USD",
       date: "2026-01-01",
       rates: { EUR: 0.9, CNY: 7, USD: 1 },
       cachedAt: Date.now(),
-      requestedProvider: "frankfurter",
-      provider: "frankfurter",
-    }));
-    vi.mocked(fetch).mockResolvedValue(jsonResponse(makeFloatRatesResponse()));
-
-    const { result } = renderHook(() => useExchangeRates("floatrates"));
-
-    await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(fetch).toHaveBeenCalledTimes(1);
-    expect(requestPath(0)).toBe("https://www.floatrates.com/daily/usd.json");
-    expect(result.current.activeProvider).toBe("floatrates");
-  });
-
-  it("ignores the old v1 cache key and fetches current default rates", async () => {
-    localStorage.setItem("exchange_rates_cache", JSON.stringify({
-      base: "USD",
-      date: "2026-01-01",
-      rates: { EUR: 0.9, CNY: 7 },
-      cachedAt: Date.now(),
+      requestedProvider: "floatrates",
+      provider: "floatrates",
     }));
     vi.mocked(fetch).mockResolvedValue(jsonResponse(makeFloatRatesResponse()));
 
@@ -139,10 +106,10 @@ describe("useExchangeRates", () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(requestPath(0)).toBe("https://www.floatrates.com/daily/usd.json");
-    expect(result.current.rates["CNY"]).toBe(6.8);
+    expect(result.current.rates["CNY"]).toBe(supportedRates["CNY"]);
   });
 
-  it("fetches FloatRates by default and does not call Frankfurter when it succeeds", async () => {
+  it("fetches FloatRates by default and does not call exchange-api when it succeeds", async () => {
     vi.mocked(fetch).mockResolvedValue(jsonResponse(makeFloatRatesResponse()));
 
     const { result } = renderHook(() => useExchangeRates());
@@ -150,12 +117,12 @@ describe("useExchangeRates", () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.error).toBeNull();
     expect(result.current.activeProvider).toBe("floatrates");
-    expect(result.current.rates["CNY"]).toBe(6.8);
+    expect(result.current.rates["CNY"]).toBe(supportedRates["CNY"]);
     expect(result.current.rates["USD"]).toBe(1);
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(requestPath(0)).toBe("https://www.floatrates.com/daily/usd.json");
 
-    const cached = JSON.parse(localStorage.getItem("exchange_rates_cache_v2") ?? "{}") as {
+    const cached = JSON.parse(localStorage.getItem("exchange_rates_cache_v3") ?? "{}") as {
       base?: string;
       provider?: string;
       requestedProvider?: string;
@@ -164,115 +131,74 @@ describe("useExchangeRates", () => {
     expect(cached["base"]).toBe("USD");
     expect(cached["provider"]).toBe("floatrates");
     expect(cached["requestedProvider"]).toBe("floatrates");
-    expect(cached["rates"]?.["CNY"]).toBe(6.8);
+    expect(cached["rates"]?.["CNY"]).toBe(supportedRates["CNY"]);
     expect(cached["rates"]?.["USD"]).toBe(1);
   });
 
-  it("uses Frankfurter first when selected", async () => {
-    vi.mocked(fetch).mockResolvedValue(jsonResponse(makeFrankfurterV2Rows()));
+  it("uses exchange-api first when selected", async () => {
+    vi.mocked(fetch).mockResolvedValue(jsonResponse(makeExchangeApiUsdResponse()));
 
-    const { result } = renderHook(() => useExchangeRates("frankfurter"));
+    const { result } = renderHook(() => useExchangeRates("exchange-api"));
 
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.error).toBeNull();
-    expect(result.current.activeProvider).toBe("frankfurter");
-    expect(result.current.rates["CNY"]).toBe(6.8);
+    expect(result.current.activeProvider).toBe("exchange-api");
+    expect(result.current.rates["CNY"]).toBe(supportedRates["CNY"]);
     expect(fetch).toHaveBeenCalledTimes(1);
-
-    const [requestUrl] = vi.mocked(fetch).mock.calls[0] ?? [];
-    const url = new URL(String(requestUrl));
-    expect(`${url.origin}${url.pathname}`).toBe("https://api.frankfurter.dev/v2/rates");
-    expect(url.searchParams.get("base")).toBe("USD");
-    expect(url.searchParams.get("quotes")?.split(",")).toContain("CNY");
-    expect(url.searchParams.has("symbols")).toBe(false);
+    expect(requestPath(0)).toBe("https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.min.json");
   });
 
-  it("falls back to FloatRates when Frankfurter fails", async () => {
+  it("uses the exchange-api Cloudflare fallback when jsDelivr fails", async () => {
     vi.mocked(fetch)
-      .mockRejectedValueOnce(new Error("network down"))
+      .mockRejectedValueOnce(new Error("jsdelivr down"))
+      .mockResolvedValueOnce(jsonResponse(makeExchangeApiUsdResponse()));
+
+    const { result } = renderHook(() => useExchangeRates("exchange-api"));
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.error).toBeNull();
+    expect(result.current.activeProvider).toBe("exchange-api");
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(requestPath(0)).toBe("https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.min.json");
+    expect(requestPath(1)).toBe("https://latest.currency-api.pages.dev/v1/currencies/usd.min.json");
+  });
+
+  it("falls back to FloatRates when exchange-api fails", async () => {
+    vi.mocked(fetch)
+      .mockRejectedValueOnce(new Error("jsdelivr down"))
+      .mockResolvedValueOnce(jsonResponse({ error: "unavailable" }, { status: 503 }))
       .mockResolvedValueOnce(jsonResponse(makeFloatRatesResponse()));
 
-    const { result } = renderHook(() => useExchangeRates("frankfurter"));
+    const { result } = renderHook(() => useExchangeRates("exchange-api"));
 
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.error).toBeNull();
     expect(result.current.activeProvider).toBe("floatrates");
-    expect(result.current.rates["CNY"]).toBe(6.8);
-    expect(fetch).toHaveBeenCalledTimes(2);
-    expect(requestPath(0)).toBe("https://api.frankfurter.dev/v2/rates");
-    expect(requestPath(1)).toBe("https://www.floatrates.com/daily/usd.json");
+    expect(result.current.rates["CNY"]).toBe(supportedRates["CNY"]);
+    expect(fetch).toHaveBeenCalledTimes(3);
+    expect(requestPath(2)).toBe("https://www.floatrates.com/daily/usd.json");
 
-    const cached = JSON.parse(localStorage.getItem("exchange_rates_cache_v2") ?? "{}") as {
+    const cached = JSON.parse(localStorage.getItem("exchange_rates_cache_v3") ?? "{}") as {
       provider?: string;
       requestedProvider?: string;
     };
     expect(cached["provider"]).toBe("floatrates");
-    expect(cached["requestedProvider"]).toBe("frankfurter");
+    expect(cached["requestedProvider"]).toBe("exchange-api");
   });
 
-  it("falls back to FloatRates when Frankfurter has a contract error", async () => {
-    const rows = makeFrankfurterV2Rows().filter((row) => row.quote !== "CNY");
-    vi.mocked(fetch)
-      .mockResolvedValueOnce(jsonResponse(rows))
-      .mockResolvedValueOnce(jsonResponse(makeFloatRatesResponse()));
-
-    const { result } = renderHook(() => useExchangeRates("frankfurter"));
-
-    await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(result.current.error).toBeNull();
-    expect(result.current.activeProvider).toBe("floatrates");
-    expect(result.current.rates["CNY"]).toBe(6.8);
-  });
-
-  it("falls back to Frankfurter when FloatRates fails", async () => {
+  it("falls back to exchange-api when FloatRates fails", async () => {
     vi.mocked(fetch)
       .mockResolvedValueOnce(jsonResponse(makeFloatRatesResponse({ cny: undefined })))
-      .mockResolvedValueOnce(jsonResponse(makeFrankfurterV2Rows()));
+      .mockResolvedValueOnce(jsonResponse(makeExchangeApiUsdResponse()));
 
     const { result } = renderHook(() => useExchangeRates("floatrates"));
 
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.error).toBeNull();
-    expect(result.current.activeProvider).toBe("frankfurter");
+    expect(result.current.activeProvider).toBe("exchange-api");
     expect(fetch).toHaveBeenCalledTimes(2);
     expect(requestPath(0)).toBe("https://www.floatrates.com/daily/usd.json");
-    expect(requestPath(1)).toBe("https://api.frankfurter.dev/v2/rates");
-  });
-
-  it("ignores unknown fields in Frankfurter v2 rows", async () => {
-    vi.mocked(fetch).mockResolvedValue(jsonResponse(
-      makeFrankfurterV2Rows().map((row) => ({
-        ...row,
-        amount: 1,
-        provider: "frankfurter",
-      })),
-    ));
-
-    const { result } = renderHook(() => useExchangeRates("frankfurter"));
-
-    await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(result.current.error).toBeNull();
-    expect(result.current.rates["CNY"]).toBe(6.8);
-  });
-
-  it("rejects dirty cache and falls back when both remote providers fail", async () => {
-    localStorage.setItem("exchange_rates_cache_v2", JSON.stringify({
-      base: "USD",
-      date: "2026-01-01",
-      rates: { EUR: "oops" },
-      cachedAt: Date.now(),
-      requestedProvider: "floatrates",
-      provider: "floatrates",
-    }));
-    vi.mocked(fetch).mockRejectedValue(new Error("network down"));
-
-    const { result } = renderHook(() => useExchangeRates());
-
-    await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(result.current.error).toBe("网络请求失败");
-    expect(result.current.activeProvider).toBe("builtin");
-    expect(result.current.rates["USD"]).toBe(1);
-    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(requestPath(1)).toBe("https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.min.json");
   });
 
   it.each([
@@ -282,11 +208,7 @@ describe("useExchangeRates", () => {
       return response;
     }],
     ["alphaCode/key mismatch", () => makeFloatRatesResponse({
-      cny: { alphaCode: "EUR", rate: 6.8, date: "Fri, 15 May 2026 23:55:05 GMT" },
-    })],
-    ["impossible key shape", () => makeFloatRatesResponse({
-      cny: undefined,
-      cny_extra: { alphaCode: "CNY", rate: 6.8, date: "Fri, 15 May 2026 23:55:05 GMT" },
+      cny: { alphaCode: "EUR", rate: supportedRates["CNY"], date: "Fri, 15 May 2026 23:55:05 GMT" },
     })],
     ["string rate", () => makeFloatRatesResponse({
       cny: { alphaCode: "CNY", rate: "oops", date: "Fri, 15 May 2026 23:55:05 GMT" },
@@ -294,10 +216,11 @@ describe("useExchangeRates", () => {
     ["non-positive rate", () => makeFloatRatesResponse({
       cny: { alphaCode: "CNY", rate: 0, date: "Fri, 15 May 2026 23:55:05 GMT" },
     })],
-  ])("reports contract errors when FloatRates has %s and Frankfurter also fails", async (_caseName, makePayload) => {
+  ])("reports contract errors when FloatRates has %s and exchange-api also fails", async (_caseName, makePayload) => {
     vi.mocked(fetch)
       .mockResolvedValueOnce(jsonResponse(makePayload()))
-      .mockRejectedValueOnce(new Error("frankfurter down"));
+      .mockRejectedValueOnce(new Error("exchange-api primary down"))
+      .mockRejectedValueOnce(new Error("exchange-api fallback down"));
 
     const { result } = renderHook(() => useExchangeRates("floatrates"));
 
@@ -308,16 +231,20 @@ describe("useExchangeRates", () => {
   });
 
   it.each([
-    ["duplicate quote", () => [...makeFrankfurterV2Rows(), makeFrankfurterV2Rows()[0]]],
-    ["non-USD base", () => makeFrankfurterV2Rows().map((row, index) => index === 0 ? { ...row, base: "EUR" } : row)],
-    ["string rate", () => makeFrankfurterV2Rows().map((row, index) => index === 0 ? { ...row, rate: "oops" } : row)],
-    ["non-positive rate", () => makeFrankfurterV2Rows().map((row, index) => index === 0 ? { ...row, rate: 0 } : row)],
-  ])("reports contract errors when Frankfurter has %s and FloatRates also fails", async (_caseName, makeRows) => {
+    ["missing currency", () => {
+      const response = makeExchangeApiUsdResponse();
+      delete response.usd["cny"];
+      return response;
+    }],
+    ["string rate", () => makeExchangeApiUsdResponse({ cny: "oops" })],
+    ["non-positive rate", () => makeExchangeApiUsdResponse({ cny: 0 })],
+  ])("reports contract errors when exchange-api has %s and FloatRates also fails", async (_caseName, makePayload) => {
     vi.mocked(fetch)
-      .mockResolvedValueOnce(jsonResponse(makeRows()))
+      .mockResolvedValueOnce(jsonResponse(makePayload()))
+      .mockRejectedValueOnce(new Error("exchange-api fallback down"))
       .mockRejectedValueOnce(new Error("floatrates down"));
 
-    const { result } = renderHook(() => useExchangeRates("frankfurter"));
+    const { result } = renderHook(() => useExchangeRates("exchange-api"));
 
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.error).toBe("汇率响应格式异常");
@@ -325,12 +252,13 @@ describe("useExchangeRates", () => {
     expect(result.current.rates["USD"]).toBe(1);
   });
 
-  it("falls back to FloatRates for Frankfurter HTTP failures", async () => {
+  it("falls back to FloatRates for exchange-api HTTP failures", async () => {
     vi.mocked(fetch)
+      .mockResolvedValueOnce(jsonResponse({ error: "unavailable" }, { status: 503 }))
       .mockResolvedValueOnce(jsonResponse({ error: "unavailable" }, { status: 503 }))
       .mockResolvedValueOnce(jsonResponse(makeFloatRatesResponse()));
 
-    const { result } = renderHook(() => useExchangeRates("frankfurter"));
+    const { result } = renderHook(() => useExchangeRates("exchange-api"));
 
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.error).toBeNull();
@@ -338,17 +266,24 @@ describe("useExchangeRates", () => {
     expect(result.current.rates["USD"]).toBe(1);
   });
 
-  it("falls back to FloatRates when Frankfurter times out", async () => {
+  it("falls back to FloatRates when both exchange-api endpoints time out", async () => {
     vi.useFakeTimers();
     vi.mocked(fetch)
       .mockImplementationOnce((_input, init) => new Promise((_resolve, reject) => {
         const signal = (init as RequestInit | undefined)?.signal;
         signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
       }))
+      .mockImplementationOnce((_input, init) => new Promise((_resolve, reject) => {
+        const signal = (init as RequestInit | undefined)?.signal;
+        signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
+      }))
       .mockResolvedValueOnce(jsonResponse(makeFloatRatesResponse()));
 
-    const { result } = renderHook(() => useExchangeRates("frankfurter"));
+    const { result } = renderHook(() => useExchangeRates("exchange-api"));
 
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
     await act(async () => {
       await vi.advanceTimersByTimeAsync(10_000);
     });
@@ -359,10 +294,10 @@ describe("useExchangeRates", () => {
     expect(result.current.loading).toBe(false);
     expect(result.current.error).toBeNull();
     expect(result.current.activeProvider).toBe("floatrates");
-    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(fetch).toHaveBeenCalledTimes(3);
   });
 
-  it("falls back with the timeout message when both providers time out", async () => {
+  it("falls back with the timeout message when all remote requests time out", async () => {
     vi.useFakeTimers();
     vi.mocked(fetch).mockImplementation((_input, init) => new Promise((_resolve, reject) => {
       const signal = (init as RequestInit | undefined)?.signal;
@@ -371,6 +306,9 @@ describe("useExchangeRates", () => {
 
     const { result } = renderHook(() => useExchangeRates());
 
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
     await act(async () => {
       await vi.advanceTimersByTimeAsync(10_000);
     });
@@ -388,17 +326,17 @@ describe("useExchangeRates", () => {
   });
 
   it("refresh skips cache and can use the new requested provider immediately", async () => {
-    localStorage.setItem("exchange_rates_cache_v2", JSON.stringify({
+    localStorage.setItem("exchange_rates_cache_v3", JSON.stringify({
       base: "USD",
       date: "2026-01-01",
-      rates: { EUR: 0.9, CNY: 7, USD: 1 },
+      rates: { ...supportedRates, EUR: 0.9, CNY: 7, USD: 1 },
       cachedAt: Date.now(),
-      requestedProvider: "frankfurter",
-      provider: "frankfurter",
+      requestedProvider: "exchange-api",
+      provider: "exchange-api",
     }));
     vi.mocked(fetch).mockResolvedValue(jsonResponse(makeFloatRatesResponse()));
 
-    const { result } = renderHook(() => useExchangeRates("frankfurter"));
+    const { result } = renderHook(() => useExchangeRates("exchange-api"));
 
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(fetch).not.toHaveBeenCalled();
@@ -411,7 +349,7 @@ describe("useExchangeRates", () => {
     expect(requestPath(0)).toBe("https://www.floatrates.com/daily/usd.json");
     expect(result.current.activeProvider).toBe("floatrates");
 
-    const cached = JSON.parse(localStorage.getItem("exchange_rates_cache_v2") ?? "{}") as {
+    const cached = JSON.parse(localStorage.getItem("exchange_rates_cache_v3") ?? "{}") as {
       provider?: string;
       requestedProvider?: string;
     };
@@ -456,7 +394,7 @@ describe("useExchangeRates", () => {
       }
     }));
 
-    const { result, unmount } = renderHook(() => useExchangeRates("frankfurter"));
+    const { result, unmount } = renderHook(() => useExchangeRates("exchange-api"));
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
 

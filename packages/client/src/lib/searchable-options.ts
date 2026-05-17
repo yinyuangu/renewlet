@@ -26,6 +26,7 @@ const CURRENCY_REGION_KEYWORDS: Record<CurrencyRegion, string[]> = {
   americas: ["美洲", "america", "americas", "north america", "south america"],
   oceania: ["大洋洲", "oceania"],
   africa: ["非洲", "africa"],
+  global: ["全球", "global", "currency"],
 };
 
 /** 归一化搜索文本，去掉重音并统一小写，提升跨语言搜索命中率。 */
@@ -51,6 +52,7 @@ export function rankSearchText(values: readonly string[], search: string): numbe
   if (!normalizedSearch) return 1;
 
   const compactSearch = compactSearchText(normalizedSearch);
+  const hasCompactSearch = compactSearch.length > 0;
   const searchParts = normalizedSearch.split(/\s+/).filter(Boolean);
 
   let best = 0;
@@ -59,11 +61,11 @@ export function rankSearchText(values: readonly string[], search: string): numbe
     const compactValue = compactSearchText(raw);
     if (!value && !compactValue) continue;
 
-    if (value === normalizedSearch || compactValue === compactSearch) best = Math.max(best, 1);
-    else if (value.startsWith(normalizedSearch) || compactValue.startsWith(compactSearch)) best = Math.max(best, 0.9);
-    else if (value.includes(normalizedSearch) || compactValue.includes(compactSearch)) best = Math.max(best, 0.7);
+    if (value === normalizedSearch || (hasCompactSearch && compactValue === compactSearch)) best = Math.max(best, 1);
+    else if (value.startsWith(normalizedSearch) || (hasCompactSearch && compactValue.startsWith(compactSearch))) best = Math.max(best, 0.9);
+    else if (value.includes(normalizedSearch) || (hasCompactSearch && compactValue.includes(compactSearch))) best = Math.max(best, 0.7);
     else if (searchParts.length > 1 && searchParts.every((part) => value.includes(part))) best = Math.max(best, 0.55);
-    else if (isSubsequence(compactSearch, compactValue)) best = Math.max(best, 0.35);
+    else if (hasCompactSearch && isSubsequence(compactSearch, compactValue)) best = Math.max(best, 0.35);
   }
 
   return best;

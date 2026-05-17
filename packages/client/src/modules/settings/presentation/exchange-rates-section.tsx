@@ -53,11 +53,11 @@ export function ExchangeRatesSection({
     ? t("settings.exchangeRateProvider.builtin")
     : activeRateProvider === "floatrates"
       ? t("settings.exchangeRateProvider.floatrates")
-      : t("settings.exchangeRateProvider.frankfurter");
+      : t("settings.exchangeRateProvider.exchangeApi");
   const providerUrl = activeRateProvider === "floatrates"
     ? "https://www.floatrates.com/json-feeds.html"
-    : activeRateProvider === "frankfurter"
-      ? "https://frankfurter.dev/"
+    : activeRateProvider === "exchange-api"
+      ? "https://github.com/fawazahmed0/exchange-api#readme"
       : null;
 
   return (
@@ -128,7 +128,7 @@ export function ExchangeRatesSection({
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="frankfurter">{t("settings.exchangeRateProvider.frankfurter")}</SelectItem>
+                          <SelectItem value="exchange-api">{t("settings.exchangeRateProvider.exchangeApi")}</SelectItem>
                           <SelectItem value="floatrates">{t("settings.exchangeRateProvider.floatrates")}</SelectItem>
                         </SelectContent>
                       </Select>
