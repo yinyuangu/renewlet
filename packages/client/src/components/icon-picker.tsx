@@ -17,9 +17,10 @@ import { lazy, Suspense, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Upload, Search, X, Loader2, Image as ImageIcon, Check } from 'lucide-react';
+import { Upload, Search, X, Loader2, Image as ImageIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { FaviconResultImage } from '@/components/favicon-result-image';
+import { MediaThumbnailButton } from '@/components/media-thumbnail-button';
 import { generateFaviconUrls } from '@/lib/favicon';
 import { PAYMENT_DOMAINS } from '@/lib/favicon-known-domains';
 import { IMAGE_UPLOAD_ACCEPT } from '@/lib/upload-constraints';
@@ -151,7 +152,8 @@ export function IconPicker({
           className={cn(
             "relative rounded-lg border border-border",
             "flex items-center justify-center cursor-pointer",
-            "bg-secondary/50 hover:bg-secondary/80 transition-colors",
+            "transition-colors",
+            displayedIcon ? "media-thumbnail-canvas hover:border-primary" : "bg-secondary/50 hover:bg-secondary/80",
             "overflow-hidden group shrink-0",
             iconSize,
             uploadStatus === "error" && "ring-1 ring-destructive/40"
@@ -166,6 +168,7 @@ export function IconPicker({
                 <FaviconResultImage
                   src={displayedIcon}
                   alt="Icon"
+                  className="media-thumbnail-image"
                   onError={() => applyValue(undefined)}
                 />
               </div>
@@ -279,30 +282,18 @@ export function IconPicker({
                         <p className="text-xs text-muted-foreground">{t("media.builtInIcons")}</p>
                         <div className="grid grid-cols-4 gap-1.5 p-0.5">
                           {builtInSearch.icons.map((icon) => (
-                            <button
+                            <MediaThumbnailButton
                               key={icon.slug}
-                              type="button"
+                              src={icon.iconUrl}
+                              alt={icon.title}
                               title={icon.title}
+                              size="sm"
+                              selected={value === icon.iconUrl}
                               onClick={() => {
                                 applyValue(icon.iconUrl);
                                 handleSearchOpenChange(false);
                               }}
-                              className={cn(
-                                "relative w-12 h-12 rounded-lg border p-1",
-                                "hover:border-primary hover:bg-primary/10 transition-all",
-                                "flex items-center justify-center bg-white",
-                                value === icon.iconUrl ? "border-primary ring-1 ring-primary/30" : "border-border",
-                              )}
-                            >
-                              <div className="h-full w-full">
-                                <FaviconResultImage src={icon.iconUrl} alt={icon.title} />
-                              </div>
-                              {value === icon.iconUrl && (
-                                <div className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-primary flex items-center justify-center">
-                                  <Check className="w-2 h-2 text-primary-foreground" />
-                                </div>
-                              )}
-                            </button>
+                            />
                           ))}
                         </div>
                       </div>
@@ -313,33 +304,18 @@ export function IconPicker({
                         <p className="text-xs text-muted-foreground">{t("media.faviconFallback")}</p>
                         <div className="grid grid-cols-4 gap-1.5 p-0.5">
                           {search.results.map((url, index) => (
-                            <button
+                            <MediaThumbnailButton
                               key={url}
-                              type="button"
+                              src={url}
+                              alt={`Icon ${index + 1}`}
+                              size="sm"
+                              selected={value === url}
                               onClick={() => {
                                 applyValue(url);
                                 handleSearchOpenChange(false);
                               }}
-                              className={cn(
-                                "relative w-12 h-12 rounded-lg border p-1",
-                                "hover:border-primary hover:bg-primary/10 transition-all",
-                                "flex items-center justify-center bg-white",
-                                value === url ? "border-primary ring-1 ring-primary/30" : "border-border"
-                              )}
-                            >
-                              <div className="h-full w-full">
-                                <FaviconResultImage
-                                  src={url}
-                                  alt={`Icon ${index + 1}`}
-                                  onError={() => search.removeResult(url)}
-                                />
-                              </div>
-                              {value === url && (
-                                <div className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-primary flex items-center justify-center">
-                                  <Check className="w-2 h-2 text-primary-foreground" />
-                                </div>
-                              )}
-                            </button>
+                              onError={() => search.removeResult(url)}
+                            />
                           ))}
                         </div>
                       </div>

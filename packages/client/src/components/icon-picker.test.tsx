@@ -85,6 +85,8 @@ describe("IconPicker", () => {
     await waitFor(() => {
       expectApiFetchCallWithSignal("/api/app/thesvg-icons?search=Binance");
     });
+    expect(await screen.findByRole("button", { name: "Binance" })).toHaveClass("media-thumbnail-canvas");
+    expect(await screen.findByAltText("Binance")).toHaveClass("media-thumbnail-image");
   });
 
   it("allows SVG files in the custom icon file picker", () => {
@@ -94,6 +96,14 @@ describe("IconPicker", () => {
     expect(input).toHaveAttribute("accept", IMAGE_UPLOAD_ACCEPT);
   });
 
+  it("uses the shared low-noise canvas for the current icon preview", () => {
+    render(<IconPicker value="https://example.com/icon.svg" onChange={vi.fn()} />);
+
+    const icon = screen.getByAltText("Icon");
+    expect(icon).toHaveClass("media-thumbnail-image");
+    expect(icon.closest(".media-thumbnail-canvas")).not.toBeNull();
+  });
+
   it("selects a built-in theSVG icon from the unified icon search", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
@@ -101,11 +111,28 @@ describe("IconPicker", () => {
     render(<IconPicker value={undefined} onChange={onChange} searchHint="Binance" />);
 
     await user.click(screen.getByRole("button", { name: "搜索" }));
-    await user.click(await screen.findByTitle("Binance"));
+    const binanceButton = await screen.findByTitle("Binance");
+    expect(binanceButton).toHaveAttribute("aria-pressed", "false");
+    await user.click(binanceButton);
 
     expect(onChange).toHaveBeenCalledWith(
       "https://testingcf.jsdelivr.net/gh/glincker/thesvg@main/public/icons/binance/default.svg",
     );
+  });
+
+  it("marks a selected built-in icon thumbnail with the shared canvas and pressed state", async () => {
+    const user = userEvent.setup();
+    const selectedIcon =
+      "https://testingcf.jsdelivr.net/gh/glincker/thesvg@main/public/icons/binance/default.svg";
+
+    render(<IconPicker value={selectedIcon} onChange={vi.fn()} searchHint="Binance" />);
+
+    await user.click(screen.getByRole("button", { name: "搜索" }));
+    const selectedButton = await screen.findByRole("button", { name: "Binance" });
+
+    expect(selectedButton).toHaveClass("media-thumbnail-canvas", "border-primary");
+    expect(selectedButton).toHaveAttribute("aria-pressed", "true");
+    expect(selectedButton.querySelector("span[aria-hidden='true'] svg")).not.toBeNull();
   });
 
   it("keeps the search box empty after clearing the auto-filled payment name", async () => {

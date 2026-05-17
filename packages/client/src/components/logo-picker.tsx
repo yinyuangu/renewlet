@@ -23,9 +23,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Upload, Search, X, Loader2, Image as ImageIcon, Check, Images, RefreshCw } from 'lucide-react';
+import { Upload, Search, X, Loader2, Image as ImageIcon, Images, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { FaviconResultImage } from '@/components/favicon-result-image';
+import { MediaThumbnailButton } from '@/components/media-thumbnail-button';
 import { generateFaviconUrls } from '@/lib/favicon';
 import { SERVICE_DOMAINS } from '@/lib/favicon-known-domains';
 import { IMAGE_UPLOAD_ACCEPT } from '@/lib/upload-constraints';
@@ -175,7 +176,8 @@ export function LogoPicker({
           className={cn(
             "relative w-16 h-16 rounded-xl border-2 border-dashed border-border",
             "flex items-center justify-center cursor-pointer",
-            "bg-secondary/50 hover:bg-secondary/80 transition-colors",
+            "transition-colors",
+            displayedLogo ? "media-thumbnail-canvas hover:border-primary" : "bg-secondary/50 hover:bg-secondary/80",
             "overflow-hidden group"
           )}
           onClick={() => fileInputRef.current?.click()}
@@ -188,6 +190,7 @@ export function LogoPicker({
                 <FaviconResultImage
                   src={displayedLogo}
                   alt="Logo"
+                  className="media-thumbnail-image"
                   onError={() => applyValue(undefined)}
                 />
               </div>
@@ -305,31 +308,17 @@ export function LogoPicker({
                         {uploadedLogos.assets.map((asset, index) => {
                           const label = asset.originalName ?? t("media.uploadedLogoOption", { index: index + 1 });
                           return (
-                            <button
+                            <MediaThumbnailButton
                               key={asset.id}
-                              type="button"
+                              src={asset.url}
+                              alt={label}
                               title={label}
-                              aria-label={label}
+                              selected={value === asset.url}
                               onClick={() => {
                                 applyValue(asset.url);
                                 handleUploadedLogosOpenChange(false);
                               }}
-                              className={cn(
-                                "relative h-14 w-14 rounded-lg border-2 p-1.5",
-                                "hover:border-primary hover:bg-primary/10 transition-all",
-                                "flex items-center justify-center bg-white",
-                                value === asset.url ? "border-primary ring-2 ring-primary/20" : "border-border"
-                              )}
-                            >
-                              <div className="h-full w-full">
-                                <FaviconResultImage src={asset.url} alt={label} />
-                              </div>
-                              {value === asset.url && (
-                                <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-primary flex items-center justify-center">
-                                  <Check className="w-3 h-3 text-primary-foreground" />
-                                </div>
-                              )}
-                            </button>
+                            />
                           );
                         })}
                       </div>
@@ -434,30 +423,17 @@ export function LogoPicker({
                           {builtInSearch.icons.length > 0 ? (
                             <div className="grid grid-cols-4 gap-2 p-1">
                               {builtInSearch.icons.map((icon) => (
-                                <button
+                                <MediaThumbnailButton
                                   key={icon.slug}
-                                  type="button"
+                                  src={icon.iconUrl}
+                                  alt={icon.title}
                                   title={icon.title}
+                                  selected={value === icon.iconUrl}
                                   onClick={() => {
                                     applyValue(icon.iconUrl);
                                     handleSearchOpenChange(false);
                                   }}
-                                  className={cn(
-                                    "relative h-14 w-14 rounded-lg border-2 p-1.5",
-                                    "flex items-center justify-center bg-white",
-                                    "transition-all hover:border-primary hover:bg-primary/10",
-                                    value === icon.iconUrl ? "border-primary ring-2 ring-primary/20" : "border-border",
-                                  )}
-                                >
-                                  <div className="h-full w-full">
-                                    <FaviconResultImage src={icon.iconUrl} alt={icon.title} />
-                                  </div>
-                                  {value === icon.iconUrl && (
-                                    <div className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary">
-                                      <Check className="h-3 w-3 text-primary-foreground" />
-                                    </div>
-                                  )}
-                                </button>
+                                />
                               ))}
                             </div>
                           ) : (
@@ -475,33 +451,17 @@ export function LogoPicker({
                           <p className="text-xs text-muted-foreground">{t("media.faviconFallback")}</p>
                           <div className="grid grid-cols-4 gap-2 p-1">
                             {search.results.map((url, index) => (
-                              <button
+                              <MediaThumbnailButton
                                 key={url}
-                                type="button"
+                                src={url}
+                                alt={`Logo option ${index + 1}`}
+                                selected={value === url}
                                 onClick={() => {
                                   applyValue(url);
                                   handleSearchOpenChange(false);
                                 }}
-                                className={cn(
-                                  "relative h-14 w-14 rounded-lg border-2 p-1.5",
-                                  "hover:border-primary hover:bg-primary/10 transition-all",
-                                  "flex items-center justify-center bg-white",
-                                  value === url ? "border-primary ring-2 ring-primary/20" : "border-border"
-                                )}
-                              >
-                                <div className="h-full w-full">
-                                  <FaviconResultImage
-                                    src={url}
-                                    alt={`Logo option ${index + 1}`}
-                                    onError={() => search.removeResult(url)}
-                                  />
-                                </div>
-                                {value === url && (
-                                  <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-primary flex items-center justify-center">
-                                    <Check className="w-3 h-3 text-primary-foreground" />
-                                  </div>
-                                )}
-                              </button>
+                                onError={() => search.removeResult(url)}
+                              />
                             ))}
                           </div>
                         </div>

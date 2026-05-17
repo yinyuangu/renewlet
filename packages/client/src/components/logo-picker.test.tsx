@@ -140,11 +140,22 @@ describe("LogoPicker", () => {
     });
 
     expect(await screen.findByText("内置图标：")).toBeInTheDocument();
-    await user.click(await screen.findByTitle("Netflix"));
+    const netflixButton = await screen.findByTitle("Netflix");
+    expect(netflixButton).toHaveClass("media-thumbnail-canvas");
+    expect(await screen.findByAltText("Netflix")).toHaveClass("media-thumbnail-image");
+    await user.click(netflixButton);
 
     expect(onChange).toHaveBeenCalledWith(
       "https://testingcf.jsdelivr.net/gh/glincker/thesvg@main/public/icons/netflix/default.svg",
     );
+  });
+
+  it("uses the shared low-noise canvas for the current Logo preview", () => {
+    render(<LogoPicker value="https://example.com/logo.svg" onChange={vi.fn()} />);
+
+    const logo = screen.getByAltText("Logo");
+    expect(logo).toHaveClass("media-thumbnail-image");
+    expect(logo.closest(".media-thumbnail-canvas")).not.toBeNull();
   });
 
   it("allows SVG files in the custom Logo file picker", () => {
@@ -181,7 +192,10 @@ describe("LogoPicker", () => {
     await user.click(screen.getByRole("button", { name: "已上传" }));
 
     expect(mocks.loadUploadedLogosInitial).toHaveBeenCalledTimes(1);
-    await user.click(await screen.findByRole("button", { name: "netflix.png" }));
+    const uploadedLogoButton = await screen.findByRole("button", { name: "netflix.png" });
+    expect(uploadedLogoButton).toHaveClass("media-thumbnail-canvas");
+    expect(uploadedLogoButton).toHaveAttribute("aria-pressed", "false");
+    await user.click(uploadedLogoButton);
 
     expect(onChange).toHaveBeenCalledWith("/api/app/assets/asset-1");
   });
@@ -236,7 +250,10 @@ describe("LogoPicker", () => {
     rerender(<LogoPicker value="/api/app/assets/asset-2" onChange={vi.fn()} />);
     await user.click(screen.getByRole("button", { name: "已上传" }));
 
-    expect(await screen.findByRole("button", { name: "selected.svg" })).toHaveClass("border-primary");
+    const selectedLogoButton = await screen.findByRole("button", { name: "selected.svg" });
+    expect(selectedLogoButton).toHaveClass("media-thumbnail-canvas", "border-primary");
+    expect(selectedLogoButton).toHaveAttribute("aria-pressed", "true");
+    expect(selectedLogoButton.querySelector("span[aria-hidden='true'] svg")).not.toBeNull();
     await user.click(screen.getByRole("button", { name: "加载更多" }));
     expect(mocks.loadUploadedLogosMore).toHaveBeenCalledTimes(1);
   });
