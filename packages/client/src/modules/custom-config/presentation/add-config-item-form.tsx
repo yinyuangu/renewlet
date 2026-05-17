@@ -1,3 +1,11 @@
+/**
+ * 自定义配置新增项表单。
+ *
+ * 架构位置：只负责采集 label/color/icon/enabled 等展示输入，新增规则由
+ * use-config-manager-controller 与 normalize-custom-config 兜底。
+ *
+ * Caveat: 图标上传是异步流程；提交按钮必须尊重上传状态，避免把 dataURL 或半成品写入配置。
+ */
 import { Suspense } from "react";
 import { Check, Loader2, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,15 +16,6 @@ import type { UploadStatus as IconUploadStatus } from "@/hooks/use-cropped-image
 import { ColorPicker } from "./color-picker";
 import { IconPickerFallback, LazyIconPicker } from "./icon-picker-loader";
 
-/**
- * add-config-item-form.tsx 渲染自定义配置新增表单。
- *
- * 架构位置：父级 controller 持有草稿状态和提交逻辑，本组件只负责把
- * value/labels/color/icon 四组字段拼成一致的编辑体验。
- *
- * Caveat: 新增态和编辑态共享图标上传约束；上传未完成时提交会被禁用，
- * 防止持久化尚未归一化的资源地址。
- */
 export interface AddConfigItemFormProps {
   showColor: boolean;
   showIcon: boolean;

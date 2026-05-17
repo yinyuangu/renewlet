@@ -1,3 +1,10 @@
+/**
+ * 管理员用户操作弹窗。
+ *
+ * 架构位置：创建、重置密码、删除确认都由 AdminUsersPage 持有状态，本文件只负责表单可访问性和展示。
+ *
+ * Caveat: 删除弹窗文案必须继续提示关联数据会被清理；后端实际级联逻辑变化时要同步这里。
+ */
 import type { FormEvent, RefObject } from "react";
 import { KeyRound, UserPlus } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -11,15 +18,6 @@ import { useI18n } from "@/i18n/I18nProvider";
 import type { AdminUser } from "@/lib/api/schemas/admin";
 import type { CreateUserErrors, CreateUserFormState, ResetPasswordErrors } from "./types";
 
-/**
- * user-dialogs.tsx 承载管理员用户页的创建、重置密码和删除确认弹窗。
- *
- * 架构位置：页面 controller 仍拥有表单状态、校验和 API 副作用，本文件只负责
- * 将状态映射为可访问的表单结构，避免弹窗 JSX 挤压页面控制流。
- *
- * Caveat: 输入 ref 用于提交失败后聚焦首个错误字段；调整字段顺序时要同步
- * 页面 controller 的 focusFirst*Error 逻辑。
- */
 export interface CreateUserDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;

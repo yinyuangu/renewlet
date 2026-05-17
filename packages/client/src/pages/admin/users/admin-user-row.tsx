@@ -1,3 +1,11 @@
+/**
+ * 管理员用户表格行。
+ *
+ * 架构位置：只渲染单个用户的 role/status/action 控件；真正的权限和防自锁检查由页面 controller
+ * 与后端 admin route 双重兜底。
+ *
+ * Caveat: 前端禁用是体验层保护，不可替代后端“至少保留一个管理员”的约束。
+ */
 import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -6,14 +14,6 @@ import { useI18n } from "@/i18n/I18nProvider";
 import type { AdminUser, UserRole } from "@/lib/api/schemas/admin";
 import { isEnabledAdmin } from "./types";
 
-/**
- * admin-user-row.tsx 渲染管理员用户列表中的单行操作区。
- *
- * 架构位置：页面负责 API 调用和错误处理，本组件只根据当前用户、最后管理员
- * 和更新中状态计算可交互性，让保护规则在 UI 上可见但不成为安全边界。
- *
- * Caveat: 前端禁用只提升体验；后端仍必须在 PATCH/DELETE 中执行最后管理员保护。
- */
 export interface AdminUserRowProps {
   user: AdminUser;
   currentUserId: string | undefined;

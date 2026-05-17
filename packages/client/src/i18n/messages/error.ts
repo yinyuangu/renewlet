@@ -1,11 +1,12 @@
+/**
+ * API 与校验错误文案分片。
+ *
+ * 架构位置：display-error 和各 application hook 使用这些 key 把后端错误转为用户可读文本。
+ *
+ * Caveat: 新增后端错误码时应优先在这里补翻译，而不是在调用点写硬编码 fallback。
+ */
 import type { MessageMap, MessageValue } from "./types";
 
-/**
- * error.ts 收拢API 与校验错误文案。
- *
- * 架构位置：messages.ts 只做聚合与 translate，领域分片负责保持中英文 key
- * 一一对应，避免单个巨大 message 文件突破维护上限。
- */
 export const zhCN = {
   "error.generic": "操作失败，请稍后重试",
   "error.network": "网络请求失败",

@@ -1,3 +1,10 @@
+/**
+ * 汇率设置展示区。
+ *
+ * 架构位置：展示 provider、刷新状态和币种启用列表；远端拉取、缓存和 fallback 位于 useExchangeRates。
+ *
+ * Caveat: 默认货币和启用货币会影响全站金额换算，展示层不能绕过 controller 直接修改配置。
+ */
 import { ExternalLink, RefreshCw, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -10,15 +17,6 @@ import { cn } from '@/lib/utils';
 import type { CustomConfig } from '@/types/config';
 import type { AppSettings } from '@/types/subscription';
 
-/**
- * exchange-rates-section.tsx 渲染统计货币和汇率状态分区。
- *
- * 架构位置：汇率拉取与 schema 校验在 controller/useExchangeRates 中完成，本组件
- * 只展示已归一化的 rates，并允许用户切换统计货币。
- *
- * Caveat: 这里按 USD base rates 计算相对汇率；如果未来更换 base，必须同步
- * useExchangeRates 缓存策略和这里的 preview 公式。
- */
 export interface ExchangeRatesSectionProps {
   settings: Pick<AppSettings, 'defaultCurrency' | 'exchangeRateProvider'>;
   customConfig: Pick<CustomConfig, 'currencies'>;

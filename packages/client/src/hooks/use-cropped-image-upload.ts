@@ -178,7 +178,7 @@ export function useCroppedImageUpload(options: UseCroppedImageUploadOptions): Us
       reader.readAsDataURL(file);
     }
 
-    // Reset input so the same file can be selected again.
+    // 清空 input，允许用户选择同一个文件进行重试。
     e.target.value = "";
   }, [reportUploadStatus, uploadOriginalFile]);
 

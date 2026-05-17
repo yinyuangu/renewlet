@@ -1,3 +1,11 @@
+/**
+ * i18n 文案聚合入口。
+ *
+ * 架构位置：业务分片位于 `./messages/*`，本文件只组合 zh/en map 并提供 translate，
+ * 避免调用方感知拆分后的文件结构。
+ *
+ * Caveat: 不要在这里新增具体文案；新增 key 应放入对应领域分片并保持双语对齐。
+ */
 import type { Locale } from "@/i18n/locales";
 import type { MessageValue } from "./messages/types";
 import { zhCN as commonZhCN, enUS as commonEnUS } from "./messages/common";
@@ -11,15 +19,6 @@ import { zhCN as labelsZhCN, enUS as labelsEnUS } from "./messages/labels";
 import { zhCN as adminZhCN, enUS as adminEnUS } from "./messages/admin";
 import { zhCN as errorZhCN, enUS as errorEnUS } from "./messages/error";
 
-/**
- * messages.ts 是 i18n 文案的聚合入口。
- *
- * 架构位置：业务分片位于 ./messages/*，本文件只组合 zh/en map 并提供
- * translate，避免调用方感知拆分后的文件结构。
- *
- * Caveat: 不要在这里新增具体文案；新增 key 应放入对应领域分片，并让英文
- * map satisfies Record<keyof typeof zhCN, MessageValue> 保持双语对齐。
- */
 const zhCN = {
   ...commonZhCN,
   ...legalZhCN,

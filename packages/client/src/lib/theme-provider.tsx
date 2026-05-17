@@ -1,3 +1,13 @@
+/**
+ * 轻量主题 Provider。
+ *
+ * 架构位置：统一管理 dark/light/system 解析和品牌 favicon 更新；设置页的“预览后保存”
+ * 逻辑只调用这里，不直接操作 DOM class。
+ *
+ * 状态链路：
+ *   initial theme -> document class -> favicon
+ *   setTheme -> state -> document class -> favicon
+ */
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { updateBrandFavicon } from "@/lib/brand-favicon";
 import type { ThemeMode } from "@/types/theme";

@@ -1,11 +1,12 @@
+/**
+ * 通用界面文案分片。
+ *
+ * 架构位置：只收拢跨页面复用的导航、按钮和基础控件 key，领域文案应留在对应分片。
+ *
+ * Caveat: common key 很容易被滥用；新增前先确认没有更贴近业务的分片。
+ */
 import type { MessageMap, MessageValue } from "./types";
 
-/**
- * common.ts 收拢通用界面、导航和基础控件文案。
- *
- * 架构位置：messages.ts 只做聚合与 translate，领域分片负责保持中英文 key
- * 一一对应，避免单个巨大 message 文件突破维护上限。
- */
 export const zhCN = {
   "app.tagline": "订阅管理助手",
   "common.cancel": "取消",

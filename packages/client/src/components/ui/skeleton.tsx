@@ -1,3 +1,10 @@
+/**
+ * Skeleton 设计系统原语。
+ *
+ * 架构位置：只渲染基础占位单元，页面级骨架布局由 `loading-skeleton.tsx` 组合。
+ *
+ * Caveat: 占位尺寸应由调用方控制；组件内部不推断业务布局，避免加载态造成布局跳动。
+ */
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
@@ -12,4 +19,3 @@ import { cn } from "@/lib/utils";
 export function Skeleton({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return <div className={cn("animate-pulse rounded-md bg-muted", className)} {...props} />;
 }
-

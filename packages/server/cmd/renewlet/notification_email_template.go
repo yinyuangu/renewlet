@@ -1,14 +1,11 @@
 package main
 
-// notification_email_template.go renders the email channel HTML body.
+// notification_email_template.go 渲染邮件渠道的 HTML 正文。
 //
-// Architecture: HTML lives in embedded .gohtml templates, copy lives in embedded
-// locale JSON catalogs, and Go only prepares the view model. This keeps the
-// email compatible with strict mail clients without making the layout a giant
-// string literal.
+// 架构位置：HTML 放在 embedded .gohtml 模板，文案放在 embedded locale JSON catalog，
+// Go 只负责准备 view model。这样既能保持严格邮件客户端兼容，也避免把布局写成巨大字符串。
 //
-// Caveat: do not pass pre-rendered HTML into the renderer. html/template should
-// own contextual escaping for user-controlled values.
+// Caveat: 不要把预渲染 HTML 传进模板；用户可控值必须继续交给 html/template 做上下文转义。
 import (
 	"bytes"
 	"embed"
@@ -23,10 +20,12 @@ import (
 )
 
 const (
+	// 邮件正文必须有硬上限，避免异常订阅备注或通知内容让 SMTP 请求膨胀。
 	emailMaxHTMLBytes     = 100 * 1024
 	emailCompactTextRunes = 12000
 )
 
+// 模板与文案一起 embed，保证 Docker 单 binary 部署不依赖运行时文件路径。
 //go:embed templates/email/*.gohtml i18n/email.*.json
 var emailTemplateFS embed.FS
 

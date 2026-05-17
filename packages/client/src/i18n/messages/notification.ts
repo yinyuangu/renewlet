@@ -1,11 +1,12 @@
+/**
+ * 通知、主题和媒体上传文案分片。
+ *
+ * 架构位置：设置页通知配置、历史面板、主题选择和上传反馈共用这里的 key。
+ *
+ * Caveat: 通知历史文案必须与后端 result union 保持一致，避免未知原因码落到空白展示。
+ */
 import type { MessageMap, MessageValue } from "./types";
 
-/**
- * notification.ts 收拢通知、主题和媒体上传文案。
- *
- * 架构位置：messages.ts 只做聚合与 translate，领域分片负责保持中英文 key
- * 一一对应，避免单个巨大 message 文件突破维护上限。
- */
 export const zhCN = {
   "notification.channel": "渠道",
   "theme.mode": "明暗模式",

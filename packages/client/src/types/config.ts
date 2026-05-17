@@ -1,3 +1,11 @@
+/**
+ * 自定义配置领域类型。
+ *
+ * 架构位置：Settings/CustomConfigContext/presentation 共享这些类型，远端 JSON 和 localStorage
+ * 必须先经过 normalize-custom-config 再进入这里定义的稳定结构。
+ *
+ * Caveat: ConfigItem.value 会写入订阅记录；重命名或删除时要考虑已有 subscriptions 的引用。
+ */
 import { 
   BuiltInCategory,
   SubscriptionStatus, 
@@ -27,7 +35,7 @@ export interface ConfigItem {
 }
 
 /**
- * 自定义配置（每个用户独立一份，保存到 SQLite `user_custom_configs.config`）。
+ * 自定义配置（每个用户独立一份，保存到 PocketBase `custom_configs.config`）。
  *
  * 用途：
  * - 分类/状态/支付方式/货币：用于下拉选项、统计展示、以及一些 UI 的颜色/图标表现。

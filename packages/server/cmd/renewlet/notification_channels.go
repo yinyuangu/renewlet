@@ -25,6 +25,7 @@ func sendToChannels(app core.App, channels []string, settings appSettings, messa
 		Failed:    []channelFailure{},
 	}
 	for _, channel := range channels {
+		// 串行发送牺牲一点延迟，换来确定性的 history 顺序，并降低同一分钟对多个外部服务的突发压力。
 		if err := sendToChannel(app, channel, settings, message); err != nil {
 			summary.Failed = append(summary.Failed, channelFailure{Channel: channel, Error: err.Error()})
 		} else {
@@ -87,6 +88,7 @@ func sendTelegram(settings appSettings, message notificationMessage) error {
 			text := readResponseText(resp)
 			lastErr = channelHTTPError(normalizeAppLocale(settings.Locale), "Telegram", resp.StatusCode, fallbackText(text, resp.Status))
 			if resp.StatusCode != http.StatusTooManyRequests && resp.StatusCode < 500 {
+				// 配置错误类 4xx 不重试，避免每轮 cron 都重复打到外部 API。
 				break
 			}
 		}
@@ -137,6 +139,7 @@ func sendWebhook(settings appSettings, message notificationMessage) error {
 	if settings.WebhookMethod == "GET" {
 		u := *safeURL
 		q := u.Query()
+		// GET Webhook 兼容只支持 query 的自动化平台；敏感订阅内容会进入对方访问日志，用户应优先选 POST。
 		q.Set("title", message.Title)
 		q.Set("content", message.Content)
 		q.Set("timestamp", message.Timestamp)

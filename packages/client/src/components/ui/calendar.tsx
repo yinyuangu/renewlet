@@ -1,3 +1,10 @@
+/**
+ * Calendar 日期选择原语。
+ *
+ * 架构位置：基于 react-day-picker 封装项目内的日期选择交互，订阅续费日期和筛选日期共用这里。
+ *
+ * Caveat: Renewlet 的业务日期是 date-only；不要在此组件内引入用户时区换算。
+ */
 import * as React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -62,7 +69,7 @@ function useCalendarNav() {
   return ctx;
 }
 
-// NOTE: keep this component identity stable to avoid Popover re-mount flicker
+// 保持组件 identity 稳定，避免 Popover 因标题组件重挂载而闪烁。
 /**
  * 自定义月份标题（MonthCaption）：
  * - 用 Popover 实现「年/月」快速选择
@@ -128,7 +135,7 @@ function CalendarCaption({
           className="w-[260px] p-3"
           align="center"
           sideOffset={4}
-          // prevent accidental close on internal pointer events
+          // 年/月面板内部点击不应触发自动聚焦关闭，否则键盘用户难以连续选择。
           onOpenAutoFocus={(e) => e.preventDefault()}
         >
           <div className="flex items-center justify-between mb-3">
@@ -356,7 +363,7 @@ function Calendar({
     Math.floor(new Date().getFullYear() / 12) * 12,
   );
 
-  // Sync with controlled month
+  // 受控 month 变化时同步内部月份，避免外层“回到今天”后标题仍停留在旧月份。
   useEffect(() => {
     if (controlledMonth) setInternalMonth(controlledMonth);
   }, [controlledMonth]);

@@ -1,3 +1,10 @@
+/**
+ * 通知渠道启用列表。
+ *
+ * 架构位置：负责展示渠道开关和配置完整性提示；是否可发送由 settings controller 与后端共同判定。
+ *
+ * Caveat: 禁用渠道不等于删除配置，后续重新启用时应保留用户已填写的凭据。
+ */
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -6,15 +13,6 @@ import type { MessageKey } from '@/i18n/messages';
 import { cn } from '@/lib/utils';
 import { CHANNEL_LABELS, NOTIFICATION_CHANNELS, type AppSettings, type NotificationChannel } from '@/types/subscription';
 
-/**
- * notification-channel-list.tsx 渲染通知渠道开关和配置入口。
- *
- * 架构位置：SettingsScreen 持有 active channel 和 enabledChannels，本文件只展示
- * 每个渠道的启用状态与配置摘要，真正字段编辑在 NotificationChannelConfigPanel。
- *
- * Caveat: 摘要文案按字段是否填充判断“ready”；新增渠道字段时要同步这里，
- * 否则用户会看到错误的配置完成状态。
- */
 type Translate = (key: MessageKey, params?: Record<string, string | number>) => string;
 
 function getNotificationChannelSummary(settings: AppSettings, channel: NotificationChannel, t: Translate): string {
@@ -134,4 +132,3 @@ export function NotificationChannelList({
     </div>
   );
 }
-

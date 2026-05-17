@@ -1,4 +1,15 @@
 #!/usr/bin/env node
+/**
+ * 部署脚本契约检查。
+ *
+ * 架构位置：根 `check:deploy` 在 CI/本地检查一键部署脚本是否仍会生成必要密钥、
+ * 保留已有配置，并在缺少 Docker 时给出可预测行为。
+ *
+ * 流程：
+ *   temp dir -> fake docker -> copy deploy template -> run script -> inspect .env/compose
+ *
+ * Caveat: 这里会创建临时文件但不改仓库；新增部署环境变量时要同步 env.example 和这些断言。
+ */
 import { spawnSync } from "node:child_process";
 import {
   chmodSync,

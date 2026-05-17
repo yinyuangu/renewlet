@@ -1,3 +1,10 @@
+/**
+ * 自定义配置可排序列表。
+ *
+ * 架构位置：封装 dnd-kit 的传感器和排序上下文，具体增删改禁用状态由 controller 持有。
+ *
+ * Caveat: 拖拽会高频触发顺序更新；不要在列表项内部直接持久化远端配置。
+ */
 import { memo } from "react";
 import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors } from "@dnd-kit/core";
 import type { DragEndEvent } from "@dnd-kit/core";
@@ -9,18 +16,6 @@ import type { ConfigItem } from "@/types/config";
 import { AddConfigItemForm } from "./add-config-item-form";
 import { SortableConfigItem } from "./sortable-config-item";
 
-/**
- * config-manager-sortable-list.tsx 是自定义配置管理器的排序列表容器。
- *
- * 架构位置：controller hook 负责草稿/删除/持久化状态，本组件只装配 DnD
- * sensors、可排序项和新增表单，避免拖拽细节污染领域配置逻辑。
- *
- * 状态触发链路：
- *   dragEnd -> controller 重排 -> custom_configs schema normalize -> PocketBase 保存
- *   edit/add -> upload status idle -> controller save -> list rerender
- *
- * Caveat: toggleMode 会强制 itemReadOnly，避免启用/禁用列表同时修改 label/color/icon。
- */
 export interface ConfigManagerSortableListProps {
   items: ConfigItem[];
   showColor: boolean;

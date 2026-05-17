@@ -1,3 +1,11 @@
+/**
+ * 续费日历弹窗组合。
+ *
+ * 架构位置：SubscriptionCalendar 负责日期网格和事件聚合，本文件只展示选中日期/订阅详情，
+ * 并把编辑动作交回上层订阅 CRUD 流程。
+ *
+ * Caveat: 弹窗中的金额、周期和状态标签必须继续复用 subscription domain 常量，避免日历视图口径分叉。
+ */
 import type { Subscription } from '@/types/subscription';
 import { STATUS_LABELS, CYCLE_LABELS } from '@/types/subscription';
 import { Button } from '@/components/ui/button';
@@ -9,15 +17,6 @@ import { TruncatedTooltipText } from '@/components/ui/truncated-tooltip-text';
 import { useCustomConfig } from '@/contexts/CustomConfigContext';
 import { useI18n } from '@/i18n/I18nProvider';
 
-/**
- * subscription-calendar-dialogs.tsx 承载续费日历的两个详情弹窗。
- *
- * 架构位置：主日历负责月视图状态和日期网格，本文件负责订阅详情和
- * 单日多订阅列表，避免弹窗 UI 与日历网格计算互相牵连。
- *
- * Caveat: 详情弹窗读取 custom config 来本地化分类标签；修改分类结构时要同步
- * CustomConfigContext normalizer 和订阅表单的 category 写入逻辑。
- */
 export interface CalendarDaySubscriptions {
   date: Date;
   subscriptions: Subscription[];

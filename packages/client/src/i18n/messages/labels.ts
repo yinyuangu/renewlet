@@ -1,11 +1,12 @@
+/**
+ * 内置业务标签文案分片。
+ *
+ * 架构位置：分类、状态、周期、渠道和支付方式的默认 label 由这里提供，自定义 label 由用户配置覆盖。
+ *
+ * Caveat: 内置 value 不能随意重命名；它们已写入订阅记录和统计逻辑。
+ */
 import type { MessageMap, MessageValue } from "./types";
 
-/**
- * labels.ts 收拢内置分类、状态、周期、渠道和支付标签。
- *
- * 架构位置：messages.ts 只做聚合与 translate，领域分片负责保持中英文 key
- * 一一对应，避免单个巨大 message 文件突破维护上限。
- */
 export const zhCN = {
   "category.productivity": "生产力",
   "category.entertainment": "娱乐",

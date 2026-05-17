@@ -41,6 +41,7 @@ func sendHTTPRequest(method, endpoint string, headers map[string]string, body []
 	for key, value := range headers {
 		req.Header.Set(key, value)
 	}
+	// 该函数只负责统一 HTTP 客户端策略；用户可配置 URL 必须在调用前先经过 assertSafeOutboundURL。
 	client := &http.Client{
 		Timeout: 10 * time.Second,
 		Transport: &http.Transport{
@@ -126,6 +127,7 @@ func parseHeaderJSON(input string, locale appLocale) (map[string]string, error) 
 		return nil, errors.New(tr(locale, "JSON 解析失败：请检查格式是否正确", "JSON parsing failed. Check the format."))
 	}
 	for key, value := range raw {
+		// 只接受 JSON string map，避免复杂 header 值在序列化时绕过 http.Header 的规范化。
 		headers[key] = value
 	}
 	return headers, nil
@@ -155,6 +157,7 @@ func splitList(input string) []string {
 
 // assertSafeOutboundURL 校验外发 URL，防止 SSRF。
 // DNS 解析后再检查 IP，是为了拦截域名解析到内网/本机地址的情况。
+// TODO: 若未来允许高风险内网部署场景，可改成自定义 DialContext 并固定解析后的 IP，进一步降低 DNS rebinding 窗口。
 func assertSafeOutboundURL(rawURL, label string, locale appLocale) (*url.URL, error) {
 	parsed, err := url.Parse(rawURL)
 	if err != nil || parsed.Scheme == "" || parsed.Hostname() == "" {

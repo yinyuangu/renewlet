@@ -1,3 +1,10 @@
+/**
+ * 通知渠道配置面板。
+ *
+ * 架构位置：按渠道展示凭据、模板和测试按钮；敏感配置的校验与发送仍由后端通知模块负责。
+ *
+ * Caveat: Webhook/WeCom/Bark URL 最终会触发后端外连，展示层不能把“看起来像 URL”当作安全保证。
+ */
 import { ExternalLink, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,15 +22,6 @@ import {
 } from '@/types/subscription';
 import { CheckboxSettingRow, LoadingButtonContent, type UpdateSetting } from './settings-shared-controls';
 
-/**
- * notification-channel-config-panel.tsx 渲染单个通知渠道的字段编辑面板。
- *
- * 架构位置：所有渠道最终都会进入后端 notification settings schema；这里按渠道
- * 分支只负责收集字段，测试发送通过 controller 走严格 schema 校验后的 API。
- *
- * Caveat: 新增渠道时必须同步 AppSettings、默认设置、Zod schema、Go appSettings、
- * knownChannels、history result schema 和这里的测试按钮。
- */
 type Translate = (key: MessageKey, params?: Record<string, string | number>) => string;
 
 function NotificationTestButton({
@@ -471,4 +469,3 @@ export function NotificationChannelConfigPanel({
     </div>
   );
 }
-

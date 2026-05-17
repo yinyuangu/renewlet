@@ -1,5 +1,16 @@
 #!/usr/bin/env node
 
+/**
+ * theSVG 索引生成脚本。
+ *
+ * 架构位置：把上游 registry 收敛成前端搜索和后端 embedded static 共用的窄 JSON，
+ * 避免客户端运行时拉取完整上游数据。
+ *
+ * 流程：
+ *   fetch registry -> validate slug/variant/path -> choose preferred variant -> write client/server indexes
+ *
+ * Caveat: 生成结果是仓库内静态数据；上游字段或 CDN 路径变化时必须先保证前后端解析仍兼容。
+ */
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

@@ -1,3 +1,10 @@
+/**
+ * AlertDialog 设计系统原语。
+ *
+ * 架构位置：封装 Radix AlertDialog，用于删除、禁用、重置等破坏性确认流程。
+ *
+ * Caveat: 这些确认弹窗承担防误操作职责；不要在业务页面绕过它直接执行高风险 mutation。
+ */
 import * as React from "react";
 import * as AlertDialogPrimitive from "@radix-ui/react-alert-dialog";
 

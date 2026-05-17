@@ -1,3 +1,10 @@
+/**
+ * 自定义配置排序项。
+ *
+ * 架构位置：展示单个 ConfigItem 的编辑、启用、删除和拖拽手柄；业务约束由上层 controller 注入。
+ *
+ * Caveat: 内置项和被订阅引用的分类可能不能删除，按钮禁用原因必须跟 controller 保持一致。
+ */
 import { memo, Suspense } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -15,15 +22,6 @@ import type { ConfigItem } from "@/types/config";
 import { ColorPicker } from "./color-picker";
 import { IconPickerFallback, LazyIconPicker, preloadIconPicker } from "./icon-picker-loader";
 
-/**
- * sortable-config-item.tsx 渲染单个可排序配置项的展示态和编辑态。
- *
- * 架构位置：主列表负责 DnD 容器和状态来源，本组件只消费显式 props，
- * 这样拖拽状态、编辑草稿、上传状态不会在列表映射中变成隐式闭包。
- *
- * Caveat: 保存按钮会在图标上传非 idle 时禁用，避免把临时 blob/失败 URL 写入
- * custom_configs；调整上传状态机时要同步新增表单的同款保护。
- */
 export interface SortableConfigItemProps {
   /** 当前渲染的配置项。 */
   item: ConfigItem;

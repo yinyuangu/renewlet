@@ -1,15 +1,14 @@
+/**
+ * 自定义配置图标选择器懒加载边界。
+ *
+ * 架构位置：排序项和新增表单共用这里加载 IconPicker，避免两个 presentation 组件各自引入
+ * 图标搜索、上传和裁剪相关依赖。
+ *
+ * PERF: 保持懒加载可以降低 Settings 首屏 bundle；不要在父组件静态 import IconPicker。
+ */
 import { lazy } from "react";
 import { cn } from "@/lib/utils";
 
-/**
- * icon-picker-loader.tsx 是自定义配置图标选择器的懒加载边界。
- *
- * 架构位置：排序项和新增表单都会触发图标搜索/上传，统一从这里加载
- * IconPicker，避免两个 presentation 组件各自引入大块图标搜索逻辑。
- *
- * Caveat: preloadIconPicker 依赖用户 hover/focus 预热；调整触发点时要同时确认
- * 编辑态和新增态的首屏交互延迟。
- */
 const loadIconPicker = () => import("@/components/icon-picker");
 
 export const LazyIconPicker = lazy(() => loadIconPicker().then((mod) => ({ default: mod.IconPicker })));

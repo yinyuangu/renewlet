@@ -229,10 +229,12 @@ export function useSettingsFormController(): SettingsFormController {
   const hasUnsavedChanges = settingsDirty || customConfigDirty;
 
   useEffect(() => {
+    // effect 读取 ref 而不是把 draft 放入依赖，是为了在远端刷新时判断“当前是否仍可安全覆盖本地草稿”。
     settingsDirtyRef.current = settingsDirty;
   }, [settingsDirty]);
 
   useEffect(() => {
+    // 自定义配置可能由独立 Provider 防抖保存回流；dirty ref 防止回流覆盖用户正在编辑的草稿。
     customConfigDirtyRef.current = customConfigDirty;
   }, [customConfigDirty]);
 
@@ -400,6 +402,7 @@ export function useSettingsFormController(): SettingsFormController {
       const customConfigPromise: Promise<CustomConfig | null> = shouldSaveCustomConfig
         ? saveConfig(customConfig)
         : Promise.resolve(null);
+      // settings 与 custom config 是两个持久化边界；allSettled 能保留部分成功结果并给出精确失败范围。
       const [settingsResult, customConfigResult] = await Promise.allSettled([
         settingsPromise,
         customConfigPromise,

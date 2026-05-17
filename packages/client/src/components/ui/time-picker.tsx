@@ -1,3 +1,10 @@
+/**
+ * TimePicker 本地时间选择器。
+ *
+ * 架构位置：用于通知设置中的本地提醒时间，输出 `HH:mm` 字符串给 settings schema。
+ *
+ * Caveat: 这里不处理时区；调度器会在后端把 `HH:mm + IANA timezone` 转为 UTC instant。
+ */
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { KeyboardEvent, PointerEvent as ReactPointerEvent } from 'react';
 import { Button } from '@/components/ui/button';

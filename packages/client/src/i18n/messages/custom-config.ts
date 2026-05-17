@@ -1,11 +1,12 @@
+/**
+ * 自定义配置管理文案分片。
+ *
+ * 架构位置：服务分类、状态、支付方式和货币配置 UI；配置结构本身由 config domain 约束。
+ *
+ * Caveat: 删除提示文案要跟 controller 的禁用/引用判断保持一致。
+ */
 import type { MessageMap, MessageValue } from "./types";
 
-/**
- * custom-config.ts 收拢自定义配置管理文案。
- *
- * 架构位置：messages.ts 只做聚合与 translate，领域分片负责保持中英文 key
- * 一一对应，避免单个巨大 message 文件突破维护上限。
- */
 export const zhCN = {
   "customConfig.iconLabel": "图标：",
   "customConfig.valuePlaceholder": "键值",

@@ -1,11 +1,12 @@
+/**
+ * 订阅、日历和统计业务文案分片。
+ *
+ * 架构位置：订阅 CRUD、筛选、导出、日历和统计页面共享这些 key。
+ *
+ * Caveat: 周期/状态/统计文案变化会影响用户对金额口径的理解，需与 domain 计算保持一致。
+ */
 import type { MessageMap, MessageValue } from "./types";
 
-/**
- * subscription.ts 收拢订阅、日历和统计业务文案。
- *
- * 架构位置：messages.ts 只做聚合与 translate，领域分片负责保持中英文 key
- * 一一对应，避免单个巨大 message 文件突破维护上限。
- */
 export const zhCN = {
   "subscription.add": "添加订阅",
   "subscription.dialogCreateTitle": "添加新订阅",

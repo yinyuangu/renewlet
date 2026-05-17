@@ -1,11 +1,12 @@
+/**
+ * 管理员用户管理文案分片。
+ *
+ * 架构位置：只维护 admin 领域 key，聚合与运行时 translate 由 `messages.ts` 负责。
+ *
+ * Caveat: 删除/重命名 key 会直接影响管理员页表单、Toast 和测试契约。
+ */
 import type { MessageMap, MessageValue } from "./types";
 
-/**
- * admin.ts 收拢管理员用户管理文案。
- *
- * 架构位置：messages.ts 只做聚合与 translate，领域分片负责保持中英文 key
- * 一一对应，避免单个巨大 message 文件突破维护上限。
- */
 export const zhCN = {
   "admin.title": "用户管理",
   "admin.subtitle": "创建账号、禁用账号和重置密码",

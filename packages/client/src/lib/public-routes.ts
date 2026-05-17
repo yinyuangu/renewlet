@@ -12,7 +12,7 @@
 
 /** 判断某个 pathname 是否为“公开页面”。 */
 export function isPublicRoutePath(pathname: string): boolean {
-  // Auth pages
+  // 认证/初始化页面必须公开，否则首次部署和会话过期无法恢复。
   if (
     pathname === "/login" ||
     pathname === "/forgot-password" ||
@@ -22,12 +22,12 @@ export function isPublicRoutePath(pathname: string): boolean {
     return true;
   }
 
-  // Legal pages (linked from /login)
+  // 登录页会链接法务页面，未登录用户也需要可读。
   if (pathname === "/terms" || pathname === "/privacy") {
     return true;
   }
 
-  // Static docs (public/docs/* -> /docs/*)
+  // public/docs/* 会映射到 /docs/*，用于公开部署文档。
   if (pathname === "/docs" || pathname.startsWith("/docs/")) {
     return true;
   }

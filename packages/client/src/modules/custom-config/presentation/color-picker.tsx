@@ -1,3 +1,10 @@
+/**
+ * 自定义配置颜色选择器。
+ *
+ * 架构位置：作为 presentation 控件输出 HSL 字符串，颜色合法性仍由配置 domain 规范化。
+ *
+ * Caveat: 该控件会出现在 Dialog 内，Popover 必须复用全局浮层容器以避免被裁剪。
+ */
 import { useState } from "react";
 import type { ChangeEvent } from "react";
 import { Palette } from "lucide-react";
@@ -6,15 +13,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useI18n } from "@/i18n/I18nProvider";
 import { cn } from "@/lib/utils";
 
-/**
- * color-picker.tsx 封装自定义配置项的颜色输入。
- *
- * 架构位置：配置管理器的新增态和编辑态共享同一个色板，外层只持有
- * 字符串形式的 CSS color，避免颜色 UI 细节渗入领域配置模型。
- *
- * Caveat: 这里允许 hex/hsl 等 CSS 颜色字符串；若未来要收窄 schema，必须同步
- * config normalizer、PocketBase JSON 校验和现有用户配置迁移策略。
- */
 export interface ColorPickerProps {
   /** 当前选中的颜色（支持 hex/hsl 等合法 CSS 颜色字符串）。 */
   color: string;

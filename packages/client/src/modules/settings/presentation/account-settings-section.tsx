@@ -1,3 +1,10 @@
+/**
+ * 账号设置展示区。
+ *
+ * 架构位置：只渲染邮箱、密码弹窗和 PocketBase Admin 入口；密码修改流程由 application hook 管理。
+ *
+ * Caveat: 不要在展示层缓存密码字段，关闭弹窗时必须交给 controller 清理。
+ */
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -6,15 +13,6 @@ import Link from '@/components/router-link';
 import { useI18n } from '@/i18n/I18nProvider';
 import { ExternalLink } from 'lucide-react';
 
-/**
- * account-settings-section.tsx 渲染账号信息和修改密码弹窗。
- *
- * 架构位置：密码更新状态来自 useSettingsFormController，本组件只负责表单呈现，
- * 不直接接触 auth client 或 API client，保持 presentation/application 分层。
- *
- * Caveat: accountEmail 为 null 表示仍在加载，不代表账号缺失；占位文案必须区分
- * loading 和 missing，避免管理员误判账号状态。
- */
 export interface AccountSettingsSectionProps {
   accountEmail: string | null;
   canAccessPocketBaseAdmin: boolean;

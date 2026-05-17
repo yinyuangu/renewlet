@@ -98,7 +98,7 @@ export function writeThemeVariantToStorage(variant: ThemeVariant): void {
   try {
     localStorage.setItem(THEME_VARIANT_STORAGE_KEY, variant);
   } catch {
-    // ignore
+    // 存储失败时保留内存态即可；不要因为隐私模式阻断主题切换。
   }
 }
 
@@ -107,7 +107,7 @@ export function writeCustomThemeColorToStorage(color: CustomThemeColor): void {
   try {
     localStorage.setItem(CUSTOM_COLOR_STORAGE_KEY, JSON.stringify(color));
   } catch {
-    // ignore
+    // 存储失败时保留内存态即可；不要因为隐私模式阻断主题切换。
   }
 }
 
@@ -136,6 +136,6 @@ export function writeAppearancePendingToStorage(pending: boolean): void {
     }
     localStorage.removeItem(APPEARANCE_PENDING_STORAGE_KEY);
   } catch {
-    // ignore
+    // 存储失败时保留内存态即可；下次启动按远端设置重新收敛。
   }
 }

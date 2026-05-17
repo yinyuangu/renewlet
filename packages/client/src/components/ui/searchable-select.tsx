@@ -1,3 +1,10 @@
+/**
+ * SearchableSelect 可搜索选择器。
+ *
+ * 架构位置：组合 Popover + cmdk + Tooltip，服务自定义配置、货币、分类等长选项列表。
+ *
+ * Caveat: 选项 label 可能来自用户自定义配置；渲染层只展示文本，不在这里修复配置结构。
+ */
 import * as React from "react";
 import { Command } from "cmdk";
 import { Check, ChevronsUpDown, Search } from "lucide-react";

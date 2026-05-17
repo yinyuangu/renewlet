@@ -123,7 +123,7 @@ export const SubscriptionCalendar = ({ subscriptions, onEditSubscription }: Subs
     const monthStart = startOfMonth(currentMonth);
     const monthEnd = endOfMonth(currentMonth);
     
-    // Start from Monday (weekStartsOn: 1)
+    // 续费日历以周一为一周起点，和中文/欧洲常见账单视图保持一致。
     const calendarStart = startOfWeek(monthStart, { weekStartsOn: 1 });
     const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
     

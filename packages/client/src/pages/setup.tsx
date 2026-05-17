@@ -1,3 +1,11 @@
+/**
+ * 首次安装页面。
+ *
+ * 架构位置：检查 setup 状态后调用 `/api/app/setup` 创建初始管理员；
+ * 是否允许初始化、是否同步 PocketBase superuser 由后端最终裁决。
+ *
+ * Caveat: 这里的表单校验只是 UX，不能放宽后端 strict JSON 和安装状态检查。
+ */
 import { type FormEvent, useRef, useState } from "react";
 import { useRouter } from '@/lib/router';
 import { ArrowRight, Lock, Mail, UserRound } from "lucide-react";

@@ -1,12 +1,23 @@
+/**
+ * 延迟清理弹窗临时状态的 Hook。
+ *
+ * 架构位置：Radix Dialog 关闭动画和 React 状态清理存在同帧竞争；这里把“释放临时表单/
+ * 上传预览/编辑草稿”的副作用统一延后，供配置项、订阅弹窗等复用。
+ *
+ * 状态链路：
+ *   close requested -> scheduleCleanup -> animation starts -> cleanup
+ *   reopen/cancel -> cancelCleanup
+ *
+ * Caveat: 这里不保存业务状态，只控制清理时机；调用方仍必须决定哪些草稿可以丢弃。
+ */
 import { useCallback, useEffect, useRef } from "react";
 
 const DEFAULT_DIALOG_CLEANUP_DELAY_MS = 200;
 
 /**
- * Defer transient dialog cleanup until the close animation has started.
+ * 延迟执行弹窗临时状态清理。
  *
- * This keeps existing state semantics, but avoids doing expensive cleanup work
- * in the same interaction frame that closes a Radix dialog.
+ * 为什么延迟：关闭动画开始前同步清空内容会造成布局闪烁，尤其是包含图片裁剪或长表单的弹窗。
  */
 export function useDeferredDialogCleanup(
   cleanup: () => void,

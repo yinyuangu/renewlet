@@ -1,3 +1,10 @@
+/**
+ * 表单错误展示原语。
+ *
+ * 架构位置：上层表单负责校验和本地化，本组件只统一错误文本的视觉层级与 aria 语义。
+ *
+ * Caveat: 错误归一化应在 domain/hook 边界完成，这里只接收最终展示文案。
+ */
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 

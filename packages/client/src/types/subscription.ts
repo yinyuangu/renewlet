@@ -1,3 +1,11 @@
+/**
+ * 订阅、设置与通知的前端领域模型。
+ *
+ * 架构位置：API/PocketBase 响应必须先经过 Zod schema 与 hook 边界，页面、统计、日历和通知设置
+ * 只消费这里的品牌类型与联合类型。
+ *
+ * Caveat: date-only、本地时间和 custom 周期是核心不变量；新增字段时要同步 Go schema/hooks 与前端 schema。
+ */
 import type { CustomThemeColor, ThemeMode, ThemeVariant } from './theme';
 import { DEFAULT_CUSTOM_THEME_COLOR } from './theme';
 import { getInitialLocale, labels, type Locale, type LocalizedLabels } from '@/i18n/locales';
@@ -5,16 +13,6 @@ import { SUPPORTED_EXCHANGE_RATE_CURRENCIES, getIntlCurrencyOptionLabel } from '
 import type { ExchangeRateProvider } from '@/lib/api/schemas/exchange-rates';
 import type { DateOnly } from '@/lib/time/date-only';
 import type { LocalTime } from '@/lib/time/local-time';
-
-/**
- * 订阅与设置领域模型。
- *
- * 架构位置：
- * - 这里定义前端 domain 层的稳定类型，API/PocketBase 响应必须先经过 schema/hook 边界再转换进来。
- * - 页面、统计、日历、通知配置和表单都依赖这些联合类型与品牌类型表达业务不变量。
- *
- * Caveat: 不要把 API row 类型直接导出给 UI 使用；否则 date-only、本地时间和 custom 周期约束会被绕过。
- */
 
 export const SUBSCRIPTION_STATUSES = ['trial', 'active', 'paused', 'cancelled'] as const;
 /** 订阅状态（影响展示、统计与提醒逻辑）。 */
@@ -168,11 +166,11 @@ export interface SubscriptionStats {
 }
 
 export interface AppSettings {
-  // Admin
+  // 管理员展示信息
   /** 管理员用户名（用于界面展示/未来扩展）。 */
   adminUsername: string;
   
-  // Display
+  // 显示与本地化
   /** 明暗模式（light/dark/system，对应本地 ThemeProvider）。 */
   themeMode: ThemeMode;
   /** 主题风格（emerald/ocean/...，对应 html[data-theme]）。 */
@@ -188,15 +186,15 @@ export interface AppSettings {
   /** 首选汇率来源；另一个远端来源仍作为兜底。 */
   exchangeRateProvider: ExchangeRateProvider;
   
-  // Budget
+  // 预算
   /** 月度预算（用于统计页预算占比）。 */
   monthlyBudget: number;
   
-  // Timezone
+  // 时区
   /** 用户时区（用于后续定时任务/通知展示）。 */
   timezone: string;
   
-  // Notification
+  // 通知总开关
   /** 每天发送通知的本地墙上时间（格式 HH:mm，需结合 timezone 解释）。 */
   notificationTimeLocal: LocalTime;
   /** 启用的通知渠道（可多选）。 */
@@ -204,17 +202,17 @@ export interface AppSettings {
   /** 第三方 API 测试号码（部分渠道测试用）。 */
   testPhone: string;
   
-  // Telegram
+  // Telegram 渠道
   /** Telegram Bot Token。 */
   telegramBotToken: string;
   /** Telegram Chat ID。 */
   telegramChatId: string;
   
-  // Notifyx
+  // Notifyx 渠道
   /** Notifyx API Key。 */
   notifyxApiKey: string;
   
-  // Webhook
+  // Webhook 渠道
   /** Webhook URL。 */
   webhookUrl: string;
   /** Webhook 请求方法。 */
@@ -224,7 +222,7 @@ export interface AppSettings {
   /** Webhook Payload（模板字符串/JSON 字符串）。 */
   webhookPayload: string;
   
-  // WeChat Work
+  // 企业微信渠道
   /** 企业微信机器人 Webhook URL。 */
   wechatWebhookUrl: string;
   /** 企业微信消息类型。 */
@@ -236,7 +234,7 @@ export interface AppSettings {
   /** 企业微信是否 @ 全体。 */
   wechatAtAll: boolean;
   
-  // Email (SMTP)
+  // 邮件渠道
   /** SMTP 服务器地址。 */
   smtpHost: string;
   /** SMTP 端口。 */
@@ -256,7 +254,7 @@ export interface AppSettings {
   /** 收件人邮箱。 */
   recipientEmail: string;
   
-  // Bark
+  // Bark 渠道
   /** Bark 服务器地址。 */
   barkServerUrl: string;
   /** Bark 设备 Key。 */

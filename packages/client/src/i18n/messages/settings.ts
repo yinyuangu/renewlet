@@ -1,11 +1,12 @@
+/**
+ * 设置页基础表单与汇率文案分片。
+ *
+ * 架构位置：SettingsScreen/presentation 只消费这些 key，保存和校验反馈由 controller 选择。
+ *
+ * Caveat: 汇率 provider 文案要与 schema 枚举同步；旧枚举迁移提示不能提前删除。
+ */
 import type { MessageMap, MessageValue } from "./types";
 
-/**
- * settings.ts 收拢设置页基础表单与汇率文案。
- *
- * 架构位置：messages.ts 只做聚合与 translate，领域分片负责保持中英文 key
- * 一一对应，避免单个巨大 message 文件突破维护上限。
- */
 export const zhCN = {
   "settings.title": "系统配置",
   "settings.subtitle": "管理您的账户、显示和通知设置",

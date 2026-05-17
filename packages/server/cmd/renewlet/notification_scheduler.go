@@ -381,6 +381,7 @@ func runNotificationCron(app core.App, options notificationCronOptions) (notific
 		}
 
 		if finalReason != "" {
+			// 即使没有可发送内容也写入 skipped job，前端历史才能解释“本次 cron 已检查但无提醒”。
 			result := createJobResult(finalReason, schedule.localScheduleOccurrence, settings, due, options, jobChannels{})
 			if err := finalizeNotificationJob(app, existingJob, userID, schedule, notificationStatusSkipped, "", result); err != nil {
 				return notificationCronResult{}, err

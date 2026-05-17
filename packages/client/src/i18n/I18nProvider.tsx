@@ -1,3 +1,17 @@
+/**
+ * i18n Provider 与格式化能力聚合层。
+ *
+ * 架构位置：messages 只提供纯文案，settings 保存用户偏好，本文件负责把
+ * locale 同步到 DOM、API 错误语言、React Query 缓存和用户设置。
+ *
+ * 状态链路：
+ *   initial locale -> document/api/localStorage
+ *   remote settings.locale -> state
+ *   user preview -> state only
+ *   user persist -> query cache + settings API
+ *
+ * Caveat: 外观设置页会用 `persist=false` 做本地预览；不要把预览态提前写入远端。
+ */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { setApiLocale } from "@/i18n/api-locale";
@@ -26,6 +40,7 @@ function applyDocumentLocale(locale: Locale) {
   document.documentElement.lang = locale;
 }
 
+/** 构建 Provider 外调用 `useI18n` 时的保守兜底，避免错误边界二次崩溃。 */
 function createFallbackI18nValue(): I18nContextValue {
   const locale = getInitialLocale();
   const t = (key: MessageKey, params?: Record<string, string | number>) => translate(locale, key, params);
@@ -63,6 +78,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   const { mutate: updateSettings } = useUpdateSettings();
 
   useEffect(() => {
+    // 本地预览时只更新 DOM 语言，API/持久化语言仍保持上一次已保存值。
     applyDocumentLocale(locale);
     if (hasLocalPreviewRef.current) return;
     setApiLocale(locale);
@@ -70,6 +86,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   }, [locale]);
 
   useEffect(() => {
+    // 远端设置是登录后真相来源，但不能覆盖用户正在预览的未保存语言。
     if (!settings?.locale || settings.locale === locale) return;
     if (hasLocalPreviewRef.current) return;
     setLocaleState(settings.locale);
@@ -82,6 +99,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       setLocaleState(nextLocale);
 
       if (!shouldPersist) {
+        // Settings 页需要即时预览语言，同时等用户点击保存后再写 settings。
         hasLocalPreviewRef.current = !options.markAsSaved;
         if (options.markAsSaved) {
           setApiLocale(nextLocale);
@@ -93,6 +111,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
 
       hasLocalPreviewRef.current = false;
       queryClient.setQueryData(["settings"], (current: unknown) => {
+        // 先更新缓存可以让 Settings 页和 Header 立即看到新语言，失败回滚交给保存流程处理。
         if (!current || typeof current !== "object") return current;
         return { ...current, locale: nextLocale };
       });

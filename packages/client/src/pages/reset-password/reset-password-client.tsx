@@ -1,3 +1,10 @@
+/**
+ * 重置密码客户端表单。
+ *
+ * 架构位置：负责本地密码一致性校验和 PocketBase confirmPasswordReset 调用。
+ *
+ * Caveat: 成功后立即清空本地密码 state，避免用户离开页面前明文继续停留在内存和输入框中。
+ */
 import { type FormEvent, useRef, useState } from "react";
 import Link from '@/components/router-link';
 import { ArrowLeft, CheckCircle2, Eye, EyeOff, Lock, ShieldAlert } from "lucide-react";

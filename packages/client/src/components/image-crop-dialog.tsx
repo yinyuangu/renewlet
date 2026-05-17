@@ -113,7 +113,7 @@ async function getCroppedImg(
 
   ctx.imageSmoothingQuality = 'high';
 
-  // Calculate rotation center
+  // 旋转中心使用原图中心，避免裁剪框局部坐标导致旋转后偏移。
   const rotateRads = rotate * (Math.PI / 180);
   const centerX = image.naturalWidth / 2;
   const centerY = image.naturalHeight / 2;
