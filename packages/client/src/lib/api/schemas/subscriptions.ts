@@ -12,6 +12,8 @@
 import { z } from "zod";
 import {
   BILLING_CYCLES,
+  MAX_SUBSCRIPTION_TAG_LENGTH,
+  MAX_SUBSCRIPTION_TAGS,
   REPEAT_REMINDER_INTERVALS,
   REPEAT_REMINDER_WINDOWS,
   SUBSCRIPTION_STATUSES,
@@ -71,10 +73,10 @@ const optionalLogoReferenceSchema = z
   }, "Invalid logo URL");
 
 const tagsSchema = z
-  .array(z.string().trim().min(1).max(40))
-  .max(20)
+  .array(z.string().trim().min(1).max(MAX_SUBSCRIPTION_TAG_LENGTH))
+  .max(MAX_SUBSCRIPTION_TAGS)
   .optional()
-  .describe("标签数组（可选，最多 20 个）。");
+  .describe("标签数组（可选，最多 100 个）。");
 
 /** 创建订阅请求体（PocketBase subscriptions collection）。 */
 export const subscriptionCreateBodySchema = z.object({

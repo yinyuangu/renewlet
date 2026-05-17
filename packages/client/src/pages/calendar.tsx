@@ -6,13 +6,14 @@
  * - 支持从日历点击订阅并进入编辑
  */
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { Subscription, SubscriptionDraft } from '@/types/subscription';
 import { Header } from '@/components/header';
 import { SubscriptionCalendar } from '@/components/subscription-calendar';
 import { EditSubscriptionDialog } from '@/components/edit-subscription-dialog';
 import { CalendarSkeleton } from '@/components/loading-skeleton';
 import { useCreateSubscription, useSubscriptions, useUpdateSubscription } from '@/hooks/use-subscriptions';
+import { collectSubscriptionTags } from '@/modules/subscriptions/domain/subscription-filters';
 import { useI18n } from '@/i18n/I18nProvider';
 
 /** 日历页组件。 */
@@ -22,6 +23,7 @@ const Calendar = () => {
   const createSubscription = useCreateSubscription();
   const updateSubscription = useUpdateSubscription();
   const { t } = useI18n();
+  const availableTags = useMemo(() => collectSubscriptionTags(subscriptions), [subscriptions]);
   const [editingSubscription, setEditingSubscription] = useState<Subscription | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
 
@@ -47,7 +49,7 @@ const Calendar = () => {
   if (subscriptionsQuery.isPending) {
     return (
       <div className="min-h-screen bg-background">
-        <Header onAddSubscription={handleAddSubscription} />
+        <Header onAddSubscription={handleAddSubscription} availableTags={availableTags} />
         <main className="mx-auto max-w-7xl px-6 py-8">
           <div className="mb-6">
             <div className="h-8 w-32 bg-muted rounded animate-pulse mb-2" />
@@ -61,7 +63,7 @@ const Calendar = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header onAddSubscription={handleAddSubscription} />
+      <Header onAddSubscription={handleAddSubscription} availableTags={availableTags} />
 
       <main className="mx-auto max-w-7xl px-6 py-8">
         <div className="mb-6">
@@ -80,6 +82,7 @@ const Calendar = () => {
         open={editDialogOpen}
         onOpenChange={setEditDialogOpen}
         onSave={handleSaveSubscription}
+        availableTags={availableTags}
       />
     </div>
   );

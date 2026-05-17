@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils";
 import { dateOnlyToLocalDate, dateToDateOnly } from "@/lib/time/date-only";
 import { LogoPicker, type UploadStatus as LogoUploadStatus } from "@/components/logo-picker";
 import { AuthorizedImage } from "@/components/authorized-image";
+import { SubscriptionTagInput } from "@/components/subscription-tag-input";
 import type { CustomConfig } from "@/types/config";
 import type {
   BillingCycle,
@@ -56,6 +57,7 @@ export interface SubscriptionFormFieldsProps {
   config: CustomConfig;
   formData: SubscriptionFormState;
   setFormData: Dispatch<SetStateAction<SubscriptionFormState>>;
+  availableTags?: readonly string[] | undefined;
   onLogoUploadStatusChange: (status: LogoUploadStatus) => void;
   onFieldChange?: <K extends keyof SubscriptionFormState>(key: K, value: SubscriptionFormState[K]) => void;
   errors?: SubscriptionFormErrors | undefined;
@@ -63,7 +65,7 @@ export interface SubscriptionFormFieldsProps {
 }
 
 export type SubscriptionFormErrors = Partial<Record<
-  "name" | "price" | "dates" | "customDays" | "reminderDays" | "website",
+  "name" | "price" | "dates" | "customDays" | "reminderDays" | "website" | "tags",
   string
 >>;
 
@@ -78,6 +80,7 @@ const errorFieldByFormKey: Partial<Record<keyof SubscriptionFormState, keyof Sub
   reminderDays: "reminderDays",
   customReminderDays: "reminderDays",
   website: "website",
+  tags: "tags",
 } satisfies Partial<Record<keyof SubscriptionFormState, keyof SubscriptionFormErrors>>;
 
 /** 渲染新增/编辑订阅共用字段。 */
@@ -86,6 +89,7 @@ export const SubscriptionFormFields = memo(function SubscriptionFormFields({
   config,
   formData,
   setFormData,
+  availableTags = [],
   onLogoUploadStatusChange,
   onFieldChange,
   errors = {},
@@ -571,12 +575,14 @@ export const SubscriptionFormFields = memo(function SubscriptionFormFields({
 
       <div className="grid gap-2">
         <Label htmlFor={id("tags")}>{t("subscription.field.tags")}</Label>
-        <Input
+        <SubscriptionTagInput
           id={id("tags")}
-          placeholder={t("subscription.placeholder.tags")}
           value={formData.tags}
-          onChange={(e) => update("tags", e.target.value)}
-          className="border-border bg-secondary"
+          onChange={(tags) => update("tags", tags)}
+          suggestions={availableTags}
+          error={errors.tags}
+          errorId={id("tags-error")}
+          onClearError={() => onClearFieldError?.("tags")}
         />
       </div>
     </>

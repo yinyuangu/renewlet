@@ -67,6 +67,48 @@ test("setup, login, create subscriptions with empty and tagged tags", async ({ p
   await expect(page.getByText("标签:")).toBeVisible();
   await expect(page.getByText("工作")).toBeVisible();
 
+  const desktopViewport = page.viewportSize();
+  await openSubscriptionEditDialog(page, "Tagged Cloud");
+  const desktopEditDialog = page.getByRole("dialog", { name: "编辑订阅" });
+  await expect(desktopEditDialog).toBeVisible();
+  const desktopTagInput = desktopEditDialog.getByLabel("标签", { exact: true });
+  await desktopTagInput.fill("Writing、test、Docs、Research");
+  await desktopTagInput.click();
+  await expectEmptyTagCursorStaysInline(page, desktopEditDialog);
+  await page.keyboard.press("Escape");
+  await desktopEditDialog.getByRole("button", { name: "取消" }).click();
+  await expect(desktopEditDialog).toBeHidden();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openSubscriptionEditDialog(page, "Tagged Cloud");
+  const editDialog = page.getByRole("dialog", { name: "编辑订阅" });
+  await expect(editDialog).toBeVisible();
+  const editTagInput = editDialog.getByLabel("标签", { exact: true });
+  await editTagInput.fill("测试、研发、财务、运营、设计、增长");
+  await editTagInput.click();
+  await page.keyboard.type("lfsdfsdfsdf");
+  await expectTagInputPopoverLayout(page, editDialog);
+  if (process.env.RENEWLET_E2E_SCREENSHOTS === "1") {
+    await page.screenshot({ path: "test-results/tag-popover-layout.png" });
+  }
+  await page.keyboard.press("Escape");
+  await editDialog.getByRole("button", { name: "取消" }).click();
+  await expect(editDialog).toBeHidden();
+
+  await page.getByRole("button", { name: "添加订阅" }).click();
+  const emptyTagDialog = page.getByRole("dialog", { name: "添加新订阅" });
+  await expect(emptyTagDialog).toBeVisible();
+  await emptyTagDialog.getByLabel("标签", { exact: true }).click();
+  await expect(page.getByRole("listbox")).toBeVisible();
+  await page.waitForTimeout(250);
+  await expect(page.getByRole("listbox")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await emptyTagDialog.getByRole("button", { name: "取消" }).click();
+  await expect(emptyTagDialog).toBeHidden();
+  if (desktopViewport) {
+    await page.setViewportSize(desktopViewport);
+  }
+
   await page.getByText("工作").click();
   await expect(page.getByText("Tagged Cloud")).toBeVisible();
   await expect(page.getByText("Aws")).toBeHidden();
@@ -189,6 +231,109 @@ function isTargetConsoleWarning(text: string): boolean {
     (text.includes("fonts.googleapis.com") && text.includes("Content Security Policy"));
 }
 
+async function openSubscriptionEditDialog(page: Page, subscriptionName: string) {
+  const card = page
+    .getByRole("heading", { name: subscriptionName })
+    .locator("xpath=ancestor::div[contains(@class, 'group')][1]");
+  await card.getByRole("button", { name: "更多操作" }).click();
+  await page.getByRole("menuitem", { name: "编辑" }).click();
+}
+
+async function expectTagInputPopoverLayout(page: Page, dialog: Locator) {
+  const tagInput = dialog.getByLabel("标签", { exact: true });
+  const listbox = page.getByRole("listbox");
+  await expect(listbox).toBeVisible();
+
+  const popoverContent = listbox.locator("xpath=..");
+  await expect(popoverContent).toHaveAttribute("data-side", "top");
+
+  const [inputBox, popoverBox] = await Promise.all([
+    getRequiredLocatorBoundingBox(tagInput, "subscription tag input"),
+    getRequiredLocatorBoundingBox(popoverContent, "subscription tag popover"),
+  ]);
+  expect(
+    popoverBox.y + popoverBox.height,
+    "subscription tag popover should render above the input when there is room",
+  ).toBeLessThanOrEqual(inputBox.y);
+
+  const wrapState = await tagInput.evaluate((element) => {
+    if (!(element instanceof HTMLInputElement)) {
+      throw new Error("Tag control is not an input");
+    }
+
+    const container = element.closest<HTMLElement>('[data-slot="subscription-tag-field"]');
+    const sizer = element.closest<HTMLElement>('[data-slot="subscription-tag-input-sizer"]');
+    if (!container || !sizer) {
+      throw new Error("Tag input is missing its chip field or autosize wrapper");
+    }
+
+    const chips = Array.from(container.querySelectorAll<HTMLButtonElement>('button[aria-label^="移除标签"]'))
+      .map((button) => button.parentElement)
+      .filter((chip): chip is HTMLElement => chip instanceof HTMLElement);
+    const lastChip = chips.at(-1);
+    if (!lastChip) {
+      throw new Error("Expected tag chips before checking input wrapping");
+    }
+
+    const containerRect = container.getBoundingClientRect();
+    const chipRect = lastChip.getBoundingClientRect();
+    const sizerRect = sizer.getBoundingClientRect();
+    const inputRect = element.getBoundingClientRect();
+    return {
+      freeSpaceAfterLastChip: Math.round(containerRect.right - chipRect.right),
+      inputIsBelowLastChip: sizerRect.top - chipRect.top > 12,
+      inputOverflowsField: inputRect.right > containerRect.right,
+      sizerWidth: Math.round(sizerRect.width),
+    };
+  });
+
+  expect(
+    !wrapState.inputIsBelowLastChip && wrapState.freeSpaceAfterLastChip < wrapState.sizerWidth,
+    `tag input stayed on a cramped row: ${wrapState.freeSpaceAfterLastChip}px free for ${wrapState.sizerWidth}px input`,
+  ).toBe(false);
+  expect(wrapState.inputOverflowsField, "tag input should stay inside the field edge").toBe(false);
+}
+
+async function expectEmptyTagCursorStaysInline(page: Page, dialog: Locator) {
+  const tagInput = dialog.getByLabel("标签", { exact: true });
+  await expect(page.getByRole("listbox")).toBeVisible();
+
+  const cursorState = await tagInput.evaluate((element) => {
+    if (!(element instanceof HTMLInputElement)) {
+      throw new Error("Tag control is not an input");
+    }
+
+    const container = element.closest<HTMLElement>('[data-slot="subscription-tag-field"]');
+    const sizer = element.closest<HTMLElement>('[data-slot="subscription-tag-input-sizer"]');
+    if (!container || !sizer) {
+      throw new Error("Tag input is missing its chip field or autosize wrapper");
+    }
+
+    const chips = Array.from(container.querySelectorAll<HTMLButtonElement>('button[aria-label^="移除标签"]'))
+      .map((button) => button.parentElement)
+      .filter((chip): chip is HTMLElement => chip instanceof HTMLElement);
+    const lastChip = chips.at(-1);
+    if (!lastChip) {
+      throw new Error("Expected tag chips before checking empty cursor layout");
+    }
+
+    const containerRect = container.getBoundingClientRect();
+    const chipRect = lastChip.getBoundingClientRect();
+    const sizerRect = sizer.getBoundingClientRect();
+    return {
+      freeSpaceAfterLastChip: Math.round(containerRect.right - chipRect.right),
+      cursorFitsCurrentRow: containerRect.right - chipRect.right >= sizerRect.width,
+      inputIsBelowLastChip: sizerRect.top - chipRect.top > 12,
+      sizerWidth: Math.round(sizerRect.width),
+    };
+  });
+
+  expect(
+    cursorState.inputIsBelowLastChip && cursorState.cursorFitsCurrentRow,
+    `empty tag cursor wrapped with ${cursorState.freeSpaceAfterLastChip}px free for ${cursorState.sizerWidth}px cursor`,
+  ).toBe(false);
+}
+
 async function getRequiredElementBoundingBox(element: ElementHandle<HTMLElement | SVGElement>, label: string) {
   const box = await element.boundingBox();
   if (!box) {
@@ -222,7 +367,11 @@ async function expectLabelControlGap(control: Locator, label: string) {
     }
 
     const labelRect = labelElement.getBoundingClientRect();
-    const controlRect = element.getBoundingClientRect();
+    const visualControl =
+      element instanceof HTMLInputElement
+        ? element.closest<HTMLElement>('[data-slot="subscription-tag-field"]') ?? element
+        : element;
+    const controlRect = visualControl.getBoundingClientRect();
     return Math.round((controlRect.top - labelRect.bottom) * 100) / 100;
   });
 
@@ -386,4 +535,5 @@ async function saveSubscription(page: Page) {
   if (!response.ok()) {
     throw new Error(`subscription create failed: ${response.status()} ${await response.text()}`);
   }
+  await expect(dialog).toBeHidden();
 }

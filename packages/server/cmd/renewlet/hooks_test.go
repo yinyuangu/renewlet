@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"strings"
 	"testing"
@@ -248,10 +249,25 @@ func TestNormalizeTagsAcceptsPocketBaseJSONShapes(t *testing.T) {
 	}
 }
 
+func TestNormalizeTagsAcceptsProtectiveHighLimit(t *testing.T) {
+	tags := make([]string, maxSubscriptionTags)
+	for i := range tags {
+		tags[i] = fmt.Sprintf("tag-%d", i)
+	}
+
+	got, err := normalizeTags(tags)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != maxSubscriptionTags {
+		t.Fatalf("got %d tags, want %d", len(got), maxSubscriptionTags)
+	}
+}
+
 func TestNormalizeTagsRejectsInvalidValues(t *testing.T) {
-	tooMany := make([]string, 21)
+	tooMany := make([]string, maxSubscriptionTags+1)
 	for i := range tooMany {
-		tooMany[i] = "tag"
+		tooMany[i] = fmt.Sprintf("tag-%d", i)
 	}
 	cases := []struct {
 		name  string

@@ -41,7 +41,7 @@ vi.mock("@/components/subscription-form-fields", () => ({
             currency: "USD",
             startDate: assertDateOnly("2026-05-14"),
             nextBillingDate: assertDateOnly("2026-06-14"),
-            tags: "",
+            tags: [],
           }))
         }
       >
@@ -56,7 +56,7 @@ vi.mock("@/components/subscription-form-fields", () => ({
             currency: "USD",
             startDate: assertDateOnly("2026-05-14"),
             nextBillingDate: assertDateOnly("2026-06-14"),
-            tags: "",
+            tags: [],
           }))
         }
       >

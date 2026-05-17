@@ -329,7 +329,7 @@ func normalizeTags(value interface{}) ([]string, error) {
 	if err != nil {
 		return nil, errors.New("TAGS_MUST_BE_STRING_ARRAY")
 	}
-	if len(raw) > 20 {
+	if len(raw) > maxSubscriptionTags {
 		return nil, errors.New("TAGS_TOO_MANY")
 	}
 	seen := map[string]struct{}{}
@@ -339,7 +339,7 @@ func normalizeTags(value interface{}) ([]string, error) {
 		if tag == "" {
 			continue
 		}
-		if len([]rune(tag)) > 40 {
+		if len([]rune(tag)) > maxSubscriptionTagLength {
 			return nil, errors.New("TAG_TOO_LONG")
 		}
 		if _, exists := seen[tag]; exists {

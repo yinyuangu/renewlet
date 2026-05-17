@@ -12,6 +12,7 @@
  * - 首页统计由 `useDashboardStats` 生成，CRUD 弹窗状态由 `useSubscriptionCrud` 管理。
  */
 
+import { useMemo } from "react";
 import Link from '@/components/router-link';
 import type { Subscription } from "@/types/subscription";
 import { Header } from "@/components/header";
@@ -28,6 +29,7 @@ import { useSubscriptions } from "@/hooks/use-subscriptions";
 import { useSettings } from "@/hooks/use-settings";
 import { useDashboardStats } from "@/modules/subscriptions/application/use-dashboard-stats";
 import { useSubscriptionCrud } from "@/modules/subscriptions/application/use-subscription-crud";
+import { collectSubscriptionTags } from "@/modules/subscriptions/domain/subscription-filters";
 import { useI18n } from "@/i18n/I18nProvider";
 
 const EMPTY_SUBSCRIPTIONS: Subscription[] = [];
@@ -42,6 +44,7 @@ export default function Index() {
   const { convert, loading: ratesLoading } = useExchangeRates(settings?.exchangeRateProvider);
   const defaultCurrency = settings?.defaultCurrency ?? "CNY";
   const timeZone = settings?.timezone ?? "UTC";
+  const availableTags = useMemo(() => collectSubscriptionTags(subscriptions), [subscriptions]);
   const { activeSubscriptions, totalMonthly, upcomingCount, trialCount } = useDashboardStats(
     subscriptions,
     defaultCurrency,
@@ -63,7 +66,7 @@ export default function Index() {
   if (subscriptionsQuery.isPending || settingsQuery.isPending) {
     return (
       <div className="min-h-screen bg-background">
-        <Header onAddSubscription={handleAddSubscription} />
+        <Header onAddSubscription={handleAddSubscription} availableTags={availableTags} />
         <main className="mx-auto max-w-7xl px-6 py-8">
           <DashboardSkeleton />
         </main>
@@ -76,7 +79,7 @@ export default function Index() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header onAddSubscription={handleAddSubscription} />
+      <Header onAddSubscription={handleAddSubscription} availableTags={availableTags} />
 
       <main className="mx-auto max-w-7xl px-6 py-8">
         {/* Stats Grid */}
@@ -171,6 +174,7 @@ export default function Index() {
         open={editDialogOpen}
         onOpenChange={handleEditDialogOpenChange}
         onSave={handleSaveSubscription}
+        availableTags={availableTags}
       />
     </div>
   );

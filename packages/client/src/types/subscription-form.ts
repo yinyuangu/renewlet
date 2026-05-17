@@ -71,8 +71,8 @@ export type SubscriptionFormState = {
   website: string;
   /** 备注输入（可选）。 */
   notes: string;
-  /** 标签输入（逗号分隔字符串，提交时拆分为 string[]）。 */
-  tags: string;
+  /** 标签数组；输入组件负责把用户键入的分隔文本归并为数组。 */
+  tags: string[];
 };
 
 /**
@@ -105,7 +105,7 @@ export function createSubscriptionFormState(
     repeatReminderWindow: "72h",
     website: "",
     notes: "",
-    tags: "",
+    tags: [],
     ...overrides,
   };
 }

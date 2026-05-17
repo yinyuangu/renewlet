@@ -17,11 +17,20 @@ interface EditSubscriptionDialogProps {
   onOpenChange: (open: boolean) => void;
   /** 保存回调（回传完整 Subscription）。 */
   onSave: (subscription: Subscription) => void;
+  /** 当前用户已有标签建议。 */
+  availableTags?: readonly string[] | undefined;
 }
 
 /** 以 edit mode 渲染通用订阅弹窗。 */
-export function EditSubscriptionDialog({ subscription, open, onOpenChange, onSave }: EditSubscriptionDialogProps) {
+export function EditSubscriptionDialog({ subscription, open, onOpenChange, onSave, availableTags }: EditSubscriptionDialogProps) {
   return (
-    <SubscriptionDialog mode="edit" open={open} onOpenChange={onOpenChange} subscription={subscription} onSubmit={onSave} />
+    <SubscriptionDialog
+      mode="edit"
+      open={open}
+      onOpenChange={onOpenChange}
+      subscription={subscription}
+      onSubmit={onSave}
+      availableTags={availableTags}
+    />
   );
 }

@@ -25,6 +25,7 @@ import type { UploadStatus as LogoUploadStatus } from "@/components/logo-picker"
 import { calculateNextBillingDate } from "@/lib/subscription-billing";
 import {
   isOptionalHttpUrl,
+  getTagsValidationError,
   parseNonNegativeFiniteNumberInput,
   parseNonNegativeIntegerInput,
   parsePositiveIntegerInput,
@@ -48,6 +49,8 @@ type CreateDialogProps = {
   onOpenChange: (open: boolean) => void;
   /** 新增提交回调（不含 id）。 */
   onSubmit: (subscription: SubscriptionDraft) => void;
+  /** 当前用户已有标签建议。 */
+  availableTags?: readonly string[] | undefined;
   /** 触发器（可选，通常是“添加订阅”按钮）。 */
   trigger?: ReactNode;
 };
@@ -62,6 +65,8 @@ type EditDialogProps = {
   subscription: Subscription | null;
   /** 保存回调（回传完整 Subscription）。 */
   onSubmit: (subscription: Subscription) => void;
+  /** 当前用户已有标签建议。 */
+  availableTags?: readonly string[] | undefined;
 };
 
 export type SubscriptionDialogProps = CreateDialogProps | EditDialogProps;
@@ -132,7 +137,7 @@ export function SubscriptionDialog(props: SubscriptionDialogProps) {
       formData.price.trim().length === 0 &&
       formData.website.trim().length === 0 &&
       formData.notes.trim().length === 0 &&
-      formData.tags.trim().length === 0;
+      formData.tags.length === 0;
 
     const currencyDisabled = !enabledCurrencyValues.includes(formData.currency);
     const shouldSync = (!createCurrencyManuallySelected && isPristine) || currencyDisabled;
@@ -186,7 +191,7 @@ export function SubscriptionDialog(props: SubscriptionDialogProps) {
       repeatReminderWindow: subscription.repeatReminderWindow,
       website: subscription.website ?? "",
       notes: subscription.notes ?? "",
-      tags: subscription.tags?.join("、") || "",
+      tags: subscription.tags ?? [],
     });
     setLogoUploadStatus("idle");
     setFormErrors({});
@@ -232,6 +237,10 @@ export function SubscriptionDialog(props: SubscriptionDialogProps) {
     }
     if (!isOptionalHttpUrl(formData.website)) {
       errors.website = t("subscription.validation.websiteInvalid");
+    }
+    const tagsError = getTagsValidationError(formData.tags);
+    if (tagsError) {
+      errors.tags = tagsError;
     }
 
     return errors;
@@ -311,6 +320,7 @@ export function SubscriptionDialog(props: SubscriptionDialogProps) {
               config={config}
               formData={formData}
               setFormData={setFormData}
+              availableTags={props.availableTags}
               onLogoUploadStatusChange={setLogoUploadStatus}
               onFieldChange={handleFieldChange}
               errors={formErrors}

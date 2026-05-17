@@ -14,6 +14,7 @@
  * 修改其中任一处都要同步首页统计、SpendingChart 和导出逻辑。
  */
 
+import { useMemo } from 'react';
 import type { Subscription } from '@/types/subscription';
 import { Header } from '@/components/header';
 import { StatisticsSkeleton } from '@/components/loading-skeleton';
@@ -28,6 +29,7 @@ import { useSettings } from '@/hooks/use-settings';
 import { useCustomConfig } from '@/contexts/CustomConfigContext';
 import { useStatisticsModel } from '@/modules/subscriptions/application/use-statistics-model';
 import { useSubscriptionCrud } from '@/modules/subscriptions/application/use-subscription-crud';
+import { collectSubscriptionTags } from '@/modules/subscriptions/domain/subscription-filters';
 import { useI18n } from '@/i18n/I18nProvider';
 
 /** 空订阅数组：用于在数据未加载完成时提供稳定引用，避免 useMemo 依赖抖动。 */
@@ -134,6 +136,7 @@ const Statistics = () => {
   const { convert, loading: ratesLoading, refresh: refreshRates, lastUpdated, error: ratesError } = useExchangeRates(settings?.exchangeRateProvider);
   const stats = useStatisticsModel(subscriptions, config, monthlyBudget, defaultCurrency, convert, timeZone, locale);
   const { handleAddSubscription } = useSubscriptionCrud(subscriptions);
+  const availableTags = useMemo(() => collectSubscriptionTags(subscriptions), [subscriptions]);
 
   const CustomTooltip = ({ active, payload, valueKind }: ChartTooltipProps) => {
     const first = payload?.[0];
@@ -226,7 +229,7 @@ const Statistics = () => {
   if (subscriptionsQuery.isPending || settingsQuery.isPending || ratesLoading) {
     return (
       <div className="min-h-screen bg-background">
-        <Header onAddSubscription={handleAddSubscription} />
+        <Header onAddSubscription={handleAddSubscription} availableTags={availableTags} />
         <main className="mx-auto max-w-7xl px-6 py-8">
           <div className="mb-6">
             <div className="h-8 w-32 bg-muted rounded animate-pulse mb-2" />
@@ -240,7 +243,7 @@ const Statistics = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header onAddSubscription={handleAddSubscription} />
+      <Header onAddSubscription={handleAddSubscription} availableTags={availableTags} />
 
       <main className="mx-auto max-w-7xl px-6 py-8">
         <div className="mb-6 flex items-center justify-between">

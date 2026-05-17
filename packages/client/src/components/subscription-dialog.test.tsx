@@ -188,6 +188,66 @@ describe("SubscriptionDialog", () => {
     expect(screen.getByLabelText("备注")).toHaveValue("团队年度订阅");
   });
 
+  it("reuses existing tags and creates new tags when editing", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+
+    render(
+      <TooltipProvider delayDuration={0}>
+        <SubscriptionDialog
+          mode="edit"
+          open
+          onOpenChange={vi.fn()}
+          onSubmit={onSubmit}
+          subscription={makeSubscription({ tags: ["Infra"] })}
+          availableTags={["Security", "Docs", "Infra"]}
+        />
+      </TooltipProvider>,
+    );
+
+    const tagInput = screen.getByLabelText("标签");
+    expect(screen.getByText("Infra")).toBeInTheDocument();
+
+    await user.click(tagInput);
+    await user.click(await screen.findByText("Security"));
+    const refreshedTagInput = screen.getByLabelText("标签");
+    await user.type(refreshedTagInput, "AI");
+    expect(refreshedTagInput).toHaveValue("AI");
+    await user.keyboard("{Enter}");
+    await user.type(refreshedTagInput, "Infra");
+    await user.keyboard("{Enter}");
+    await user.click(screen.getByRole("button", { name: "保存修改" }));
+
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
+      tags: ["Infra", "Security", "AI"],
+    }));
+  });
+
+  it("removes an edited tag chip before submitting", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+
+    render(
+      <TooltipProvider delayDuration={0}>
+        <SubscriptionDialog
+          mode="edit"
+          open
+          onOpenChange={vi.fn()}
+          onSubmit={onSubmit}
+          subscription={makeSubscription({ tags: ["Infra", "Security"] })}
+          availableTags={["Infra", "Security"]}
+        />
+      </TooltipProvider>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "移除标签 Infra" }));
+    await user.click(screen.getByRole("button", { name: "保存修改" }));
+
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
+      tags: ["Security"],
+    }));
+  });
+
   it("submits edited website and notes while preserving the subscription id", async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();

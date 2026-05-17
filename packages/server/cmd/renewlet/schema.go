@@ -20,8 +20,11 @@ import (
 )
 
 const (
-	maxLogoReferenceLength = 64 * 1024
-	maxSubscriptionPrice   = 1_000_000_000
+	maxLogoReferenceLength       = 64 * 1024
+	maxSubscriptionPrice         = 1_000_000_000
+	maxSubscriptionTags          = 100
+	maxSubscriptionTagLength     = 40
+	maxSubscriptionTagsFieldSize = 16 * 1024
 )
 
 // ensureSchema 创建/修正 PocketBase collection schema。
@@ -234,7 +237,7 @@ func ensureSubscriptionsCollection(app core.App, users *core.Collection) error {
 			&core.TextField{Name: "trialEndDate", Max: 10, Pattern: `^$|^\d{4}-\d{2}-\d{2}$`},
 			&core.URLField{Name: "website"},
 			&core.TextField{Name: "notes", Max: 5000},
-			&core.JSONField{Name: "tags", MaxSize: 4096},
+			&core.JSONField{Name: "tags", MaxSize: maxSubscriptionTagsFieldSize},
 			&core.JSONField{Name: "extra", MaxSize: 65536},
 			&core.NumberField{Name: "reminderDays", OnlyInt: true, Min: &minZero},
 			&core.BoolField{Name: "repeatReminderEnabled"},

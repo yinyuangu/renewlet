@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  getTagsValidationError,
   getSubscriptionDraftValidationError,
   isOptionalHttpUrl,
+  normalizeTagsArray,
   parseNonNegativeFiniteNumberInput,
   parseNonNegativeIntegerInput,
   parseTagsInput,
@@ -15,6 +17,10 @@ describe("subscription-form", () => {
     expect(parseTagsInput("AI、工具, 生产力；\n年度;;")).toEqual(["AI", "工具", "生产力", "年度"]);
   });
 
+  it("normalizes tag arrays with trimming and exact-text de-duplication", () => {
+    expect(normalizeTagsArray([" AI ", "AI", "ai", "", "  工具  "])).toEqual(["AI", "ai", "工具"]);
+  });
+
   it("builds an empty tags array when the tags input is blank", () => {
     const form = createSubscriptionFormState({
       name: "Aws",
@@ -22,10 +28,17 @@ describe("subscription-form", () => {
       currency: "USD",
       startDate: assertDateOnly("2026-05-14"),
       nextBillingDate: assertDateOnly("2026-06-14"),
-      tags: "",
+      tags: [],
     });
 
     expect(toSubscriptionDraft(form)?.tags).toEqual([]);
+  });
+
+  it("validates the high protective tag limits", () => {
+    expect(getTagsValidationError(Array.from({ length: 100 }, (_, index) => `tag-${index}`))).toBeNull();
+    expect(getTagsValidationError(Array.from({ length: 101 }, (_, index) => `tag-${index}`))).toContain("100");
+    expect(getTagsValidationError(["a".repeat(40)])).toBeNull();
+    expect(getTagsValidationError(["a".repeat(41)])).toContain("40");
   });
 
   it("rejects loose numeric prefixes, Infinity, NaN and negative prices", () => {

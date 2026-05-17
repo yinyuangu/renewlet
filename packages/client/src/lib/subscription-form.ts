@@ -7,13 +7,18 @@
  *
  * Caveat: 上传中的 logo/icon 状态不在这里判断，调用方需要在提交按钮层面禁用保存。
  */
-import type { SubscriptionDraft } from "@/types/subscription";
+import {
+  MAX_SUBSCRIPTION_TAG_LENGTH,
+  MAX_SUBSCRIPTION_TAGS,
+  type SubscriptionDraft,
+} from "@/types/subscription";
 import type { SubscriptionFormState } from "@/types/subscription-form";
 import { getApiLocale } from "@/i18n/api-locale";
 import { translate } from "@/i18n/messages";
 
 const MAX_PRICE = 1_000_000_000;
 const MAX_DAYS = 3650;
+const TAG_SEPARATOR_PATTERN = /[、，,;；\n]+/g;
 
 /** 严格解析非负有限数，拒绝 `1e3` 等浏览器/后端口径可能不一致的写法。 */
 export function parseNonNegativeFiniteNumberInput(input: string, max = MAX_PRICE): number | null {
@@ -59,12 +64,33 @@ export function isOptionalHttpUrl(input: string | null | undefined): boolean {
  * - 兼容多种分隔符：顿号 `、` / 中文逗号 `，` / 英文逗号 `,` / 分号 `;；` / 换行
  * - 会 trim 并过滤空项（例如连续分隔符、首尾分隔符）
  */
+export function normalizeTagsArray(tags: readonly string[]): string[] {
+  const seen = new Set<string>();
+  const normalized: string[] = [];
+  for (const item of tags) {
+    const tag = item.trim();
+    if (!tag || seen.has(tag)) continue;
+    seen.add(tag);
+    normalized.push(tag);
+  }
+  return normalized;
+}
+
 export function parseTagsInput(tags: string): string[] {
   if (!tags) return [];
-  return tags
-    .split(/[、，,;；\n]+/g)
-    .map((t) => t.trim())
-    .filter((t) => t.length > 0);
+  return normalizeTagsArray(tags.split(TAG_SEPARATOR_PATTERN));
+}
+
+export function getTagsValidationError(formDataTags: readonly string[]): string | null {
+  const locale = getApiLocale();
+  const tags = normalizeTagsArray(formDataTags);
+  if (tags.length > MAX_SUBSCRIPTION_TAGS) {
+    return translate(locale, "subscription.validation.tagsTooMany", { count: MAX_SUBSCRIPTION_TAGS });
+  }
+  if (tags.some((tag) => Array.from(tag).length > MAX_SUBSCRIPTION_TAG_LENGTH)) {
+    return translate(locale, "subscription.validation.tagTooLong", { count: MAX_SUBSCRIPTION_TAG_LENGTH });
+  }
+  return null;
 }
 
 /**
@@ -97,6 +123,8 @@ export function getSubscriptionDraftValidationError(formData: SubscriptionFormSt
     return translate(locale, "subscription.validation.customCycleInvalid");
   }
   if (!isOptionalHttpUrl(formData.website)) return translate(locale, "subscription.validation.websiteInvalid");
+  const tagsError = getTagsValidationError(formData.tags);
+  if (tagsError) return tagsError;
   return null;
 }
 
@@ -142,7 +170,7 @@ export function toSubscriptionDraft(formData: SubscriptionFormState): Subscripti
     repeatReminderWindow: formData.repeatReminderWindow,
     website: formData.website || undefined,
     notes: formData.notes || undefined,
-    tags: parseTagsInput(formData.tags),
+    tags: normalizeTagsArray(formData.tags),
   };
   if (formData.billingCycle === "custom") {
     return {

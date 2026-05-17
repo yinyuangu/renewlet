@@ -114,7 +114,7 @@ const Subscriptions = () => {
   if (subscriptionsQuery.isPending) {
     return (
       <div className="min-h-screen bg-background">
-        <Header onAddSubscription={handleAddSubscription} />
+        <Header onAddSubscription={handleAddSubscription} availableTags={allTags} />
         <main className="mx-auto max-w-7xl px-6 py-8">
           <div className="mb-8">
             <div className="h-8 w-32 bg-muted rounded animate-pulse mb-2" />
@@ -128,7 +128,7 @@ const Subscriptions = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header onAddSubscription={handleAddSubscription} />
+      <Header onAddSubscription={handleAddSubscription} availableTags={allTags} />
 
       <main className="mx-auto max-w-7xl px-6 py-8">
         {/* Page Title */}
@@ -277,6 +277,7 @@ const Subscriptions = () => {
             {!hasActiveFilters && (
               <AddSubscriptionDialog 
                 onAdd={handleAddSubscription}
+                availableTags={allTags}
                 trigger={
                   <Button className="gap-2 bg-primary text-primary-foreground hover:bg-primary-glow">
                     <Plus className="h-4 w-4" />
@@ -317,6 +318,7 @@ const Subscriptions = () => {
         open={editDialogOpen}
         onOpenChange={handleEditDialogOpenChange}
         onSave={handleSaveSubscription}
+        availableTags={allTags}
       />
     </div>
   );

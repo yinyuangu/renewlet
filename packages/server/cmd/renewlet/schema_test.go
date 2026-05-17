@@ -75,6 +75,7 @@ func TestEnsureSchemaCreatesContractFieldsAndIndexes(t *testing.T) {
 		"updated":      core.FieldTypeAutodate,
 	})
 	assertNumberField(t, app, "subscriptions", "price", false, 0, maxSubscriptionPrice)
+	assertJSONFieldMaxSize(t, app, "subscriptions", "tags", maxSubscriptionTagsFieldSize)
 	assertFileFieldMimeTypes(t, app, "assets", "file", "image/svg+xml", "image/x-icon", "image/vnd.microsoft.icon")
 	assertFields(t, app, "notification_jobs", map[string]string{
 		"user":                core.FieldTypeRelation,
@@ -241,6 +242,21 @@ func assertNumberField(t *testing.T, app core.App, collectionName string, fieldN
 	}
 	if field.Max == nil || *field.Max != max {
 		t.Fatalf("collection %s field %s max = %v, want %v", collectionName, fieldName, field.Max, max)
+	}
+}
+
+func assertJSONFieldMaxSize(t *testing.T, app core.App, collectionName string, fieldName string, maxSize int64) {
+	t.Helper()
+	collection, err := app.FindCollectionByNameOrId(collectionName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	field, ok := collection.Fields.GetByName(fieldName).(*core.JSONField)
+	if !ok {
+		t.Fatalf("collection %s field %s is not a JSON field", collectionName, fieldName)
+	}
+	if field.MaxSize != maxSize {
+		t.Fatalf("collection %s field %s max size = %d, want %d", collectionName, fieldName, field.MaxSize, maxSize)
 	}
 }
 

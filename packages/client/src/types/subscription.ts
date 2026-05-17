@@ -93,6 +93,11 @@ export const REPEAT_REMINDER_WINDOWS = ['24h', '48h', '72h', 'full'] as const;
 /** 重复提醒窗口；full 表示从首次提醒后一直重复到目标日期通知时间。 */
 export type RepeatReminderWindow = (typeof REPEAT_REMINDER_WINDOWS)[number];
 
+/** 单个订阅允许的标签数量保护上限；正常使用体验上不主动强调。 */
+export const MAX_SUBSCRIPTION_TAGS = 100;
+/** 单个标签的后端契约长度上限。 */
+export const MAX_SUBSCRIPTION_TAG_LENGTH = 40;
+
 export const WEBHOOK_HEADERS_PLACEHOLDER = '{"Authorization": "Bearer your-token", "Content-Type": "application/json"}';
 export const WEBHOOK_PAYLOAD_PLACEHOLDER = '{"title": "{title}", "content": "{content}", "timestamp": "{timestamp}"}';
 

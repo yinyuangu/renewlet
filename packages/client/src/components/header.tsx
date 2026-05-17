@@ -28,6 +28,8 @@ import type { MessageKey } from '@/i18n/messages';
 interface HeaderProps {
   /** 新增订阅回调（传入订阅主体数据，不包含 id）。不传则隐藏“新增订阅”按钮。 */
   onAddSubscription?: (subscription: SubscriptionDraft) => void;
+  /** 当前用户已有标签建议，用于新增订阅弹窗复用。 */
+  availableTags?: readonly string[] | undefined;
 }
 
 type NavIconKey = "dashboard" | "subscriptions" | "calendar" | "statistics" | "settings";
@@ -75,7 +77,7 @@ type IdleCapableWindow = Window & {
 };
 
 /** Header 组件：全局导航 + 主题切换 + 新增订阅入口。 */
-export function Header({ onAddSubscription }: HeaderProps) {
+export function Header({ onAddSubscription, availableTags }: HeaderProps) {
   const router = useRouter();
   const { theme, setTheme } = useTheme();
   const { toast } = useToast();
@@ -176,7 +178,7 @@ export function Header({ onAddSubscription }: HeaderProps) {
           </Button>
           
           {onAddSubscription && (
-            <AddSubscriptionDialog onAdd={onAddSubscription} />
+            <AddSubscriptionDialog onAdd={onAddSubscription} availableTags={availableTags} />
           )}
 
           <Button
