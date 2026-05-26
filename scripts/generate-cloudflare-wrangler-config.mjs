@@ -95,5 +95,12 @@ d1.database_id = requireEnv("D1_DATABASE_ID");
 const r2 = findBinding(config, "r2_buckets", "ASSETS_BUCKET");
 r2.bucket_name = requireEnv("R2_BUCKET_NAME");
 
+config.vars = {
+  ...(config.vars && typeof config.vars === "object" ? config.vars : {}),
+  ...(process.env.RENEWLET_VERSION ? { RENEWLET_VERSION: process.env.RENEWLET_VERSION } : {}),
+  ...(process.env.RENEWLET_COMMIT ? { RENEWLET_COMMIT: process.env.RENEWLET_COMMIT } : {}),
+  ...(process.env.RENEWLET_BUILD_TIME ? { RENEWLET_BUILD_TIME: process.env.RENEWLET_BUILD_TIME } : {}),
+};
+
 writeFileSync(outputPath, `${JSON.stringify(config, null, 2)}\n`);
 console.log(`Generated Cloudflare Wrangler config: ${outputPath}`);

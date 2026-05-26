@@ -50,7 +50,7 @@ git tag -a v0.1.0 -m "Renewlet v0.1.0"
 git push origin v0.1.0
 ```
 
-4. `Release Publish` 会构建 Docker 镜像、创建 draft GitHub Release，并附加 `renewlet-docker-v0.1.0.zip`。
+4. `Release Publish` 会构建 Docker 镜像、创建 draft GitHub Release，并附加 `renewlet-docker-v0.1.0.zip`、`renewlet_0.1.0_linux_amd64.tar.gz`、`renewlet_0.1.0_linux_arm64.tar.gz` 和 `checksums.txt`。
 5. 稳定版推送：
    - `zhiyingzzhou/renewlet:0.1.0`
    - `zhiyingzzhou/renewlet:0.1`
@@ -60,6 +60,14 @@ git push origin v0.1.0
    - `ghcr.io/zhiyingzzhou/renewlet:latest`
 6. 检查 draft Release 的镜像列表和短 changelog 后，手动发布 Release。
 7. 如果本次稳定版需要部署 Cloudflare 生产 Worker，审批 `production-cloudflare` environment。稳定版发布使用 `.github/workflows/cloudflare-production.yml`，不使用测试部署 workflow。
+
+## Docker 页面内更新
+
+- `/renewlet` 是稳定 Docker 入口和 healthcheck 路径，后续版本不要删除。
+- 真实自更新目标是 `/opt/renewlet/current/renewlet`；更新器永远不替换 `/renewlet`。
+- 使用旧布局镜像的用户仍需先执行一次 `docker compose pull && docker compose up -d`。完成桥接后，后续稳定版可在管理员版本弹窗里更新。
+- Release 二进制包必须提供 Linux `amd64` 和 `arm64` tarball，命名为 `renewlet_<version>_linux_<arch>.tar.gz`，并在 `checksums.txt` 写入对应 SHA-256。
+- Cloudflare 构建只暴露版本/发布页信息，不允许暴露可执行更新路径。
 
 ## 热修复
 

@@ -134,6 +134,37 @@ func registerRoutes(app core.App, router *router.Router[*core.RequestEvent]) {
 		}
 		return e.JSON(http.StatusOK, newOKResponse())
 	})
+	admin.GET("/system/version", func(e *core.RequestEvent) error {
+		locale := requestLocale(e.Request)
+		force := e.Request.URL.Query().Get("force") == "true"
+		info, err := defaultSystemUpdateService.CheckVersion(e.Request.Context(), locale, force)
+		if err != nil {
+			return e.InternalServerError(tr(locale, "检查版本失败", "Failed to check version"), err)
+		}
+		return e.JSON(http.StatusOK, info)
+	})
+	admin.POST("/system/update", func(e *core.RequestEvent) error {
+		locale := requestLocale(e.Request)
+		if _, err := decodeStrictJSON[systemUpdateRequest](e.Request, locale); err != nil {
+			return e.BadRequestError(validationErrorMessage(locale, "请求体无效", "Invalid request body", err), err)
+		}
+		result, err := defaultSystemUpdateService.PerformUpdate(e.Request.Context(), locale)
+		if err != nil {
+			switch {
+			case errors.Is(err, errSystemUpdateInProgress):
+				return e.TooManyRequestsError(err.Error(), nil)
+			case errors.Is(err, errSystemUpdateUnsupported), errors.Is(err, errSystemUpdateNoUpdate):
+				return e.BadRequestError(err.Error(), nil)
+			default:
+				return e.InternalServerError(tr(locale, "系统更新失败", "System update failed"), err)
+			}
+		}
+		if err := e.JSON(http.StatusOK, result); err != nil {
+			return err
+		}
+		defaultSystemUpdateService.ScheduleRestart()
+		return nil
+	})
 
 	auth := router.Group("/api/app").Bind(apis.RequireAuth("users"))
 	auth.PUT("/account/password", func(e *core.RequestEvent) error {

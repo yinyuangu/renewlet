@@ -90,7 +90,7 @@ Back up data and config before upgrading:
 tar -czf renewlet-backup-$(date +%F).tgz .env docker-compose.yml data
 ```
 
-Upgrade to a specific stable image:
+If your current container predates the in-app updater, upgrade once with Docker:
 
 ```bash
 sed -i.bak 's#RENEWLET_IMAGE=.*#RENEWLET_IMAGE="zhiyingzzhou/renewlet:0.1.0"#' .env
@@ -98,6 +98,10 @@ docker compose pull
 docker compose up -d
 docker compose logs -f
 ```
+
+After that bridge upgrade, admins can open the version badge in the header and click **Update now** for later stable releases. Docker keeps `/renewlet` as the stable entrypoint and healthcheck path; the updater only replaces `/opt/renewlet/current/renewlet` inside the container.
+
+Cloudflare deployments show the version and release link only. Upgrade them through the Cloudflare deployment workflow or by syncing your fork.
 
 ### Common commands
 

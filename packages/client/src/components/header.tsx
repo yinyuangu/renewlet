@@ -12,6 +12,7 @@
 import Link, { NavLink } from '@/components/router-link';
 import { useRouter } from '@/lib/router';
 import { LayoutDashboard, List, CalendarDays, BarChart3, Settings, Sun, Moon, LogOut } from 'lucide-react';
+import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import type { SubscriptionDraft } from '@/types/subscription';
 import { Button } from '@/components/ui/button';
@@ -21,6 +22,7 @@ import { RenewletLogo } from '@/components/icons/renewlet-logo';
 import { writeAppearancePendingToStorage } from '@/lib/theme-storage';
 import { authClient } from '@/lib/auth-client';
 import { AddSubscriptionDialog } from '@/components/add-subscription-dialog';
+import { SystemUpdateDialog, SystemVersionBadge } from '@/components/system-update-dialog';
 import { useI18n } from '@/i18n/I18nProvider';
 import type { MessageKey } from '@/i18n/messages';
 
@@ -63,6 +65,9 @@ export function Header({ onAddSubscription, availableTags }: HeaderProps) {
   const { theme, setTheme } = useTheme();
   const { toast } = useToast();
   const { t } = useI18n();
+  const { data: sessionData } = authClient.useSession();
+  const [systemDialogOpen, setSystemDialogOpen] = useState(false);
+  const isAdmin = sessionData?.user.role === "admin";
 
   /**
    * 切换明暗模式（仅本地生效）。
@@ -130,6 +135,20 @@ export function Header({ onAddSubscription, availableTags }: HeaderProps) {
         </div>
 
         <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+          {isAdmin ? (
+            <>
+              <button
+                type="button"
+                className="inline-flex rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                onClick={() => setSystemDialogOpen(true)}
+                aria-label={t("system.openUpdateDialog")}
+              >
+                <SystemVersionBadge />
+              </button>
+              <SystemUpdateDialog open={systemDialogOpen} onOpenChange={setSystemDialogOpen} />
+            </>
+          ) : null}
+
           <Button
             variant="ghost"
             size="icon"

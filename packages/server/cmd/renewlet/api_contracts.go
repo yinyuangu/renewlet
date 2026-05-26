@@ -162,6 +162,57 @@ type passwordResetStatusResponse struct {
 	Enabled bool `json:"enabled"`
 }
 
+// systemUpdateRequest 是管理员触发页面内更新的空请求体；保留严格 JSON 边界来拒绝意外字段。
+type systemUpdateRequest struct{}
+
+// systemBuildInfo 是前端版本弹窗展示的构建元数据；发布构建由 CI ldflags 注入。
+type systemBuildInfo struct {
+	Version   string `json:"version"`
+	Commit    string `json:"commit"`
+	BuildTime string `json:"buildTime"`
+	BuildType string `json:"buildType"`
+}
+
+// systemReleaseAssetDTO 只暴露资产名称和大小；真实下载 URL 只留在后端校验链路内，避免浏览器绕过校验直连。
+type systemReleaseAssetDTO struct {
+	Name string `json:"name"`
+	Size int64  `json:"size"`
+}
+
+// systemReleaseInfoDTO 是 GitHub Release 的前端展示视图。
+type systemReleaseInfoDTO struct {
+	TagName     string                  `json:"tagName"`
+	Version     string                  `json:"version"`
+	Name        string                  `json:"name"`
+	Body        string                  `json:"body"`
+	PublishedAt string                  `json:"publishedAt"`
+	HTMLURL     string                  `json:"htmlUrl"`
+	Assets      []systemReleaseAssetDTO `json:"assets"`
+}
+
+// systemVersionResponse 描述当前运行面是否能页面内自更新。
+type systemVersionResponse struct {
+	CurrentVersion    string                `json:"currentVersion"`
+	LatestVersion     string                `json:"latestVersion"`
+	HasUpdate         bool                  `json:"hasUpdate"`
+	Runtime           string                `json:"runtime"`
+	UpdateSupported   bool                  `json:"updateSupported"`
+	UnsupportedReason string                `json:"unsupportedReason,omitempty"`
+	ReleaseInfo       *systemReleaseInfoDTO `json:"releaseInfo"`
+	Cached            bool                  `json:"cached"`
+	Warning           string                `json:"warning,omitempty"`
+	Build             systemBuildInfo       `json:"build"`
+}
+
+// systemUpdateResponse 表示二进制已经替换完成，进程即将退出并交给 Docker restart 策略拉起。
+type systemUpdateResponse struct {
+	OK             bool   `json:"ok"`
+	CurrentVersion string `json:"currentVersion"`
+	TargetVersion  string `json:"targetVersion"`
+	NeedsRestart   bool   `json:"needsRestart"`
+	Message        string `json:"message"`
+}
+
 // rateLimitedResponse 是简单限流响应。
 type rateLimitedResponse struct {
 	Code    string `json:"code"`

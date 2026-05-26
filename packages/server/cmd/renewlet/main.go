@@ -36,6 +36,10 @@ func main() {
 		runHealthcheck()
 		return
 	}
+	if len(os.Args) > 1 && (os.Args[1] == "version" || os.Args[1] == "--version") {
+		fmt.Println(Version)
+		return
+	}
 
 	if os.Getenv("GOMEMLIMIT") == "" {
 		_ = os.Setenv("GOMEMLIMIT", "128MiB")

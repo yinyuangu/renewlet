@@ -7,6 +7,9 @@ export interface Env {
   ASSETS_BUCKET: R2Bucket;
   SETUP_ENABLED?: string;
   SESSION_TTL_DAYS?: string;
+  RENEWLET_VERSION?: string;
+  RENEWLET_COMMIT?: string;
+  RENEWLET_BUILD_TIME?: string;
 }
 
 export interface UserRow {

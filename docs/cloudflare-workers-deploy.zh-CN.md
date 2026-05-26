@@ -183,6 +183,8 @@ https://<WORKER_NAME>.<workers-dev-subdomain>.workers.dev/setup
 
 ## 更新版本
 
+Workers 部署不支持 Renewlet 的 Docker 页面内更新器。管理员版本弹窗只显示版本信息和 GitHub Release 链接。
+
 Workers 部署支持两种更新方式：
 
 ### 自动更新

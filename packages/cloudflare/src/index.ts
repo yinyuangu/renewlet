@@ -18,6 +18,7 @@ import { createSubscription, deleteSubscription, readSubscriptions, updateSubscr
 import { applyImport, previewImport } from "./import-export";
 import { mediaCandidates } from "./search";
 import { notificationHistory, notificationRun, notificationTest, runScheduledNotifications } from "./notifications";
+import { systemUpdate, systemVersion } from "./system";
 import { errorResponse, methodNotAllowed, pathSegments, toResponse } from "./http";
 import type { Env } from "./types";
 
@@ -75,6 +76,12 @@ async function routeApp(request: Request, env: Env, url: URL): Promise<Response>
       PATCH: () => adminPatchUser(request, env, third),
       DELETE: () => adminDeleteUser(request, env, third),
     });
+  }
+  if (head === "admin" && second === "system" && third === "version") {
+    return routeMethods(request, { GET: () => systemVersion(request, env) });
+  }
+  if (head === "admin" && second === "system" && third === "update") {
+    return routeMethods(request, { POST: () => systemUpdate(request, env) });
   }
 
   if (head === "settings") return routeMethods(request, {

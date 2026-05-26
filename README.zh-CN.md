@@ -90,7 +90,7 @@ docker compose up -d
 tar -czf renewlet-backup-$(date +%F).tgz .env docker-compose.yml data
 ```
 
-升级到指定稳定版镜像：
+如果当前容器还没有页面内更新能力，先用 Docker 手动桥接升级一次：
 
 ```bash
 sed -i.bak 's#RENEWLET_IMAGE=.*#RENEWLET_IMAGE="zhiyingzzhou/renewlet:0.1.0"#' .env
@@ -98,6 +98,10 @@ docker compose pull
 docker compose up -d
 docker compose logs -f
 ```
+
+完成这次桥接后，管理员可以点击 Header 里的版本徽标，在弹窗里对后续稳定版执行 **立即更新**。Docker 会继续保留 `/renewlet` 作为稳定入口和 healthcheck 路径；自更新只替换容器内的 `/opt/renewlet/current/renewlet`。
+
+Cloudflare 部署只显示版本和发布页链接，不提供页面内一键更新；请通过 Cloudflare 部署 workflow 或同步 fork 升级。
 
 ### 常用命令
 

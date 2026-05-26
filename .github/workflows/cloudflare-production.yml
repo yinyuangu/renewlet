@@ -43,6 +43,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Resolve build time
+        id: build-time
+        run: echo "value=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
       - name: Validate stable release version
         # 双保险：调用方已过滤 RC，但生产部署自身也拒绝候选版，避免复用 workflow 时误放行。
         run: |
@@ -53,6 +57,10 @@ jobs:
           fi
 
       - name: Generate Cloudflare config
+        env:
+          RENEWLET_VERSION: ${{ inputs.version }}
+          RENEWLET_COMMIT: ${{ github.sha }}
+          RENEWLET_BUILD_TIME: ${{ steps.build-time.outputs.value }}
         run: pnpm cloudflare:config:ci
 
       - name: Check Cloudflare build

@@ -183,6 +183,8 @@ Custom domain: after deployment, bind a Worker route or custom domain for the Wo
 
 ## Update Version
 
+Workers deploy does not support Renewlet's Docker in-app updater. The admin version dialog only shows version information and the GitHub Release link.
+
 Workers deploy supports two update modes:
 
 ### Automatic Update

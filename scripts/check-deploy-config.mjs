@@ -169,9 +169,48 @@ function checkComposeConfig() {
   run("docker", ["compose", "-f", "docker-compose.ghcr.yml", "config"]);
 }
 
+function checkDockerSelfUpdateLayout() {
+  const dockerfile = readFileSync(join(repoRoot, "Dockerfile"), "utf8");
+  const entrypoint = readFileSync(join(repoRoot, "deploy/docker-entrypoint.sh"), "utf8");
+  const compose = readFileSync(join(repoRoot, "deploy/docker-compose.yml"), "utf8");
+  const releaseWorkflow = readFileSync(join(repoRoot, ".github/workflows/release-publish.yml"), "utf8");
+
+  for (const snippet of [
+    "/opt/renewlet/current/renewlet",
+    "RENEWLET_SELF_UPDATE_ENABLED=true",
+    "ln -s /opt/renewlet/current/renewlet /renewlet",
+  ]) {
+    if (!dockerfile.includes(snippet)) {
+      throw new Error(`Dockerfile must keep self-update layout snippet: ${snippet}`);
+    }
+  }
+  if (
+    !entrypoint.includes("mkdir -p /pb_data /opt/renewlet/current /opt/renewlet/backups") ||
+    !entrypoint.includes("rm -f /renewlet") ||
+    !entrypoint.includes("ln -s /opt/renewlet/current/renewlet /renewlet")
+  ) {
+    throw new Error("docker-entrypoint.sh must keep /opt/renewlet/current and backups writable");
+  }
+  if (!compose.includes('test: [ "CMD", "/renewlet", "healthcheck" ]')) {
+    throw new Error("Docker healthcheck must keep /renewlet as the stable entrypoint");
+  }
+  for (const snippet of [
+    "Build Linux self-update binaries",
+    "pnpm --filter @renewlet/client build",
+    "renewlet_${{ needs.metadata.outputs.version }}_linux_amd64.tar.gz",
+    "renewlet_${{ needs.metadata.outputs.version }}_linux_arm64.tar.gz",
+    "sha256sum renewlet_${{ needs.metadata.outputs.version }}_linux_*.tar.gz > checksums.txt",
+  ]) {
+    if (!releaseWorkflow.includes(snippet)) {
+      throw new Error(`release-publish.yml must keep self-update release asset snippet: ${snippet}`);
+    }
+  }
+}
+
 run("bash", ["-n", deployScript]);
 checkGeneratedSecrets();
 checkInvalidExistingPBKeyIsRejected();
+checkDockerSelfUpdateLayout();
 checkComposeConfig();
 
 console.log("Deployment configuration checks passed.");

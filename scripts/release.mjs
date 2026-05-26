@@ -205,8 +205,10 @@ function releaseBody(rawVersion, previous) {
     "Back up `.env`, `docker-compose.yml`, and `data/` before upgrading. Production deployments should pin a concrete version tag; `latest` only moves on stable releases.",
     "",
     stable
-      ? "This is a stable release. The `latest` Docker tag is updated after the image build succeeds."
+      ? "This is a stable release. The `latest` Docker tag is updated after the image build succeeds. Docker deployments that already run a self-update capable version can use the in-app update button; older deployments must run `docker compose pull && docker compose up -d` once to bridge to the new layout."
       : "This is a release candidate. It does not update `latest` and is intended for validation before the stable release.",
+    "",
+    "The `/renewlet` path remains the stable Docker entrypoint. In-app updates only replace `/opt/renewlet/current/renewlet` and use the attached Linux binary archives plus `checksums.txt`.",
     "",
     "## Changelog",
     "",

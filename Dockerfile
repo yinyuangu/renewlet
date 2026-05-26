@@ -18,6 +18,9 @@ FROM --platform=$BUILDPLATFORM golang:1.26.2-alpine AS server-builder
 
 ARG TARGETOS=linux
 ARG TARGETARCH
+ARG VERSION=0.0.0-dev
+ARG COMMIT=dev
+ARG BUILD_TIME=dev
 
 WORKDIR /src/packages/server
 
@@ -30,20 +33,24 @@ RUN mkdir -p internal/static/public \
 COPY --from=client-builder /app/packages/client/dist ./internal/static/public
 
 RUN mkdir -p /out /pb_data \
-  && CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-$(go env GOARCH)} go build -trimpath -ldflags="-s -w" -o /out/renewlet ./cmd/renewlet
+  && CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-$(go env GOARCH)} go build -trimpath -ldflags="-s -w -X main.Version=${VERSION} -X main.Commit=${COMMIT} -X main.BuildTime=${BUILD_TIME} -X main.BuildType=release" -o /out/renewlet ./cmd/renewlet
 
 FROM alpine:3.22 AS runner
 
-ENV GOMEMLIMIT=128MiB
+ENV GOMEMLIMIT=128MiB \
+  RENEWLET_SELF_UPDATE_ENABLED=true \
+  RENEWLET_SELF_UPDATE_BINARY=/opt/renewlet/current/renewlet \
+  RENEWLET_SELF_UPDATE_BACKUP_DIR=/opt/renewlet/backups
 
 RUN apk add --no-cache ca-certificates su-exec tzdata \
   && addgroup -S -g 1000 renewlet \
   && adduser -S -D -H -u 1000 -G renewlet renewlet \
-  && mkdir -p /pb_data \
-  && chown -R renewlet:renewlet /pb_data
+  && mkdir -p /pb_data /opt/renewlet/current /opt/renewlet/backups \
+  && ln -s /opt/renewlet/current/renewlet /renewlet \
+  && chown -R renewlet:renewlet /pb_data /opt/renewlet
 
 COPY --from=server-builder --chown=renewlet:renewlet /pb_data /pb_data
-COPY --from=server-builder /out/renewlet /renewlet
+COPY --from=server-builder --chown=renewlet:renewlet /out/renewlet /opt/renewlet/current/renewlet
 COPY --chmod=755 deploy/docker-entrypoint.sh /docker-entrypoint.sh
 
 VOLUME ["/pb_data"]
