@@ -38,6 +38,7 @@ func notificationSubscriptionFromRecord(row *core.Record) notificationSubscripti
 		Price:                  row.GetFloat("price"),
 		Currency:               row.GetString("currency"),
 		Status:                 row.GetString("status"),
+		BillingCycle:           row.GetString("billingCycle"),
 		NextBillingDate:        row.GetString("nextBillingDate"),
 		TrialEndDate:           row.GetString("trialEndDate"),
 		ReminderDays:           row.GetInt("reminderDays"),
@@ -45,6 +46,28 @@ func notificationSubscriptionFromRecord(row *core.Record) notificationSubscripti
 		RepeatReminderInterval: normalizeRepeatReminderInterval(row.GetString("repeatReminderInterval")),
 		RepeatReminderWindow:   normalizeRepeatReminderWindow(row.GetString("repeatReminderWindow")),
 	}
+}
+
+func normalizeNotificationReminderDays(value int) int {
+	if value < 0 || value > maxReminderDays {
+		return defaultNotificationReminderDays
+	}
+	return value
+}
+
+func isInheritReminderDays(value int) bool {
+	return value == inheritReminderDays
+}
+
+func effectiveReminderDays(sub notificationSubscription, settings appSettings) int {
+	// -1 是跨 Wallos 导入、前端表单、Go/PocketBase 和 Cloudflare 的继承哨兵；通知历史只输出解析后的非负天数。
+	if isInheritReminderDays(sub.ReminderDays) {
+		return normalizeNotificationReminderDays(settings.NotificationReminderDays)
+	}
+	if sub.ReminderDays < 0 || sub.ReminderDays > maxReminderDays {
+		return defaultNotificationReminderDays
+	}
+	return sub.ReminderDays
 }
 
 // buildTestNotification 构造测试通知内容。
@@ -91,21 +114,26 @@ func collectNotificationItemsForSchedule(schedule localScheduleOccurrence, setti
 func collectNotificationItems(localDate string, settings appSettings, subscriptions []notificationSubscription, includeExpired bool) []notificationContentItem {
 	items := []notificationContentItem{}
 	for _, sub := range subscriptions {
+		if sub.BillingCycle == "one-time" {
+			// one-time 是买断记录，通知系统不能把购买日当成续费日、试用日或过期日反复提醒。
+			continue
+		}
+		reminderDays := effectiveReminderDays(sub, settings)
 		if isValidDateOnly(sub.NextBillingDate) {
 			daysUntilNext := daysBetweenDateOnly(localDate, sub.NextBillingDate)
 			if daysUntilNext < 0 {
 				if settings.ShowExpired && includeExpired {
-					items = append(items, newNotificationContentItem("expired", sub, sub.NextBillingDate, daysUntilNext, nil))
+					items = append(items, newNotificationContentItem("expired", sub, sub.NextBillingDate, daysUntilNext, reminderDays, nil))
 				}
-			} else if daysUntilNext == sub.ReminderDays {
-				items = append(items, newNotificationContentItem("renewal", sub, sub.NextBillingDate, daysUntilNext, nil))
+			} else if daysUntilNext == reminderDays {
+				items = append(items, newNotificationContentItem("renewal", sub, sub.NextBillingDate, daysUntilNext, reminderDays, nil))
 			}
 		}
 
 		if sub.Status == "trial" && isValidDateOnly(sub.TrialEndDate) {
 			daysUntilTrialEnd := daysBetweenDateOnly(localDate, sub.TrialEndDate)
-			if daysUntilTrialEnd == sub.ReminderDays {
-				items = append(items, newNotificationContentItem("trial", sub, sub.TrialEndDate, daysUntilTrialEnd, nil))
+			if daysUntilTrialEnd == reminderDays {
+				items = append(items, newNotificationContentItem("trial", sub, sub.TrialEndDate, daysUntilTrialEnd, reminderDays, nil))
 			}
 		}
 	}
@@ -119,24 +147,28 @@ func collectRepeatNotificationItems(schedule localScheduleOccurrence, settings a
 	}
 	items := []notificationContentItem{}
 	for _, sub := range subscriptions {
+		if sub.BillingCycle == "one-time" {
+			continue
+		}
 		if !sub.RepeatReminderEnabled {
 			continue
 		}
+		reminderDays := effectiveReminderDays(sub, settings)
 		repeat := &repeatReminderSnapshot{
 			Interval: normalizeRepeatReminderInterval(sub.RepeatReminderInterval),
 			Window:   normalizeRepeatReminderWindow(sub.RepeatReminderWindow),
 		}
-		if isValidDateOnly(sub.NextBillingDate) && repeatReminderOccurrenceMatches(scheduledInstant, settings, sub.ReminderDays, sub.NextBillingDate, repeat) {
-			items = append(items, newNotificationContentItem("renewal", sub, sub.NextBillingDate, daysBetweenDateOnly(schedule.ScheduledLocalDate, sub.NextBillingDate), repeat))
+		if isValidDateOnly(sub.NextBillingDate) && repeatReminderOccurrenceMatches(scheduledInstant, settings, reminderDays, sub.NextBillingDate, repeat) {
+			items = append(items, newNotificationContentItem("renewal", sub, sub.NextBillingDate, daysBetweenDateOnly(schedule.ScheduledLocalDate, sub.NextBillingDate), reminderDays, repeat))
 		}
-		if sub.Status == "trial" && isValidDateOnly(sub.TrialEndDate) && repeatReminderOccurrenceMatches(scheduledInstant, settings, sub.ReminderDays, sub.TrialEndDate, repeat) {
-			items = append(items, newNotificationContentItem("trial", sub, sub.TrialEndDate, daysBetweenDateOnly(schedule.ScheduledLocalDate, sub.TrialEndDate), repeat))
+		if sub.Status == "trial" && isValidDateOnly(sub.TrialEndDate) && repeatReminderOccurrenceMatches(scheduledInstant, settings, reminderDays, sub.TrialEndDate, repeat) {
+			items = append(items, newNotificationContentItem("trial", sub, sub.TrialEndDate, daysBetweenDateOnly(schedule.ScheduledLocalDate, sub.TrialEndDate), reminderDays, repeat))
 		}
 	}
 	return items
 }
 
-func newNotificationContentItem(itemType string, sub notificationSubscription, targetDate string, daysUntil int, repeat *repeatReminderSnapshot) notificationContentItem {
+func newNotificationContentItem(itemType string, sub notificationSubscription, targetDate string, daysUntil int, reminderDays int, repeat *repeatReminderSnapshot) notificationContentItem {
 	status := normalizeSubscriptionStatus(sub.Status)
 	if itemType == "trial" {
 		status = "trial"
@@ -150,7 +182,7 @@ func newNotificationContentItem(itemType string, sub notificationSubscription, t
 		Currency:       sub.Currency,
 		Status:         status,
 		TargetDate:     targetDate,
-		ReminderDays:   sub.ReminderDays,
+		ReminderDays:   reminderDays,
 		DaysUntil:      daysUntil,
 		RepeatReminder: repeat,
 	}

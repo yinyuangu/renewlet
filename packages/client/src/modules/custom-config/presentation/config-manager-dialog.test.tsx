@@ -182,4 +182,40 @@ describe("ConfigManagerDialog", () => {
     expect(within(dialog).getByText("AFN")).toBeInTheDocument();
     expect(within(dialog).getByText("NIO")).toBeInTheDocument();
   });
+
+  it("keeps searchable config dialogs in a bounded scroll structure", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <TooltipProvider delayDuration={0}>
+        <ConfigManagerDialog
+          title="货币管理"
+          items={Array.from({ length: 12 }, (_, index) => ({
+            id: `C${index}`,
+            value: `C${index}`,
+            labels: { "zh-CN": `测试货币 ${index}`, "en-US": `Test currency ${index}` },
+            enabled: true,
+          }))}
+          onUpdate={vi.fn()}
+          toggleMode
+          searchable
+          searchPlaceholder="搜索货币、代码或符号..."
+        />
+      </TooltipProvider>,
+    );
+
+    await user.click(screen.getByRole("button", { name: /货币管理/ }));
+    const dialog = screen.getByRole("dialog", { name: "货币管理" });
+    const header = dialog.querySelector("[data-config-manager-header]");
+    const searchRow = within(dialog).getByPlaceholderText("搜索货币、代码或符号...").closest("div");
+    const scrollRegion = dialog.querySelector("[data-config-manager-scroll]");
+    const footer = dialog.querySelector("[data-config-manager-footer]");
+
+    expect(dialog).toHaveClass("h5-dialog-frame", "h5-config-manager-dialog-panel");
+    expect(dialog).not.toHaveClass("h-fit");
+    expect(header).toHaveClass("shrink-0");
+    expect(searchRow).toHaveClass("shrink-0");
+    expect(scrollRegion).toHaveClass("min-h-0", "flex-1", "overflow-y-auto");
+    expect(footer).toHaveClass("shrink-0");
+  });
 });

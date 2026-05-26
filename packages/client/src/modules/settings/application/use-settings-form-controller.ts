@@ -42,6 +42,7 @@ import { normalizePaymentMethods, type ConfigItem, type CustomConfig } from "@/t
 import type { CustomThemeColor, ThemeMode, ThemeVariant } from "@/types/theme";
 import { parseNonNegativeFiniteNumberInput } from "@/lib/subscription-form";
 import { normalizeCustomConfig } from "@/modules/custom-config/domain/normalize-custom-config";
+import { isCloudflareRuntime } from "@/services/runtime";
 import { countSubscriptionsByCategory } from "../domain/category-usage";
 import { enforceCurrencyConfigPolicy } from "../domain/currency-config-policy";
 import { useAccountIdentity } from "./use-account-email";
@@ -541,7 +542,7 @@ export function useSettingsFormController(): SettingsFormController {
   return {
     settings,
     accountEmail,
-    canAccessPocketBaseAdmin: accountIdentity.role === "admin",
+    canAccessPocketBaseAdmin: accountIdentity.role === "admin" && !isCloudflareRuntime,
     customConfig,
     subscriptionsQuery,
     categoryUsageCount,

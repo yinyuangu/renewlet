@@ -1,13 +1,17 @@
 name: Docker Image
 
+# 只作为 release-publish 的可复用构建单元；分支 push 不允许发布镜像，避免 dev/main 意外移动 latest。
 on:
-  push:
-    branches:
-      - main
-    tags:
-      - "v*.*.*"
-  workflow_dispatch:
-
+  workflow_call:
+    inputs:
+      version:
+        description: "Release version without the leading v, for example 0.1.0 or 0.1.0-rc.1."
+        required: true
+        type: string
+    outputs:
+      image-tags:
+        description: "Docker image tags pushed by this workflow."
+        value: ${{ jobs.publish.outputs.image-tags }}
 permissions:
   contents: read
   packages: write
@@ -15,15 +19,46 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    outputs:
+      image-tags: ${{ steps.tags.outputs.tags }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6.0.2
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4.0.0
+      - name: Set up Node.js
+        uses: actions/setup-node@v6.0.0
+        with:
+          node-version: 24
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate release version
+        run: node scripts/release.mjs validate-version "${{ inputs.version }}"
 
       - name: Validate deployment config
-        run: node scripts/check-deploy-config.mjs
+        run: pnpm check:deploy
+
+      - name: Resolve Docker tags
+        id: tags
+        # tag 规则集中在 release.mjs：stable 才写 latest，RC 只写 rc，避免 workflow 分叉后语义漂移。
+        run: |
+          TAGS="$(node scripts/release.mjs docker-tags "${{ inputs.version }}")"
+          {
+            echo "tags<<EOF"
+            echo "$TAGS"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+          echo "$TAGS"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4.0.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4.0.0
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v4.1.0
@@ -38,20 +73,6 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v6.0.0
-        with:
-          images: |
-            ghcr.io/${{ github.repository }}
-            docker.io/zhiyingzzhou/renewlet
-          tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=ref,event=tag
-            type=sha,prefix=sha-
-
       - name: Build and push
         uses: docker/build-push-action@v7.1.0
         with:
@@ -59,7 +80,6 @@ jobs:
           file: ./Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.tags.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

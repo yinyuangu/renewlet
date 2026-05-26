@@ -13,14 +13,23 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "@/App";
 import Providers from "@/providers";
+import { getInitialLocale } from "@/i18n/locales";
+import { activateLinguiLocale } from "@/i18n/messages";
 import "@/index.css";
 
-createRoot(document.getElementById("root") as HTMLElement).render(
-  <StrictMode>
-    <BrowserRouter>
-      <Providers>
-        <App />
-      </Providers>
-    </BrowserRouter>
-  </StrictMode>,
-);
+async function bootstrap() {
+  // 首屏渲染前加载当前 locale catalog，避免已保存英文偏好时先闪中文再切换。
+  await activateLinguiLocale(getInitialLocale());
+
+  createRoot(document.getElementById("root") as HTMLElement).render(
+    <StrictMode>
+      <BrowserRouter>
+        <Providers>
+          <App />
+        </Providers>
+      </BrowserRouter>
+    </StrictMode>,
+  );
+}
+
+void bootstrap();

@@ -83,6 +83,39 @@ describe("subscription statistics models", () => {
     expect(model.budgetUsedPercent).toBe(0);
   });
 
+  it("keeps one-time purchases active but excludes them from recurring spend and upcoming renewals", () => {
+    const oneTime = subscription({
+      id: "lifetime",
+      price: 199,
+      status: "active",
+      billingCycle: "one-time",
+      nextBillingDate: assertDateOnly("2026-01-02"),
+      autoCalculateNextBillingDate: false,
+    });
+
+    const model = buildStatisticsModel({
+      subscriptions: [oneTime],
+      config: DEFAULT_CUSTOM_CONFIG,
+      monthlyBudget: 0,
+      defaultCurrency: "USD",
+      convert,
+      now: new Date("2026-01-10T00:00:00.000Z"),
+    });
+    const dashboard = buildDashboardStats({
+      subscriptions: [oneTime],
+      defaultCurrency: "USD",
+      convert,
+      now: new Date("2026-01-01T00:00:00.000Z"),
+    });
+
+    expect(model.activeCount).toBe(1);
+    expect(model.totalMonthly).toBe(0);
+    expect(model.inactiveCount).toBe(0);
+    expect(dashboard.activeSubscriptions).toHaveLength(1);
+    expect(dashboard.totalMonthly).toBe(0);
+    expect(dashboard.upcomingCount).toBe(0);
+  });
+
   it("treats effective expired subscriptions as inactive savings", () => {
     const model = buildStatisticsModel({
       subscriptions: [

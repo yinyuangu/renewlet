@@ -1,0 +1,72 @@
+name: Release Prepare
+
+# 从 dev 拉出 release/vX.Y.Z 并同步版本号；这一步只准备 PR，不打 tag、不发布产物。
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Stable SemVer version without the leading v, for example 0.1.0."
+        required: true
+        type: string
+      base_branch:
+        description: "Integration branch to release from."
+        required: true
+        default: dev
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+        with:
+          ref: ${{ inputs.base_branch }}
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6.0.0
+        with:
+          node-version: 24
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate stable version
+        # package.json 只记录稳定 SemVer，RC 后缀只存在于 git tag 和镜像标签里。
+        run: |
+          VERSION="$(node scripts/release.mjs validate-version "${{ inputs.version }}")"
+          if [[ "$VERSION" == *"-rc."* ]]; then
+            echo "Release prepare only accepts stable versions. Use release-rc for candidates." >&2
+            exit 1
+          fi
+
+      - name: Sync workspace package versions
+        run: node scripts/release.mjs sync-version "${{ inputs.version }}"
+
+      - name: Create release branch pull request
+        uses: peter-evans/create-pull-request@v8.1.0
+        with:
+          branch: release/v${{ inputs.version }}
+          base: main
+          title: "release: v${{ inputs.version }}"
+          commit-message: "chore: prepare release v${{ inputs.version }}"
+          labels: release
+          body: |
+            ## Release v${{ inputs.version }}
+
+            This PR promotes the release branch to `main` after RC validation.
+
+            Checklist:
+            - [ ] CI is green on `release/v${{ inputs.version }}`
+            - [ ] `v${{ inputs.version }}-rc.1` has been tested
+            - [ ] Docker deployment package has been checked
+            - [ ] Cloudflare release build has passed

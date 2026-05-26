@@ -1,6 +1,6 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { assertDateOnly } from "@/lib/time/date-only";
 import { assertLocalTime } from "@/lib/time/local-time";
@@ -15,6 +15,23 @@ function setElementOverflow(element: Element) {
     clientHeight: { configurable: true, value: 20 },
   });
   fireEvent.resize(window);
+}
+
+function mockCompactHistoryLayout(matches = true) {
+  Object.defineProperty(window, "matchMedia", {
+    configurable: true,
+    writable: true,
+    value: vi.fn().mockImplementation((query: string) => ({
+      matches: query === "(max-width: 1023px)" ? matches : false,
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  });
 }
 
 function createHistoryResponse(reason: string): NotificationHistoryResponse {
@@ -196,6 +213,10 @@ function createUpcomingBatches(count: number): NotificationHistoryResponse["upco
 }
 
 describe("NotificationHistoryPanel", () => {
+  afterEach(() => {
+    Reflect.deleteProperty(window, "matchMedia");
+  });
+
   it("shows full history row text in a tooltip when truncated", async () => {
     const user = userEvent.setup();
     const reason = "smtp: 550 mailbox unavailable with a very long provider diagnostic message";
@@ -260,6 +281,40 @@ describe("NotificationHistoryPanel", () => {
     expect(screen.getAllByText("已跳过").length).toBeGreaterThan(0);
     expect(screen.getAllByText("0 项").length).toBeGreaterThan(0);
     expect(screen.getByText("累计尝试渠道")).toBeInTheDocument();
+  });
+
+  it("opens history details in a bounded mobile drawer instead of stacking them below the list", async () => {
+    mockCompactHistoryLayout();
+    const user = userEvent.setup();
+    const reason = "smtp: 550 mailbox unavailable";
+
+    render(
+      <TooltipProvider delayDuration={0}>
+        <NotificationHistoryPanel
+          data={createHistoryResponse(reason)}
+          isLoading={false}
+          isFetching={false}
+          error={null}
+          status="all"
+          setStatus={vi.fn()}
+          loadMore={vi.fn()}
+          refetch={vi.fn()}
+        />
+      </TooltipProvider>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "查看调度与历史" }));
+    await user.click(screen.getByRole("tab", { name: "发送历史" }));
+
+    expect(screen.getByTestId("notification-history-desktop-detail")).toHaveClass("hidden", "lg:block");
+
+    await user.click(screen.getAllByTestId("notification-history-row")[0]!);
+
+    const drawer = await screen.findByTestId("notification-history-detail-drawer");
+    expect(drawer).toHaveClass("h5-drawer-panel", "h5-notification-history-detail-drawer", "overflow-hidden");
+    expect(within(drawer).getByText("发送详情")).toBeInTheDocument();
+    expect(within(drawer).getByText("累计尝试渠道")).toBeInTheDocument();
+    expect(within(drawer).getByText("email：smtp: 550 mailbox unavailable")).toBeInTheDocument();
   });
 
   it("labels upcoming repeat reminder items", async () => {

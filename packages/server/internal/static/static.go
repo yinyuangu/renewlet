@@ -8,5 +8,8 @@ import "embed"
 //go:embed all:public
 var Files embed.FS
 
-//go:embed data/thesvg-index.json
-var TheSVGIndex []byte
+//go:embed data/built-in-icons-index.json
+var BuiltInIconsIndex []byte
+
+//go:embed data/media-resolver-config.json
+var MediaResolverConfig []byte

@@ -150,6 +150,16 @@ func TestNormalizeSubscriptionRecordDefaultsAndValidatesContract(t *testing.T) {
 		t.Fatal("expected custom billing cycle without customDays to fail")
 	}
 
+	record.Set("billingCycle", "one-time")
+	record.Set("customDays", 45)
+	record.Set("autoCalculateNextBillingDate", true)
+	if err := normalizeSubscriptionRecord(record); err != nil {
+		t.Fatalf("expected one-time billing cycle to be accepted: %v", err)
+	}
+	if record.GetInt("customDays") != 0 || record.GetBool("autoCalculateNextBillingDate") {
+		t.Fatalf("expected one-time to clear customDays and auto calculation, got customDays=%d auto=%v", record.GetInt("customDays"), record.GetBool("autoCalculateNextBillingDate"))
+	}
+
 	record.Set("billingCycle", "monthly")
 	record.Set("price", 0)
 	if err := normalizeSubscriptionRecord(record); err != nil {
@@ -164,6 +174,20 @@ func TestNormalizeSubscriptionRecordDefaultsAndValidatesContract(t *testing.T) {
 	record.Set("price", float64(maxSubscriptionPrice)+1)
 	if err := normalizeSubscriptionRecord(record); err == nil {
 		t.Fatal("expected too-high price to fail")
+	}
+
+	record.Set("price", 10)
+	record.Set("reminderDays", inheritReminderDays)
+	if err := normalizeSubscriptionRecord(record); err != nil {
+		t.Fatalf("expected inherited reminder days to be accepted: %v", err)
+	}
+	record.Set("reminderDays", inheritReminderDays-1)
+	if err := normalizeSubscriptionRecord(record); err == nil {
+		t.Fatal("expected reminder days below inherit sentinel to fail")
+	}
+	record.Set("reminderDays", maxReminderDays+1)
+	if err := normalizeSubscriptionRecord(record); err == nil {
+		t.Fatal("expected too-high reminder days to fail")
 	}
 }
 
@@ -213,7 +237,6 @@ func TestNormalizeSubscriptionRecordValidatesLogoReferences(t *testing.T) {
 		"https://example.com/logo.png",
 		"http://example.com/logo.png",
 		"/api/app/assets/2pbs0lgyypqhjoy",
-		"data:image/png;base64,aGVsbG8=",
 	} {
 		t.Run("allows "+logo, func(t *testing.T) {
 			if err := normalizeSubscriptionRecord(base(logo)); err != nil {
@@ -225,7 +248,9 @@ func TestNormalizeSubscriptionRecordValidatesLogoReferences(t *testing.T) {
 	for _, logo := range []string{
 		"/api/app/assets/",
 		"/other/assets/2pbs0lgyypqhjoy",
+		"data:image/png;base64,aGVsbG8=",
 		"ftp://example.com/logo.png",
+		"https://user:pass@example.com/logo.png",
 		"not a url",
 	} {
 		t.Run("rejects "+logo, func(t *testing.T) {

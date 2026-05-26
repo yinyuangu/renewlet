@@ -1,0 +1,71 @@
+name: CI
+
+# 质量门只覆盖 dev/main/release 分支，不发布任何远端产物；Docker/Cloudflare 发布必须走 tag workflow。
+on:
+  pull_request:
+    branches:
+      - dev
+      - main
+      - "release/**"
+  push:
+    branches:
+      - dev
+      - main
+      - "release/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6.0.0
+        with:
+          node-version: 24
+
+      - name: Set up Go
+        uses: actions/setup-go@v6.0.0
+        with:
+          go-version: 1.26.2
+          cache-dependency-path: packages/server/go.sum
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check file length guard
+        run: pnpm check:file-lines
+
+      - name: Check deploy config
+        run: pnpm check:deploy
+
+      - name: Lint client
+        run: pnpm --filter @renewlet/client lint
+
+      - name: Check i18n catalogs
+        run: pnpm --filter @renewlet/client i18n:check
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test client
+        run: pnpm --filter @renewlet/client test:run
+
+      - name: Test server
+        run: pnpm --dir packages/server test
+
+      - name: Check Cloudflare build path
+        # 只做类型和构建前检查，避免普通分支 CI 触发 D1 migration 或 Worker 部署副作用。
+        run: pnpm check:cloudflare

@@ -8,7 +8,7 @@
  */
 import { useEffect, useState, type CSSProperties } from 'react';
 import type { Subscription, SubscriptionStatus } from '@/types/subscription';
-import { STATUS_LABELS, CYCLE_LABELS } from '@/types/subscription';
+import { DEFAULT_NOTIFICATION_REMINDER_DAYS, INHERIT_REMINDER_DAYS, STATUS_LABELS, CYCLE_LABELS } from '@/types/subscription';
 import { Button } from '@/components/ui/button';
 import { CalendarDays, ExternalLink, Edit2, X } from 'lucide-react';
 import { Drawer } from 'vaul';
@@ -21,6 +21,7 @@ import { useI18n } from '@/i18n/I18nProvider';
 import { cn } from '@/lib/utils';
 import type { DateOnly } from '@/lib/time/date-only';
 import { getEffectiveSubscriptionStatus } from '@/modules/subscriptions/domain/subscription-status';
+import { useSettings } from '@/hooks/use-settings';
 
 const DEFAULT_LOGO_FALLBACK_COLOR = "hsl(var(--primary))";
 
@@ -96,6 +97,7 @@ export function SubscriptionDetailDialog({
   today,
 }: SubscriptionDetailDialogProps) {
   const { config } = useCustomConfig();
+  const { data: settings } = useSettings();
   const { t, label, formatDateOnly, formatCurrency } = useI18n();
   const category = subscription
     ? config.categories.find((item) => item.value === subscription.category)
@@ -103,6 +105,7 @@ export function SubscriptionDetailDialog({
   const categoryColor = category?.color ?? DEFAULT_LOGO_FALLBACK_COLOR;
   // 详情弹窗可能被不同入口复用，状态标签也走有效状态，避免绕过日历筛选时退回原始 active/trial。
   const effectiveStatus = subscription ? getEffectiveSubscriptionStatus(subscription, today) : null;
+  const inheritedReminderDays = settings?.notificationReminderDays ?? DEFAULT_NOTIFICATION_REMINDER_DAYS;
 
   const handleEdit = () => {
     if (subscription && onEditSubscription) {
@@ -164,7 +167,11 @@ export function SubscriptionDetailDialog({
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">{t("calendar.reminder")}</span>
-                <span>{t("reminder.days", { days: subscription.reminderDays })}</span>
+                <span>
+                  {subscription.reminderDays === INHERIT_REMINDER_DAYS
+                    ? t("subscription.card.reminderInherit", { days: inheritedReminderDays })
+                    : t("reminder.days", { days: subscription.reminderDays })}
+                </span>
               </div>
               {subscription.tags && subscription.tags.length > 0 && (
                 <div className="flex justify-between text-sm items-start">
@@ -244,7 +251,7 @@ function DaySubscriptionsList({ subscriptions, onSelectSubscription, today }: Da
   const { label, formatCurrency } = useI18n();
 
   return (
-    <div className="grid gap-2">
+    <div className="grid min-w-0 max-w-full grid-cols-1 gap-2" data-testid="calendar-day-subscription-list">
       {subscriptions.map((sub) => {
         // 当天列表和详情弹窗保持同一口径，确保旧过期数据不会在同一个日历流程里显示成不同状态。
         const effectiveStatus = getEffectiveSubscriptionStatus(sub, today);
@@ -254,7 +261,8 @@ function DaySubscriptionsList({ subscriptions, onSelectSubscription, today }: Da
             key={sub.id}
             type="button"
             onClick={() => onSelectSubscription(sub)}
-            className="group flex w-full items-center gap-3 rounded-lg border border-border bg-secondary/30 p-3 text-left transition-colors hover:bg-secondary/60"
+            className="group flex min-w-0 w-full max-w-full items-center gap-3 rounded-lg border border-border bg-secondary/30 p-3 text-left transition-colors hover:bg-secondary/60"
+            data-testid="calendar-day-subscription-item"
           >
             <CalendarSubscriptionLogo
               subscription={sub}
@@ -269,13 +277,13 @@ function DaySubscriptionsList({ subscriptions, onSelectSubscription, today }: Da
                 {label(CYCLE_LABELS[sub.billingCycle])}
               </p>
             </div>
-            <div className="text-right">
-              <p className="font-semibold text-foreground">
+            <div className="min-w-0 max-w-[42%] shrink-0 text-right">
+              <p className="truncate font-semibold text-foreground">
                 {formatCurrency(sub.price, sub.currency)}
               </p>
               <Badge
                 variant="outline"
-                className={cn("text-xs", statusBadgeClassNames[effectiveStatus])}
+                className={cn("max-w-full truncate text-xs", statusBadgeClassNames[effectiveStatus])}
               >
                 {label(STATUS_LABELS[effectiveStatus])}
               </Badge>

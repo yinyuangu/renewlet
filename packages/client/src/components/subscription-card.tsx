@@ -11,7 +11,14 @@
  */
 
 import { useEffect, useState, type CSSProperties } from 'react';
-import { STATUS_LABELS, CYCLE_LABELS, type Subscription, type SubscriptionStatus } from '@/types/subscription';
+import {
+  DEFAULT_NOTIFICATION_REMINDER_DAYS,
+  INHERIT_REMINDER_DAYS,
+  STATUS_LABELS,
+  CYCLE_LABELS,
+  type Subscription,
+  type SubscriptionStatus,
+} from '@/types/subscription';
 import { useCustomConfig } from '@/contexts/CustomConfigContext';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -43,6 +50,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useI18n } from '@/i18n/I18nProvider';
 import { localizedLabel } from '@/i18n/locales';
+import { useSettings } from '@/hooks/use-settings';
 
 interface SubscriptionCardProps {
   /** 订阅数据（前端 domain 类型）。 */
@@ -75,6 +83,7 @@ type LogoTileStyle = CSSProperties & {
 /** 订阅卡片。 */
 export function SubscriptionCard({ subscription, viewMode = 'grid', onEdit, onDelete, timeZone }: SubscriptionCardProps) {
   const { config } = useCustomConfig();
+  const { data: settings } = useSettings();
   const { t, locale, label, formatCurrency, formatDateOnly } = useI18n();
   const categoryConfig = config.categories.find((c) => c.value === subscription.category);
   const categoryLabel = categoryConfig ? label(categoryConfig.labels) : subscription.category;
@@ -93,13 +102,15 @@ export function SubscriptionCard({ subscription, viewMode = 'grid', onEdit, onDe
   const today = todayDateOnlyInTimeZone(new Date(), timeZone);
   const daysUntilRenewal = daysBetweenDateOnly(today, subscription.nextBillingDate);
   const daysUntilTrialEnd = subscription.trialEndDate ? daysBetweenDateOnly(today, subscription.trialEndDate) : null;
+  const isOneTime = subscription.billingCycle === "one-time";
   // 卡片是用户最先看到的状态入口，必须用有效状态，避免旧 active/trial 过期数据同时显示“活跃”和“即将续费”。
   const effectiveStatus = getEffectiveSubscriptionStatus(subscription, today);
   const isExpired = effectiveStatus === "expired";
   // 这里是展示提示窗口，不等同于 Cron 通知窗口；不要把两者的阈值混用。
-  const isRenewingSoon = !isExpired && daysUntilRenewal <= 7 && daysUntilRenewal >= 0;
+  const isRenewingSoon = !isOneTime && !isExpired && daysUntilRenewal <= 7 && daysUntilRenewal >= 0;
   const isTrialEndingSoon = !isExpired && subscription.status === 'trial' && daysUntilTrialEnd !== null &&
     daysUntilTrialEnd <= 3 && daysUntilTrialEnd >= 0;
+  const inheritedReminderDays = settings?.notificationReminderDays ?? DEFAULT_NOTIFICATION_REMINDER_DAYS;
 
   // 当 logo 变化时重置错误状态（例如用户从无效 URL 换成了有效 URL）
   useEffect(() => {
@@ -196,6 +207,11 @@ export function SubscriptionCard({ subscription, viewMode = 'grid', onEdit, onDe
               >
                 {localizedLabel(STATUS_LABELS[effectiveStatus], locale)}
               </Badge>
+              {isOneTime && (
+                <Badge variant="secondary" className="shrink-0 whitespace-nowrap text-xs">
+                  {localizedLabel(CYCLE_LABELS["one-time"], locale)}
+                </Badge>
+              )}
             </div>
           </div>
 
@@ -216,7 +232,9 @@ export function SubscriptionCard({ subscription, viewMode = 'grid', onEdit, onDe
             )}>
               <Calendar className="h-3.5 w-3.5" />
               <span className="text-xs">
-                {isExpired ? (
+                {isOneTime ? (
+                  t("subscription.card.oneTimeDate", { date: formatDateOnly(subscription.nextBillingDate) })
+                ) : isExpired ? (
                   daysUntilRenewal < 0
                     ? t("subscription.card.expiredDays", { days: Math.abs(daysUntilRenewal) })
                     : t("subscription.card.expired")
@@ -246,11 +264,13 @@ export function SubscriptionCard({ subscription, viewMode = 'grid', onEdit, onDe
             })()}
 
             {/* 提醒设置，仅列表模式展示 */}
-            {viewMode === 'list' && (
+            {viewMode === 'list' && !isOneTime && (
               <div className="flex items-center gap-1.5 text-muted-foreground">
                 <Bell className="h-3.5 w-3.5" />
                 <span className="text-xs">
-                  {t("subscription.card.reminderDays", { days: subscription.reminderDays })}
+                  {subscription.reminderDays === INHERIT_REMINDER_DAYS
+                    ? t("subscription.card.reminderInherit", { days: inheritedReminderDays })
+                    : t("subscription.card.reminderDays", { days: subscription.reminderDays })}
                 </span>
               </div>
             )}

@@ -14,7 +14,8 @@
  * 注意： `NotificationJobResult` 是 cron result | empty object。访问 message/channels 前必须用 `hasCronResult` 收窄。
  */
 import { useCallback, useMemo, useRef, useState, type RefObject } from "react";
-import { AlertTriangle, BellRing, CheckCircle2, Clock, History, RefreshCw, XCircle } from "lucide-react";
+import { AlertTriangle, BellRing, CheckCircle2, Clock, History, RefreshCw, X, XCircle } from "lucide-react";
+import { Drawer } from "vaul";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { TruncatedTooltipText } from "@/components/ui/truncated-tooltip-text";
@@ -28,6 +29,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n/I18nProvider";
 import type {
@@ -55,6 +57,11 @@ type NotificationHistoryPanelProps = {
 
 function formatSchedule(date: string, time: string, timeZone: string) {
   return `${date} ${time} · ${timeZone}`;
+}
+
+function repeatIntervalHours(interval: string) {
+  const hours = Number.parseInt(interval, 10);
+  return Number.isFinite(hours) && hours > 0 ? hours : 0;
 }
 
 function getStatusClass(status: NotificationHistoryJob["status"]) {
@@ -133,7 +140,7 @@ function UpcomingBatchCard({ batch }: { batch: UpcomingNotificationBatch }) {
               {item.type === "expired"
                 ? t("notification.dailyIncluded")
                 : item.repeatReminder
-                  ? t("notification.targetRepeatReminder", { date: item.targetDate, interval: item.repeatReminder.interval })
+                  ? t("notification.targetRepeatReminder", { date: item.targetDate, hours: repeatIntervalHours(item.repeatReminder.interval) })
                 : t("notification.targetReminder", { date: item.targetDate, days: item.reminderDays })}
             </span>
           </div>
@@ -196,6 +203,7 @@ function HistoryRow({ job, selected, onSelect }: { job: NotificationHistoryJob; 
     <button
       type="button"
       onClick={onSelect}
+      data-testid="notification-history-row"
       className={cn(
         "grid w-full min-w-0 grid-cols-1 gap-2 border-b border-border px-4 py-3 text-left transition-colors last:border-b-0 sm:grid-cols-[minmax(0,1fr)_auto_auto_minmax(110px,160px)] sm:items-center",
         selected ? "bg-primary/5" : "hover:bg-secondary/50",
@@ -219,7 +227,7 @@ function HistoryRow({ job, selected, onSelect }: { job: NotificationHistoryJob; 
   );
 }
 
-function HistoryDetail({ job }: { job: NotificationHistoryJob }) {
+function HistoryDetail({ job, className, testId }: { job: NotificationHistoryJob; className?: string; testId?: string }) {
   const { t, formatDateTime } = useI18n();
   const channels = getResultChannels(job);
   const content = getMessageContent(job);
@@ -228,7 +236,7 @@ function HistoryDetail({ job }: { job: NotificationHistoryJob }) {
   const succeeded = channels.succeeded;
 
   return (
-    <div className="min-w-0 rounded-lg border border-border bg-secondary/30 p-3 sm:p-4">
+    <div className={cn("min-w-0 rounded-lg border border-border bg-secondary/30 p-3 sm:p-4", className)} data-testid={testId}>
       <div className="grid gap-3 sm:grid-cols-2">
         <SummaryValue label={t("notification.createdAt")} value={formatDateTime(job.createdAt, { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })} />
         <SummaryValue label={t("notification.updatedAt")} value={formatDateTime(job.updatedAt, { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })} />
@@ -250,6 +258,56 @@ function HistoryDetail({ job }: { job: NotificationHistoryJob }) {
         <pre className="mt-4 max-h-48 max-w-full overflow-auto whitespace-pre-wrap break-words rounded-lg bg-background p-3 text-xs text-foreground">{content}</pre>
       ) : null}
     </div>
+  );
+}
+
+function HistoryDetailDrawer({
+  job,
+  open,
+  onOpenChange,
+}: {
+  job: NotificationHistoryJob | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const { t } = useI18n();
+
+  return (
+    <Drawer.Root open={open} onOpenChange={onOpenChange} shouldScaleBackground={false}>
+      {open && job ? (
+        <Drawer.Portal>
+          <Drawer.Overlay className="fixed inset-0 z-[70] bg-black/60 data-[state=open]:animate-in data-[state=open]:fade-in-0" />
+          <Drawer.Content
+            className="h5-drawer-panel h5-notification-history-detail-drawer fixed inset-x-0 bottom-0 z-[70] mx-auto flex w-full max-w-lg flex-col overflow-hidden rounded-t-lg border border-border bg-card text-card-foreground shadow-lg outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-bottom-4"
+            data-testid="notification-history-detail-drawer"
+          >
+            <div className="mx-auto mt-3 h-1.5 w-12 rounded-full bg-muted" />
+
+            <div className="flex items-start justify-between gap-4 px-5 pb-3 pt-4">
+              <div className="min-w-0">
+                <Drawer.Title className="flex min-w-0 items-center gap-2 text-base font-semibold text-foreground">
+                  <History className="h-5 w-5 shrink-0 text-primary" />
+                  <span className="min-w-0 truncate">{t("notification.historyDetailTitle")}</span>
+                </Drawer.Title>
+                <Drawer.Description className="mt-1 truncate text-left text-xs text-muted-foreground">
+                  {formatSchedule(job.scheduledLocalDate, job.scheduledLocalTime, job.timeZone)}
+                </Drawer.Description>
+              </div>
+              <Drawer.Close asChild>
+                <Button variant="ghost" size="icon" className="-mr-2 -mt-2 h-9 w-9 text-muted-foreground">
+                  <X className="h-4 w-4" />
+                  <span className="sr-only">{t("common.close")}</span>
+                </Button>
+              </Drawer.Close>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+              <HistoryDetail job={job} />
+            </div>
+          </Drawer.Content>
+        </Drawer.Portal>
+      ) : null}
+    </Drawer.Root>
   );
 }
 
@@ -278,7 +336,7 @@ function HistoryList({
           <HistoryRow key={job.id} job={job} selected={selected.id === job.id} onSelect={() => onSelect(job.id)} />
         ))}
       </div>
-      <HistoryDetail job={selected} />
+      <HistoryDetail job={selected} className="hidden lg:block" testId="notification-history-desktop-detail" />
     </div>
   );
 }
@@ -295,6 +353,8 @@ export function NotificationHistoryPanel({
 }: NotificationHistoryPanelProps) {
   const [open, setOpen] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [detailJob, setDetailJob] = useState<NotificationHistoryJob | null>(null);
+  const isCompactHistoryLayout = useMediaQuery("(max-width: 1023px)");
   const dialogScrollRef = useRef<HTMLDivElement>(null);
   const { t } = useI18n();
   const filterLabels: Array<{ value: NotificationHistoryStatusFilter; label: string }> = [
@@ -384,6 +444,7 @@ export function NotificationHistoryPanel({
                           className="min-w-0"
                           onClick={() => {
                             setSelectedJobId(null);
+                            setDetailJob(null);
                             setStatus(item.value);
                           }}
                         >
@@ -398,7 +459,13 @@ export function NotificationHistoryPanel({
                       <HistoryList
                         jobs={data?.history.jobs ?? []}
                         selectedJobId={selectedJobId}
-                        onSelect={setSelectedJobId}
+                        onSelect={(jobId) => {
+                          const job = data?.history.jobs.find((item) => item.id === jobId) ?? null;
+                          setSelectedJobId(jobId);
+                          if (isCompactHistoryLayout) {
+                            setDetailJob(job);
+                          }
+                        }}
                       />
                     )}
 
@@ -414,6 +481,15 @@ export function NotificationHistoryPanel({
               </Tabs>
             </div>
           </DialogContent>
+          <HistoryDetailDrawer
+            job={detailJob}
+            open={Boolean(detailJob)}
+            onOpenChange={(nextOpen) => {
+              if (!nextOpen) {
+                setDetailJob(null);
+              }
+            }}
+          />
         </Dialog>
       </div>
     </div>

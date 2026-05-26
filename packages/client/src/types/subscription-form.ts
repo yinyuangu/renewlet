@@ -20,8 +20,9 @@ import type { DateOnly } from "@/lib/time/date-only";
  * 订阅表单提醒类型：
  * - preset：使用预设提醒天数（下拉选项）
  * - custom：使用自定义提醒天数（输入框）
+ * - inherit：保存为 -1，通知计算时读取设置页全局提醒提前时间
  */
-export type SubscriptionFormReminderType = "preset" | "custom";
+export type SubscriptionFormReminderType = "inherit" | "preset" | "custom";
 
 /**
  * 订阅表单的本地状态（UI 输入专用）。
@@ -33,7 +34,7 @@ export type SubscriptionFormReminderType = "preset" | "custom";
 export type SubscriptionFormState = {
   /** 订阅名称（必填）。 */
   name: string;
-  /** Logo（可选，URL 或 data URL）。 */
+  /** Logo（可选，私有资产路径或 http(s) 外链）。 */
   logo: string | undefined;
   /** 金额输入框字符串（提交时 parseFloat）。 */
   price: string;
@@ -55,9 +56,9 @@ export type SubscriptionFormState = {
   nextBillingDate: DateOnly | undefined;
   /** 是否自动根据开始日期 + 周期推算 nextBillingDate。 */
   autoCalculate: boolean;
-  /** 到期提醒类型：预设天数 or 自定义天数。 */
+  /** 到期提醒类型：继承全局、预设天数或自定义天数。 */
   reminderType: SubscriptionFormReminderType;
-  /** 预设提醒天数（字符串，提交时 parseInt）。 */
+  /** 预设提醒天数；继承时保存字符串 "-1" 作为 UI 选中值。 */
   reminderDays: string;
   /** 自定义提醒天数（字符串，提交时 parseInt）。 */
   customReminderDays: string;
@@ -97,8 +98,8 @@ export function createSubscriptionFormState(
     startDate: undefined,
     nextBillingDate: undefined,
     autoCalculate: true,
-    reminderType: "preset",
-    reminderDays: "3",
+    reminderType: "inherit",
+    reminderDays: "-1",
     customReminderDays: "",
     repeatReminderEnabled: false,
     repeatReminderInterval: "1h",

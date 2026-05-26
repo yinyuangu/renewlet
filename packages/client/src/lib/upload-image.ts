@@ -3,23 +3,16 @@
  *
  * 架构位置：
  * - ImageCropDialog 输出 data URL，SVG 上传保留原始 File。
- * - 本模块把 data URL 或原始 File 写入 PocketBase `assets` collection。
+ * - 本模块把 data URL 或原始 File 交给当前运行时的资产服务。
  *
  * 注意： 客户端校验只是体验优化；PocketBase collection 规则仍是最终安全边界。
  */
 import { MAX_IMAGE_BYTES, imageExtensionForMime, isAllowedImageMime, uploadMimeTypeForFile } from "@/lib/upload-constraints";
 import type { ApiUploadImageResponse, UploadKind } from "@/lib/api/schemas/media";
-import { getCurrentUserId, pb, type RecordModel } from "@/lib/pocketbase";
 import { getApiLocale } from "@/i18n/api-locale";
 import { translate } from "@/i18n/messages";
+import { assetService } from "@/services/asset-service";
 
-/**
- * 将 base64 data URL 转为 Blob（用于上传）。
- *
- * 说明：
- * - `ImageCropDialog` 的输出是 data URL（例如 data:image/png;base64,...）
- * - 上传时需要转换成二进制（Blob/File），再用 multipart/form-data 写入 PocketBase。
- */
 export function dataUrlToBlob(dataUrl: string): Blob {
   const commaIndex = dataUrl.indexOf(",");
   if (commaIndex === -1) {
@@ -58,8 +51,8 @@ export function dataUrlToBlob(dataUrl: string): Blob {
   return blob;
 }
 
-/** 客户端文件预检；服务端 collection 规则仍会做最终校验。 */
 export function validateImageFileForUpload(file: File): string | null {
+  // 这里只做交互层快速失败；真实边界仍在 PocketBase collection / Worker 上传 API。
   if (!isAllowedImageMime(uploadMimeTypeForFile(file))) return translate(getApiLocale(), "media.imageTypeInvalid");
   if (file.size > MAX_IMAGE_BYTES) {
     return translate(getApiLocale(), "media.imageTooLarge", { size: Math.floor(MAX_IMAGE_BYTES / 1024 / 1024) });
@@ -68,20 +61,14 @@ export function validateImageFileForUpload(file: File): string | null {
 }
 
 interface UploadImageDataUrlOptions {
-  /** `ImageCropDialog` 输出的 data URL（data:image/*;base64,...）。 */
   dataUrl: string;
-  /** 上传用途：logo/icon（决定保存目录）。 */
   kind: UploadKind;
-  /** 可选：文件名（只用于上传时的 filename；最终对象名由后端生成）。 */
   filename?: string;
 }
 
 interface UploadImageFileOptions {
-  /** 原始上传文件（SVG 会走这里以保留矢量内容）。 */
   file: File;
-  /** 上传用途：logo/icon（决定保存目录）。 */
   kind: UploadKind;
-  /** 可选：文件名（只用于上传时的 filename；最终对象名由后端生成）。 */
   filename?: string;
 }
 
@@ -91,27 +78,9 @@ function getDefaultFilename(mimeType: string): string {
 }
 
 async function createAssetFromFile(file: Blob, kind: UploadKind, filename: string): Promise<ApiUploadImageResponse> {
-  const form = new FormData();
-  const userId = getCurrentUserId();
-  if (!userId) throw new Error(translate(getApiLocale(), "auth.loginRequired"));
-
-  form.append("user", userId);
-  form.append("kind", kind);
-  form.append("file", file, filename);
-
-  const record = await pb.collection("assets").create<RecordModel>(form);
-  const storedFile = typeof record["file"] === "string" ? record["file"] : "";
-  // 返回受控读取 API，而不是 PocketBase 直链；这样私有资产继续走统一鉴权和缓存策略。
-  if (!storedFile) throw new Error(translate(getApiLocale(), "media.uploadFailed"));
-  return { url: `/api/app/assets/${record.id}` };
+  return await assetService.create(file, kind, filename);
 }
 
-/**
- * 上传裁剪后的图片（data URL）到 PocketBase 文件存储。
- *
- * 返回：
- * - `{ url }`，指向需要 Authorization 读取的 `/api/app/assets/{id}` 受控资产。
- */
 export async function uploadImageDataUrl(
   options: UploadImageDataUrlOptions,
 ): Promise<ApiUploadImageResponse> {
@@ -121,7 +90,6 @@ export async function uploadImageDataUrl(
   return createAssetFromFile(blob, options.kind, filename);
 }
 
-/** 上传原始图片文件（当前用于 SVG，避免裁剪流程把矢量图转成 PNG）。 */
 export async function uploadImageFile(
   options: UploadImageFileOptions,
 ): Promise<ApiUploadImageResponse> {

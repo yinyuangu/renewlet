@@ -127,6 +127,10 @@ func normalizeSubscriptionRecord(record *core.Record) error {
 		// 非 custom 周期清零 customDays，避免历史值影响前端统计和通知计算。
 		record.Set("customDays", 0)
 	}
+	if billingCycle == "one-time" {
+		// one-time 是买断/终身授权，不应参与自动续费日期推算；API 和 Admin UI 写入都在持久层兜底关闭。
+		record.Set("autoCalculateNextBillingDate", false)
+	}
 
 	startDate := strings.TrimSpace(record.GetString("startDate"))
 	if err := requireDateOnly(startDate, "START_DATE"); err != nil {
@@ -150,9 +154,11 @@ func normalizeSubscriptionRecord(record *core.Record) error {
 		record.Set("trialEndDate", trialEndDate)
 	}
 
-	if err := validateOptionalLogoReference(record.GetString("logo")); err != nil {
+	logo := strings.TrimSpace(record.GetString("logo"))
+	if err := validateOptionalLogoReference(logo); err != nil {
 		return err
 	}
+	record.Set("logo", logo)
 	if err := validateOptionalHTTPURL(record.GetString("website"), "WEBSITE_URL"); err != nil {
 		return err
 	}
@@ -169,7 +175,7 @@ func normalizeSubscriptionRecord(record *core.Record) error {
 	}
 
 	reminderDays := record.GetInt("reminderDays")
-	if reminderDays < 0 || reminderDays > 3650 {
+	if reminderDays < inheritReminderDays || reminderDays > maxReminderDays {
 		return errors.New("REMINDER_DAYS_OUT_OF_RANGE")
 	}
 
@@ -301,7 +307,7 @@ func requireDateOnly(value string, label string) error {
 }
 
 // validateOptionalLogoReference 校验订阅 Logo 引用。
-// data:image 只为历史数据兼容保留；新上传链路应使用 /api/app/assets/{id}。
+// Logo 外链只由浏览器展示，服务端不抓取用户 URL；userinfo 会污染审计日志且不应进入持久层。
 func validateOptionalLogoReference(value string) error {
 	value = strings.TrimSpace(value)
 	if value == "" {
@@ -310,13 +316,10 @@ func validateOptionalLogoReference(value string) error {
 	if len([]rune(value)) > maxLogoReferenceLength {
 		return errors.New("LOGO_URL_TOO_LONG")
 	}
-	if strings.HasPrefix(value, "data:image/") {
-		return nil
-	}
 	if privateAssetPathRe.MatchString(value) {
 		return nil
 	}
-	return validateOptionalHTTPURL(value, "LOGO_URL")
+	return validateOptionalLogoHTTPURL(value)
 }
 
 // validateOptionalHTTPURL 校验可选 HTTP(S) URL 字段。
@@ -331,6 +334,24 @@ func validateOptionalHTTPURL(value string, label string) error {
 	}
 	if parsed.Scheme != "http" && parsed.Scheme != "https" {
 		return fmt.Errorf("%s_SCHEME_INVALID", label)
+	}
+	return nil
+}
+
+func validateOptionalLogoHTTPURL(value string) error {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil
+	}
+	parsed, err := url.Parse(value)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return errors.New("LOGO_URL_INVALID")
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return errors.New("LOGO_URL_SCHEME_INVALID")
+	}
+	if parsed.User != nil {
+		return errors.New("LOGO_URL_USERINFO_INVALID")
 	}
 	return nil
 }

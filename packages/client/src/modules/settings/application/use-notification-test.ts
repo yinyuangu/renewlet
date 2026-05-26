@@ -10,14 +10,12 @@
  * - 服务端测试接口不会持久化这份临时配置，因此不会污染数据库。
  */
 import { useCallback, useState } from "react";
-import { apiFetch } from "@/lib/api-client";
-import { notificationsTestResponseSchema } from "@/lib/api/schemas/notifications";
 import { getDisplayErrorMessage } from "@/lib/display-error";
 import { useToast } from "@/hooks/use-toast";
 import { CHANNEL_LABELS, type AppSettings, type NotificationChannel } from "@/types/subscription";
 import { useI18n } from "@/i18n/I18nProvider";
+import { notificationService } from "@/services/notification-service";
 
-/** 发送通知渠道测试消息。 */
 export function useNotificationTest(settings: AppSettings) {
   const { toast } = useToast();
   const { t, label } = useI18n();
@@ -30,10 +28,7 @@ export function useNotificationTest(settings: AppSettings) {
       setTestingChannel(channel);
 
       try {
-        await apiFetch("/api/app/notifications/test", notificationsTestResponseSchema, {
-          method: "POST",
-          body: JSON.stringify({ channel, settings }),
-        });
+        await notificationService.test(channel, settings);
         toast({
           title: t("notification.testSuccess"),
           description: `${t("notification.channel")}：${label(CHANNEL_LABELS[channel])}`,

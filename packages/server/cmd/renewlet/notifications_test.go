@@ -30,6 +30,20 @@ func TestBuildDueNotificationForLocalDate(t *testing.T) {
 	}
 }
 
+func TestBuildDueNotificationSkipsOneTimePurchases(t *testing.T) {
+	settings := defaultAppSettings()
+	settings.ShowExpired = true
+	settings.Timezone = "Asia/Shanghai"
+
+	message := buildDueNotificationForLocalDate("2026-05-14", time.Date(2026, 5, 14, 1, 2, 3, 0, time.UTC), settings, []notificationSubscription{
+		{ID: "one-time", Name: "Lifetime", Price: 199, Currency: "USD", Status: "active", BillingCycle: "one-time", NextBillingDate: "2026-05-14", TrialEndDate: "2026-05-14", ReminderDays: 0},
+	}, true)
+
+	if message.HasPayload || len(message.Items) != 0 {
+		t.Fatalf("expected one-time purchase to be excluded from notifications, got %#v", message.Items)
+	}
+}
+
 func TestBuildDueNotificationUsesEnglishLocale(t *testing.T) {
 	settings := defaultAppSettings()
 	settings.Locale = string(localeEnUS)
@@ -44,6 +58,23 @@ func TestBuildDueNotificationUsesEnglishLocale(t *testing.T) {
 	}
 	if !strings.Contains(message.Content, "Upcoming renewals") || !strings.Contains(message.Content, "3 days before") {
 		t.Fatalf("expected English notification content, got %q", message.Content)
+	}
+}
+
+func TestBuildDueNotificationUsesGlobalReminderForInheritedSubscription(t *testing.T) {
+	settings := defaultAppSettings()
+	settings.Timezone = "UTC"
+	settings.NotificationReminderDays = 5
+
+	message := buildDueNotificationForLocalDate("2026-05-12", time.Date(2026, 5, 12, 1, 2, 3, 0, time.UTC), settings, []notificationSubscription{
+		{ID: "inherit", Name: "Inherited", Price: 18, Currency: "USD", Status: "active", NextBillingDate: "2026-05-17", ReminderDays: inheritReminderDays},
+	}, true)
+
+	if !message.HasPayload || len(message.Items) != 1 {
+		t.Fatalf("expected inherited reminder item, got %#v", message.Items)
+	}
+	if message.Items[0].ReminderDays != 5 {
+		t.Fatalf("expected effective reminder days in history payload, got %d", message.Items[0].ReminderDays)
 	}
 }
 
@@ -81,6 +112,40 @@ func TestRepeatReminderScheduleBuildsRepeatItem(t *testing.T) {
 	}
 	if !strings.Contains(message.Content, "重复提醒，每 1 小时") {
 		t.Fatalf("expected repeat reminder copy in content, got %q", message.Content)
+	}
+}
+
+func TestRepeatReminderScheduleUsesGlobalReminderForInheritedSubscription(t *testing.T) {
+	settings := defaultAppSettings()
+	settings.Timezone = "UTC"
+	settings.NotificationTimeLocal = "08:00"
+	settings.NotificationReminderDays = 5
+
+	subscriptions := []notificationSubscription{{
+		ID:                     "critical",
+		Name:                   "Critical SaaS",
+		Price:                  99,
+		Currency:               "USD",
+		Status:                 "active",
+		NextBillingDate:        "2026-05-17",
+		ReminderDays:           inheritReminderDays,
+		RepeatReminderEnabled:  true,
+		RepeatReminderInterval: "1h",
+		RepeatReminderWindow:   "full",
+	}}
+	now := time.Date(2026, 5, 12, 9, 0, 30, 0, time.UTC)
+
+	schedule := getNotificationScheduleDecision(now, settings, subscriptions, 2, false)
+	if !schedule.Due || schedule.ScheduledLocalTime != "09:00" {
+		t.Fatalf("expected inherited repeat reminder to be due, got %#v", schedule)
+	}
+
+	message := buildDueNotificationForSchedule(schedule.localScheduleOccurrence, now, settings, subscriptions, true)
+	if !message.HasPayload || len(message.Items) != 1 {
+		t.Fatalf("expected one inherited repeat item, got %#v", message.Items)
+	}
+	if message.Items[0].ReminderDays != 5 || message.Items[0].RepeatReminder == nil {
+		t.Fatalf("expected effective repeat reminder snapshot, got %#v", message.Items[0])
 	}
 }
 
@@ -230,6 +295,7 @@ func TestMergeSettingsSanitizesNotificationFields(t *testing.T) {
 		"notificationTimeLocal": "99:99",
 		"enabledChannels": ["telegram", "telegram", "unknown", "email"],
 		"exchangeRateProvider": "unknown",
+		"notificationReminderDays": -2,
 		"webhookMethod": "DELETE",
 		"webhookHeaders": `+strconv.Quote(legacyWebhookHeadersExample)+`,
 		"webhookPayload": `+strconv.Quote(legacyWebhookPayloadExample)+`,
@@ -245,6 +311,9 @@ func TestMergeSettingsSanitizesNotificationFields(t *testing.T) {
 	}
 	if settings.NotificationTimeLocal != "08:00" {
 		t.Fatalf("expected local time fallback, got %q", settings.NotificationTimeLocal)
+	}
+	if settings.NotificationReminderDays != defaultNotificationReminderDays {
+		t.Fatalf("expected global reminder fallback, got %d", settings.NotificationReminderDays)
 	}
 	if len(settings.EnabledChannels) != 2 || settings.EnabledChannels[0] != "telegram" || settings.EnabledChannels[1] != "email" {
 		t.Fatalf("unexpected channels %#v", settings.EnabledChannels)

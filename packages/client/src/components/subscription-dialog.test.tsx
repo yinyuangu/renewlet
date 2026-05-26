@@ -31,7 +31,7 @@ vi.mock("@/contexts/CustomConfigContext", () => ({
 
 vi.mock("@/hooks/use-settings", () => ({
   useSettings: () => ({
-    data: { defaultCurrency: "USD" },
+    data: { defaultCurrency: "USD", notificationReminderDays: 5 },
   }),
 }));
 
@@ -105,9 +105,14 @@ describe("SubscriptionDialog", () => {
     );
 
     const form = document.querySelector("form");
+    const dialog = screen.getByRole("dialog", { name: "添加新订阅" });
+    const header = document.querySelector("[data-subscription-dialog-header]");
     const scrollRegion = form?.firstElementChild;
     const footer = screen.getByRole("button", { name: "添加订阅" }).closest("div");
 
+    expect(dialog).toHaveClass("h5-dialog-frame", "h5-subscription-dialog-panel");
+    expect(dialog).not.toHaveClass("h-fit");
+    expect(header).toHaveClass("shrink-0");
     expect(form).toHaveClass("h5-subscription-dialog-form");
     expect(scrollRegion).toHaveClass("h5-mobile-sheet-scroll", "h5-subscription-dialog-scroll", "py-4");
     expect(scrollRegion?.className).not.toContain("--subscription-dialog-footer-space");
@@ -146,6 +151,53 @@ describe("SubscriptionDialog", () => {
     await user.click(await screen.findByText("人民币 (¥)"));
 
     expect(screen.getByRole("combobox", { name: "选择货币" })).toHaveTextContent("人民币 (¥)");
+  });
+
+  it("defaults new subscriptions to the inherited reminder setting", () => {
+    render(
+      <TooltipProvider delayDuration={0}>
+        <SubscriptionDialog
+          mode="create"
+          open
+          onOpenChange={vi.fn()}
+          onSubmit={vi.fn()}
+        />
+      </TooltipProvider>,
+    );
+
+    expect(screen.getByRole("combobox", { name: "到期提醒" })).toHaveTextContent("默认值从设置中获取（提前 5 天）");
+  });
+
+  it("keeps explicit reminder days when editing historical subscriptions", () => {
+    render(
+      <TooltipProvider delayDuration={0}>
+        <SubscriptionDialog
+          mode="edit"
+          open
+          onOpenChange={vi.fn()}
+          onSubmit={vi.fn()}
+          subscription={makeSubscription({ reminderDays: 30 })}
+        />
+      </TooltipProvider>,
+    );
+
+    expect(screen.getByRole("combobox", { name: "到期提醒" })).toHaveTextContent("提前 30 天");
+  });
+
+  it("shows inherited reminder selections when editing inherited subscriptions", () => {
+    render(
+      <TooltipProvider delayDuration={0}>
+        <SubscriptionDialog
+          mode="edit"
+          open
+          onOpenChange={vi.fn()}
+          onSubmit={vi.fn()}
+          subscription={makeSubscription({ reminderDays: -1 })}
+        />
+      </TooltipProvider>,
+    );
+
+    expect(screen.getByRole("combobox", { name: "到期提醒" })).toHaveTextContent("默认值从设置中获取（提前 5 天）");
   });
 
   it("opens the date picker on the month of the selected field value", async () => {
@@ -298,6 +350,31 @@ describe("SubscriptionDialog", () => {
 
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
       tags: ["Infra", "Security", "AI"],
+    }));
+  });
+
+  it("commits pending tag text when submitting without Enter", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+
+    render(
+      <TooltipProvider delayDuration={0}>
+        <SubscriptionDialog
+          mode="edit"
+          open
+          onOpenChange={vi.fn()}
+          onSubmit={onSubmit}
+          subscription={makeSubscription({ tags: ["Infra"] })}
+          availableTags={["Infra"]}
+        />
+      </TooltipProvider>,
+    );
+
+    await user.type(screen.getByLabelText("标签"), "AI");
+    await user.click(screen.getByRole("button", { name: "保存修改" }));
+
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
+      tags: ["Infra", "AI"],
     }));
   });
 

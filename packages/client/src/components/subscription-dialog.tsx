@@ -27,8 +27,11 @@ import {
   isOptionalHttpUrl,
   getTagsValidationError,
   isRenewalDateBeforeStartDate,
+  normalizeTagsArray,
+  parseTagsInput,
   parseNonNegativeFiniteNumberInput,
   parseNonNegativeIntegerInput,
+  parseReminderDaysInput,
   parsePositiveIntegerInput,
   toSubscriptionDraft,
 } from "@/lib/subscription-form";
@@ -36,7 +39,7 @@ import { useCustomConfig } from "@/contexts/CustomConfigContext";
 import { useDeferredDialogCleanup } from "@/hooks/use-deferred-dialog-cleanup";
 import { useSettings } from "@/hooks/use-settings";
 import type { Subscription, SubscriptionDraft } from "@/types/subscription";
-import { REMINDER_DAYS_OPTIONS } from "@/types/subscription";
+import { DEFAULT_NOTIFICATION_REMINDER_DAYS, INHERIT_REMINDER_DAYS, REMINDER_DAYS_OPTIONS } from "@/types/subscription";
 import { createSubscriptionFormState, type SubscriptionFormState } from "@/types/subscription-form";
 import { useI18n } from "@/i18n/I18nProvider";
 import { todayDateOnlyInTimeZone } from "@/lib/time/date-only";
@@ -79,6 +82,7 @@ export function SubscriptionDialog(props: SubscriptionDialogProps) {
   const { data: settings } = useSettings();
   const { t } = useI18n();
   const statisticCurrency = settings?.defaultCurrency ?? "CNY";
+  const notificationReminderDays = settings?.notificationReminderDays ?? DEFAULT_NOTIFICATION_REMINDER_DAYS;
 
   // 新建订阅时默认货币：
   // - 优先使用“统计货币”（Settings.defaultCurrency）
@@ -169,6 +173,7 @@ export function SubscriptionDialog(props: SubscriptionDialogProps) {
     if (!editSubscription) return;
 
     const subscription = editSubscription;
+    const isInheritReminder = subscription.reminderDays === INHERIT_REMINDER_DAYS;
     const isPresetReminder = REMINDER_DAYS_OPTIONS.some((opt) => opt.value === subscription.reminderDays);
 
     setFormData({
@@ -184,9 +189,9 @@ export function SubscriptionDialog(props: SubscriptionDialogProps) {
       startDate: subscription.startDate,
       nextBillingDate: subscription.nextBillingDate,
       autoCalculate: subscription.autoCalculateNextBillingDate,
-      reminderType: isPresetReminder ? "preset" : "custom",
-      reminderDays: isPresetReminder ? subscription.reminderDays.toString() : "3",
-      customReminderDays: !isPresetReminder ? subscription.reminderDays.toString() : "",
+      reminderType: isInheritReminder ? "inherit" : isPresetReminder ? "preset" : "custom",
+      reminderDays: isInheritReminder ? String(INHERIT_REMINDER_DAYS) : isPresetReminder ? subscription.reminderDays.toString() : "3",
+      customReminderDays: !isInheritReminder && !isPresetReminder ? subscription.reminderDays.toString() : "",
       repeatReminderEnabled: subscription.repeatReminderEnabled,
       repeatReminderInterval: subscription.repeatReminderInterval,
       repeatReminderWindow: subscription.repeatReminderWindow,
@@ -201,6 +206,13 @@ export function SubscriptionDialog(props: SubscriptionDialogProps) {
   // 自动推算 nextBillingDate（仅当 autoCalculate=true 且已选择 startDate）。
   // 注意： 这里依赖 DateOnly 字符串算法，不应引入 JS Date 时区换算，否则跨时区用户会看到扣费日漂移。
   useEffect(() => {
+    if (formData.billingCycle === "one-time") {
+      if (formData.autoCalculate) {
+        // one-time 是买断记录，不存在“下一次续费”；这里只修正表单中间态，后端/Worker 保存时还会兜底清空。
+        setFormData((prev) => ({ ...prev, autoCalculate: false }));
+      }
+      return;
+    }
     if (formData.autoCalculate && formData.startDate) {
       const customDays = formData.billingCycle === "custom" ? parsePositiveIntegerInput(formData.customDays) ?? 30 : undefined;
       const nextDate = calculateNextBillingDate(formData.startDate, formData.billingCycle, customDays, billingReferenceDate);
@@ -218,36 +230,50 @@ export function SubscriptionDialog(props: SubscriptionDialogProps) {
     [props.mode],
   );
 
-  const validateForm = useCallback(() => {
+  const getSubmissionFormData = useCallback(() => {
+    const pendingTags = Array.from(
+      formRef.current?.querySelectorAll<HTMLInputElement>("[data-subscription-tag-pending-input]") ?? [],
+    ).flatMap((input) => parseTagsInput(input.value));
+    if (pendingTags.length === 0) return formData;
+    return {
+      ...formData,
+      tags: normalizeTagsArray([...formData.tags, ...pendingTags]),
+    };
+  }, [formData]);
+
+  const validateForm = useCallback((nextFormData: SubscriptionFormState) => {
     const errors: SubscriptionFormErrors = {};
 
-    if (!formData.name.trim()) errors.name = t("subscription.validation.nameRequired");
-    if (parseNonNegativeFiniteNumberInput(formData.price) === null) {
+    if (!nextFormData.name.trim()) errors.name = t("subscription.validation.nameRequired");
+    if (parseNonNegativeFiniteNumberInput(nextFormData.price) === null) {
       errors.price = t("subscription.validation.amountInvalid");
     }
-    if (!formData.startDate || !formData.nextBillingDate) {
+    if (!nextFormData.startDate || !nextFormData.nextBillingDate) {
       errors.dates = t("subscription.validation.datesRequired");
-    } else if (isRenewalDateBeforeStartDate(formData)) {
+    } else if (isRenewalDateBeforeStartDate(nextFormData)) {
       errors.dates = t("subscription.validation.dateOrderInvalid");
     }
-    if (formData.billingCycle === "custom" && parsePositiveIntegerInput(formData.customDays) === null) {
+    if (nextFormData.billingCycle === "custom" && parsePositiveIntegerInput(nextFormData.customDays) === null) {
       errors.customDays = t("subscription.validation.customCycleInvalid");
     }
-    if (parseNonNegativeIntegerInput(
-      formData.reminderType === "custom" ? formData.customReminderDays : formData.reminderDays,
-    ) === null) {
+    const reminderValue = nextFormData.reminderType === "inherit"
+      ? INHERIT_REMINDER_DAYS
+      : nextFormData.reminderType === "custom"
+        ? parseNonNegativeIntegerInput(nextFormData.customReminderDays)
+        : parseReminderDaysInput(nextFormData.reminderDays);
+    if (reminderValue === null) {
       errors.reminderDays = t("subscription.validation.reminderInvalid");
     }
-    if (!isOptionalHttpUrl(formData.website)) {
+    if (!isOptionalHttpUrl(nextFormData.website)) {
       errors.website = t("subscription.validation.websiteInvalid");
     }
-    const tagsError = getTagsValidationError(formData.tags);
+    const tagsError = getTagsValidationError(nextFormData.tags);
     if (tagsError) {
       errors.tags = tagsError;
     }
 
     return errors;
-  }, [formData, t]);
+  }, [t]);
 
   const clearFieldError = useCallback((field: keyof SubscriptionFormErrors) => {
     setSubmitError(null);
@@ -265,7 +291,13 @@ export function SubscriptionDialog(props: SubscriptionDialogProps) {
     // 彻底杜绝把临时 data URL 写入数据库：上传未完成时禁止提交
     if (logoUploadStatus === "uploading") return;
 
-    const nextErrors = validateForm();
+    const submissionFormData = getSubmissionFormData();
+    if (submissionFormData !== formData) {
+      // 提交是标签输入状态进入订阅草稿的最后边界；不能要求用户必须先按 Enter 或触发 blur。
+      setFormData(submissionFormData);
+    }
+
+    const nextErrors = validateForm(submissionFormData);
     if (Object.keys(nextErrors).length > 0) {
       setFormErrors(nextErrors);
       setSubmitError(null);
@@ -274,7 +306,7 @@ export function SubscriptionDialog(props: SubscriptionDialogProps) {
     }
 
     setFormErrors({});
-    const draft = toSubscriptionDraft(formData);
+    const draft = toSubscriptionDraft(submissionFormData);
     if (!draft) {
       setSubmitError(t("subscription.formIncomplete"));
       return;
@@ -304,8 +336,11 @@ export function SubscriptionDialog(props: SubscriptionDialogProps) {
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
       {"trigger" in props && props.trigger ? <DialogTrigger asChild>{props.trigger}</DialogTrigger> : null}
 
-      <DialogContent className="h5-subscription-dialog-panel min-h-0 border-border bg-card p-0 sm:max-w-lg">
-        <DialogHeader className="shrink-0 p-6 pb-0">
+      <DialogContent
+        layout="frame"
+        className="h5-dialog-frame h5-subscription-dialog-panel border-border bg-card p-0 sm:max-w-lg"
+      >
+        <DialogHeader data-subscription-dialog-header="" className="shrink-0 p-6 pb-0">
           <DialogTitle className="text-xl font-semibold">
             {props.mode === "create" ? t("subscription.dialogCreateTitle") : t("subscription.dialogEditTitle")}
           </DialogTitle>
@@ -336,6 +371,7 @@ export function SubscriptionDialog(props: SubscriptionDialogProps) {
               onFieldChange={handleFieldChange}
               errors={formErrors}
               onClearFieldError={clearFieldError}
+              notificationReminderDays={notificationReminderDays}
             />
           </div>
 

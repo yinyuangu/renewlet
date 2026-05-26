@@ -44,6 +44,7 @@ import { useConfigManagerController } from '@/modules/custom-config/application/
 import { ConfigManagerSortableList } from '@/modules/custom-config/presentation/config-manager-sortable-list';
 import { useI18n } from '@/i18n/I18nProvider';
 import { rankSearchText } from '@/lib/searchable-options';
+import { cn } from '@/lib/utils';
 
 const DEFAULT_COLORS = [
   'hsl(160 84% 45%)',
@@ -217,8 +218,16 @@ export const ConfigManagerDialog = ({
           <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
         </button>
       </DialogTrigger>
-      <DialogContent className="flex min-h-0 flex-col sm:max-w-lg">
-        <DialogHeader>
+      <DialogContent
+        layout={searchable ? "frame" : "content"}
+        className={cn(
+          "sm:max-w-lg",
+          searchable
+            ? "h5-dialog-frame h5-config-manager-dialog-panel"
+            : "flex min-h-0 flex-col",
+        )}
+      >
+        <DialogHeader data-config-manager-header="" className="shrink-0">
           <DialogTitle className="flex items-center gap-2">
             {icon && <div className="text-primary">{icon}</div>}
             {title}
@@ -233,7 +242,7 @@ export const ConfigManagerDialog = ({
         </DialogHeader>
 
         {searchable && (
-          <div className="relative mt-2">
+          <div className="relative mt-2 shrink-0">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={searchQuery}
@@ -245,7 +254,10 @@ export const ConfigManagerDialog = ({
           </div>
         )}
 
-        <div className="min-h-0 min-w-0 flex-1 grid gap-2 overflow-y-auto py-4 pr-1 sm:pr-2">
+        <div
+          data-config-manager-scroll=""
+          className="min-h-0 min-w-0 flex-1 grid gap-2 overflow-y-auto py-4 pr-1 sm:pr-2"
+        >
           <ConfigManagerSortableList
             items={filteredItems}
             showColor={showColor}
@@ -288,7 +300,10 @@ export const ConfigManagerDialog = ({
           />
         </div>
 
-        <div className="flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
+        <div
+          data-config-manager-footer=""
+          className="flex shrink-0 flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between"
+        >
           <p className="min-w-0 break-words text-xs text-muted-foreground">
             {toggleMode
               ? t("customConfig.dragSortEnabled", { enabled: enabledCount, total: items.length })

@@ -168,31 +168,107 @@ type rateLimitedResponse struct {
 	Message string `json:"message"`
 }
 
-// faviconSearchResponse 是 favicon/logo 远端增强搜索响应。
-type faviconSearchResponse struct {
-	ImageURLs []string `json:"imageUrls"`
-	Kind      string   `json:"kind"`
+// mediaCandidateResolveRequest 是 Logo/Icon 候选解析的统一入口。
+// Docker 与 Cloudflare 必须共享这组字段，避免前端再按运行面拆 favicon/内置图标搜索。
+type mediaCandidateResolveRequest struct {
+	Kind  string                      `json:"kind"`
+	Mode  string                      `json:"mode"`
+	Items []mediaCandidateResolveItem `json:"items"`
+	Limit *int                        `json:"limit,omitempty"`
 }
 
-// theSvgIconsResponse 是 The SVG 索引搜索响应。
-type theSvgIconsResponse struct {
-	Icons []apiTheSvgIcon `json:"icons"`
+// Validate 校验 media candidates 请求体，并在边界处完成 trim。
+func (r *mediaCandidateResolveRequest) Validate(locale appLocale) error {
+	r.Kind = strings.TrimSpace(r.Kind)
+	r.Mode = strings.TrimSpace(r.Mode)
+	if r.Kind != "logo" && r.Kind != "icon" {
+		return errors.New(tr(locale, "媒体类型无效", "Invalid media kind"))
+	}
+	if r.Mode != "auto" && r.Mode != "search" {
+		return errors.New(tr(locale, "候选解析模式无效", "Invalid media candidate mode"))
+	}
+	if len(r.Items) == 0 || len(r.Items) > mediaResolverCfg.Limits.MaxItems {
+		return errors.New(tr(locale, "候选解析条目数量无效", "Invalid media candidate item count"))
+	}
+	if r.Limit != nil && *r.Limit <= 0 {
+		return errors.New(tr(locale, "候选数量上限无效", "Invalid media candidate limit"))
+	}
+	for index := range r.Items {
+		item := &r.Items[index]
+		item.ID = strings.TrimSpace(item.ID)
+		item.Name = strings.TrimSpace(item.Name)
+		item.Website = strings.TrimSpace(item.Website)
+		if item.ID == "" || len([]rune(item.ID)) > 120 || item.Name == "" || len([]rune(item.Name)) > 120 || len([]rune(item.Website)) > 500 {
+			return errors.New(tr(locale, "候选解析条目无效", "Invalid media candidate item"))
+		}
+	}
+	return nil
+}
+
+// mediaCandidateResolveItem 是单条候选解析输入。
+type mediaCandidateResolveItem struct {
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	Website string `json:"website,omitempty"`
+}
+
+// mediaCandidate 是前端统一展示、导入自动分配和后续 provider 扩展共用的候选模型。
+type mediaCandidate struct {
+	ID             string  `json:"id"`
+	Kind           string  `json:"kind"`
+	Source         string  `json:"source"`
+	Provider       string  `json:"provider"`
+	Label          string  `json:"label"`
+	Variant        *string `json:"variant"`
+	URL            string  `json:"url"`
+	Confidence     string  `json:"confidence"`
+	AutoAssignable bool    `json:"autoAssignable"`
+	MatchedQuery   string  `json:"matchedQuery"`
+	Rank           int     `json:"rank"`
+}
+
+// mediaCandidateGroup 按来源分组；best 只指向分组中的首选候选，不额外生成第三类结果。
+type mediaCandidateGroup struct {
+	Best    *mediaCandidate  `json:"best"`
+	BuiltIn []mediaCandidate `json:"builtIn"`
+	Favicon []mediaCandidate `json:"favicon"`
+}
+
+// mediaCandidateResolveItemResponse 是单条解析响应。
+type mediaCandidateResolveItemResponse struct {
+	ID            string              `json:"id"`
+	AutoCandidate *mediaCandidate     `json:"autoCandidate"`
+	Candidates    mediaCandidateGroup `json:"candidates"`
+}
+
+// mediaCandidateResolveResponse 是 media candidates API 响应。
+type mediaCandidateResolveResponse struct {
+	Items []mediaCandidateResolveItemResponse `json:"items"`
 }
 
 // decodeStrictJSON 从 HTTP 请求体解码严格 JSON。
 func decodeStrictJSON[T interface{}](request *http.Request, locale appLocale) (T, error) {
-	return decodeStrictJSONFromReader[T](request.Body, locale, false)
+	return decodeStrictJSONFromReaderWithLimit[T](request.Body, locale, false, maxJSONBodyBytes)
+}
+
+// decodeStrictJSONWithLimit 只给少数大 JSON 入口使用；默认 API 仍保持 1MiB 防滥用上限。
+func decodeStrictJSONWithLimit[T interface{}](request *http.Request, locale appLocale, maxBytes int64) (T, error) {
+	return decodeStrictJSONFromReaderWithLimit[T](request.Body, locale, false, maxBytes)
 }
 
 // decodeOptionalStrictJSON 解码可为空的严格 JSON。
 // 手动通知运行允许空 body，因此这里把“空 body”与“非法 JSON”区分开。
 func decodeOptionalStrictJSON[T interface{}](request *http.Request, locale appLocale) (T, error) {
-	return decodeStrictJSONFromReader[T](request.Body, locale, true)
+	return decodeStrictJSONFromReaderWithLimit[T](request.Body, locale, true, maxJSONBodyBytes)
 }
 
 // decodeStrictJSONFromReader 限制请求体大小后再进入 JSON decoder。
 // 这样能在 DisallowUnknownFields 前先阻断异常大 body，避免内存被恶意请求放大。
 func decodeStrictJSONFromReader[T interface{}](reader io.Reader, locale appLocale, allowEmpty bool) (T, error) {
+	return decodeStrictJSONFromReaderWithLimit[T](reader, locale, allowEmpty, maxJSONBodyBytes)
+}
+
+func decodeStrictJSONFromReaderWithLimit[T interface{}](reader io.Reader, locale appLocale, allowEmpty bool, maxBytes int64) (T, error) {
 	var zero T
 	if reader == nil {
 		if allowEmpty {
@@ -200,11 +276,11 @@ func decodeStrictJSONFromReader[T interface{}](reader io.Reader, locale appLocal
 		}
 		return zero, errEmptyJSONBody
 	}
-	data, err := io.ReadAll(io.LimitReader(reader, maxJSONBodyBytes+1))
+	data, err := io.ReadAll(io.LimitReader(reader, maxBytes+1))
 	if err != nil {
 		return zero, err
 	}
-	if len(data) > maxJSONBodyBytes {
+	if int64(len(data)) > maxBytes {
 		return zero, errors.New("JSON body too large")
 	}
 	return decodeStrictJSONFromBytes[T](data, locale, allowEmpty)

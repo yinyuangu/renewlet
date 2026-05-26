@@ -170,4 +170,21 @@ describe("SubscriptionTagInput", () => {
     expect(screen.getByText("Security")).toBeInTheDocument();
     expect(focusSpy).toHaveBeenCalled();
   });
+
+  it("commits pending text when focus leaves the tag input", async () => {
+    const user = userEvent.setup();
+
+    render(<TagInputHarness />);
+
+    const input = screen.getByLabelText("标签");
+    await user.click(input);
+    await user.type(input, "Renewal");
+
+    expect(screen.queryByRole("button", { name: "移除标签 Renewal" })).not.toBeInTheDocument();
+
+    await user.tab();
+
+    expect(screen.getByRole("button", { name: "移除标签 Renewal" })).toBeInTheDocument();
+    expect(input).toHaveValue("");
+  });
 });

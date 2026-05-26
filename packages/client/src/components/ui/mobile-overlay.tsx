@@ -11,9 +11,21 @@ export type ResolvedMobileSheetDetent = Exclude<MobileSheetDetent, "auto">;
 export type MobileSheetKind = "list" | "calendar" | "panel";
 
 let activeMobileBackdropCount = 0;
-let suppressMobileOverlayTrigger = false;
+type MobileOverlayInteractionPoint = {
+  x: number;
+  y: number;
+};
+
+type MobileOverlayTriggerSuppression = {
+  expiresAt: number;
+  point?: MobileOverlayInteractionPoint | undefined;
+};
+
+let mobileOverlayTriggerSuppression: MobileOverlayTriggerSuppression | undefined;
 let clearMobileOverlayTriggerSuppressionTimer: ReturnType<typeof setTimeout> | undefined;
 const mobileOverlayStateListeners = new Set<() => void>();
+const MOBILE_OVERLAY_TRIGGER_SUPPRESSION_MS = 450;
+const MOBILE_OVERLAY_TRIGGER_SUPPRESSION_RADIUS_PX = 24;
 
 function subscribeMobileOverlayState(listener: () => void) {
   mobileOverlayStateListeners.add(listener);
@@ -120,26 +132,90 @@ export function stopMobileOverlayBackdropEvent(event: Pick<Event, "preventDefaul
   event.stopPropagation();
 }
 
-function markMobileOverlayBackdropInteraction() {
-  suppressMobileOverlayTrigger = true;
+type MobileOverlayInteractionEvent = (Event | React.SyntheticEvent) & {
+  changedTouches?: TouchList;
+  clientX?: number;
+  clientY?: number;
+  nativeEvent?: Event & {
+    changedTouches?: TouchList;
+    clientX?: number;
+    clientY?: number;
+  };
+};
+
+function getMobileOverlayInteractionPoint(
+  event: MobileOverlayInteractionEvent | undefined,
+): MobileOverlayInteractionPoint | undefined {
+  const source = event && "nativeEvent" in event ? event.nativeEvent : event;
+  if (!source) return undefined;
+
+  if (typeof source.clientX === "number" && typeof source.clientY === "number") {
+    return { x: source.clientX, y: source.clientY };
+  }
+
+  const touch = source.changedTouches?.[0];
+  if (touch) {
+    return { x: touch.clientX, y: touch.clientY };
+  }
+
+  return undefined;
+}
+
+function isWithinMobileOverlaySuppressionPoint(
+  interactionPoint: MobileOverlayInteractionPoint | undefined,
+  eventPoint: MobileOverlayInteractionPoint | undefined,
+) {
+  if (!interactionPoint || !eventPoint) return true;
+
+  return (
+    Math.abs(interactionPoint.x - eventPoint.x) <= MOBILE_OVERLAY_TRIGGER_SUPPRESSION_RADIUS_PX &&
+    Math.abs(interactionPoint.y - eventPoint.y) <= MOBILE_OVERLAY_TRIGGER_SUPPRESSION_RADIUS_PX
+  );
+}
+
+function clearExpiredMobileOverlayTriggerSuppression() {
+  if (!mobileOverlayTriggerSuppression) return;
+  if (Date.now() <= mobileOverlayTriggerSuppression.expiresAt) return;
+
+  mobileOverlayTriggerSuppression = undefined;
+  if (clearMobileOverlayTriggerSuppressionTimer) {
+    clearTimeout(clearMobileOverlayTriggerSuppressionTimer);
+    clearMobileOverlayTriggerSuppressionTimer = undefined;
+  }
+}
+
+function markMobileOverlayBackdropInteraction(event?: MobileOverlayInteractionEvent) {
+  // Mobile browsers may deliver a delayed compatibility click after the sheet
+  // portal is dismissed. Keep a short, coordinate-scoped guard so that tap
+  // cannot be retargeted to the trigger/control that was visually behind the
+  // backdrop, while still allowing an intentional tap elsewhere immediately.
+  mobileOverlayTriggerSuppression = {
+    expiresAt: Date.now() + MOBILE_OVERLAY_TRIGGER_SUPPRESSION_MS,
+    point: getMobileOverlayInteractionPoint(event),
+  };
 
   if (clearMobileOverlayTriggerSuppressionTimer) {
     clearTimeout(clearMobileOverlayTriggerSuppressionTimer);
   }
   clearMobileOverlayTriggerSuppressionTimer = setTimeout(() => {
-    suppressMobileOverlayTrigger = false;
+    mobileOverlayTriggerSuppression = undefined;
     clearMobileOverlayTriggerSuppressionTimer = undefined;
-  }, 0);
+  }, MOBILE_OVERLAY_TRIGGER_SUPPRESSION_MS);
 }
 
 export function shouldSuppressMobileOverlayTriggerEvent(
-  event: Pick<React.SyntheticEvent, "preventDefault" | "stopPropagation">,
+  event: Pick<React.SyntheticEvent, "preventDefault" | "stopPropagation"> & MobileOverlayInteractionEvent,
 ) {
-  if (!suppressMobileOverlayTrigger) return false;
+  clearExpiredMobileOverlayTriggerSuppression();
+  if (!mobileOverlayTriggerSuppression) return false;
+
+  const eventPoint = getMobileOverlayInteractionPoint(event);
+  if (!isWithinMobileOverlaySuppressionPoint(mobileOverlayTriggerSuppression.point, eventPoint)) {
+    return false;
+  }
 
   event.preventDefault();
   event.stopPropagation();
-  suppressMobileOverlayTrigger = false;
   return true;
 }
 
@@ -158,7 +234,7 @@ export function handleMobileOverlayOutsideEvent(
   // Keep the sheet mounted until click so the browser cannot retarget that same
   // tap to a trigger or to the parent Dialog behind the backdrop.
   event.preventDefault();
-  markMobileOverlayBackdropInteraction();
+  markMobileOverlayBackdropInteraction(event.detail?.originalEvent);
   return true;
 }
 
@@ -213,33 +289,33 @@ export function MobileOverlayBackdrop({
       style={{ ...style, pointerEvents: "auto" }}
       {...props}
       onClickCapture={(event) => {
-        markMobileOverlayBackdropInteraction();
+        markMobileOverlayBackdropInteraction(event);
         stopMobileOverlayBackdropEvent(event);
         onDismiss?.();
         onClickCapture?.(event);
       }}
       onClick={(event) => {
-        markMobileOverlayBackdropInteraction();
+        markMobileOverlayBackdropInteraction(event);
         stopMobileOverlayBackdropEvent(event);
         onClick?.(event);
       }}
       onPointerDownCapture={(event) => {
-        markMobileOverlayBackdropInteraction();
+        markMobileOverlayBackdropInteraction(event);
         stopMobileOverlayBackdropEvent(event);
         onPointerDownCapture?.(event);
       }}
       onPointerDown={(event) => {
-        markMobileOverlayBackdropInteraction();
+        markMobileOverlayBackdropInteraction(event);
         stopMobileOverlayBackdropEvent(event);
         onPointerDown?.(event);
       }}
       onPointerUpCapture={(event) => {
-        markMobileOverlayBackdropInteraction();
+        markMobileOverlayBackdropInteraction(event);
         stopMobileOverlayBackdropEvent(event);
         onPointerUpCapture?.(event);
       }}
       onPointerUp={(event) => {
-        markMobileOverlayBackdropInteraction();
+        markMobileOverlayBackdropInteraction(event);
         stopMobileOverlayBackdropEvent(event);
         onPointerUp?.(event);
       }}

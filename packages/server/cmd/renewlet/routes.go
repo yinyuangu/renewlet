@@ -3,7 +3,7 @@ package main
 // routes.go 集中注册 Renewlet 自定义 HTTP API。
 //
 // 架构位置：
-//   - 公共 route 暴露 health/setup/password-reset/TheSVG 状态。
+//   - 公共 route 暴露 health/setup/password-reset 状态。
 //   - 认证 route 复用 PocketBase session，并把请求体交给严格 decoder 和命名 request struct。
 //   - route 返回的 response struct 是前端 Zod schema 的运行时契约。
 //
@@ -154,11 +154,12 @@ func registerRoutes(app core.App, router *router.Router[*core.RequestEvent]) {
 	auth.POST("/notifications/test", func(e *core.RequestEvent) error { return handleNotificationTest(app, e) })
 	auth.GET("/notifications/history", func(e *core.RequestEvent) error { return handleNotificationHistory(app, e) })
 	auth.POST("/notifications/run", func(e *core.RequestEvent) error { return handleNotificationRun(app, e) })
+	auth.POST("/import/preview", func(e *core.RequestEvent) error { return handleImportPreview(app, e) })
+	auth.POST("/import/apply", func(e *core.RequestEvent) error { return handleImportApply(app, e) })
 	auth.GET("/assets/{id}", func(e *core.RequestEvent) error { return handleAssetRead(app, e) })
-	auth.GET("/favicon-search", faviconSearch)
+	auth.POST("/media/candidates", mediaCandidates)
 
 	router.GET("/api/app/account/password-reset/status", func(e *core.RequestEvent) error {
 		return e.JSON(http.StatusOK, passwordResetStatusResponse{Enabled: app.Settings().SMTP.Enabled})
 	})
-	router.GET("/api/app/thesvg-icons", theSvgSearch)
 }

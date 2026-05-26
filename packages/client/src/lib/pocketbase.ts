@@ -9,6 +9,8 @@
  * 打开 SDK 自动取消会让相同 collection 的并行请求互相中断。
  */
 import PocketBase, { ClientResponseError, type RecordModel } from "pocketbase";
+import { getCloudflareAuthHeader, getCloudflareCurrentUserId } from "@/services/cloudflare-session";
+import { isCloudflareRuntime } from "@/services/runtime";
 
 const configuredBaseUrl: unknown = import.meta.env["VITE_POCKETBASE_URL"];
 const baseUrl = typeof configuredBaseUrl === "string" && configuredBaseUrl
@@ -21,13 +23,15 @@ pb.autoCancellation(false);
 export { ClientResponseError };
 export type { RecordModel };
 
-/** 返回当前登录用户 id；未登录或 authStore 尚未恢复时返回 null。 */
 export function getCurrentUserId(): string | null {
+  // service 层以登录状态分流数据请求，组件不能感知 authStore/localStorage 差异。
+  if (isCloudflareRuntime) return getCloudflareCurrentUserId();
   const id = pb.authStore.record?.id;
   return typeof id === "string" && id ? id : null;
 }
 
-/** 为自定义 fetch API 生成 PocketBase Bearer header。 */
 export function getAuthHeader(): Record<string, string> {
+  // apiFetch 只依赖 Authorization header；PocketBase token 和 Worker token 在这里合流。
+  if (isCloudflareRuntime) return getCloudflareAuthHeader();
   return pb.authStore.token ? { Authorization: `Bearer ${pb.authStore.token}` } : {};
 }

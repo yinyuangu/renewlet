@@ -129,17 +129,69 @@ func staticWithSecurityHeaders(staticFS fs.FS) func(*core.RequestEvent) error {
 		headers.Set("X-Content-Type-Options", "nosniff")
 		headers.Set("Referrer-Policy", "strict-origin-when-cross-origin")
 		headers.Set("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
-		headers.Set("Content-Security-Policy", strings.Join([]string{
-			"default-src 'self'",
-			"script-src 'self'",
-			"style-src 'self' 'unsafe-inline'",
-			"font-src 'self' data:",
-			"img-src 'self' data: blob: https:",
-			"connect-src 'self' https://cdn.jsdelivr.net https://latest.currency-api.pages.dev https://www.floatrates.com https://testingcf.jsdelivr.net https://www.google.com https://icons.duckduckgo.com",
-			"object-src 'none'",
-			"base-uri 'self'",
-			"frame-ancestors 'none'",
-		}, "; "))
+		headers.Set("Content-Security-Policy", staticContentSecurityPolicy(e.Request))
 		return handler(e)
 	}
+}
+
+func staticContentSecurityPolicy(request *http.Request) string {
+	directives := []string{
+		"default-src 'self'",
+		// wasm-unsafe-eval 只给前端 Worker 内 sql.js 解析用户本地 Wallos DB；不允许后端代请求 Wallos URL。
+		"script-src 'self' 'wasm-unsafe-eval'",
+		"style-src 'self' 'unsafe-inline'",
+		"font-src 'self' data:",
+		"img-src 'self' data: blob: " + staticImageSources(request),
+		"connect-src 'self' https://cdn.jsdelivr.net https://latest.currency-api.pages.dev https://www.floatrates.com",
+		"object-src 'none'",
+		"base-uri 'self'",
+		"frame-ancestors 'none'",
+	}
+	if externalRequestProto(request) == "https" {
+		// HTTPS 外部访问不能实际发起 HTTP 图片请求；浏览器可升级域名源，IP 源由展示 helper 直接降级为 fallback。
+		directives = append(directives, "upgrade-insecure-requests")
+	}
+	return strings.Join(directives, "; ")
+}
+
+func staticImageSources(request *http.Request) string {
+	if externalRequestProto(request) == "https" {
+		return "https:"
+	}
+	return "http: https:"
+}
+
+func externalRequestProto(request *http.Request) string {
+	if proto := forwardedProto(request.Header.Get("Forwarded")); proto != "" {
+		return proto
+	}
+	if proto := strings.TrimSpace(request.Header.Get("X-Forwarded-Proto")); proto != "" {
+		if comma := strings.Index(proto, ","); comma >= 0 {
+			proto = proto[:comma]
+		}
+		proto = strings.ToLower(strings.TrimSpace(proto))
+		if proto == "http" || proto == "https" {
+			return proto
+		}
+	}
+	if request.TLS != nil {
+		return "https"
+	}
+	return "http"
+}
+
+func forwardedProto(value string) string {
+	for _, forwardedValue := range strings.Split(value, ",") {
+		for _, part := range strings.Split(forwardedValue, ";") {
+			pair := strings.SplitN(strings.TrimSpace(part), "=", 2)
+			if len(pair) != 2 || !strings.EqualFold(strings.TrimSpace(pair[0]), "proto") {
+				continue
+			}
+			proto := strings.ToLower(strings.Trim(strings.TrimSpace(pair[1]), `"`))
+			if proto == "http" || proto == "https" {
+				return proto
+			}
+		}
+	}
+	return ""
 }

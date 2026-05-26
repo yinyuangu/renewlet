@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	maxLogoReferenceLength       = 64 * 1024
+	maxLogoReferenceLength       = 2048
 	maxSubscriptionPrice         = 1_000_000_000
 	maxSubscriptionTags          = 100
 	maxSubscriptionTagLength     = 40
@@ -71,7 +71,10 @@ func ensureSchema(app core.App) error {
 	if err := ensureNotificationJobsCollection(app, users); err != nil {
 		return err
 	}
-	return backfillAutodates(app, "subscriptions", "settings", "custom_configs", "assets", "notification_jobs")
+	if err := backfillAutodates(app, "subscriptions", "settings", "custom_configs", "assets", "notification_jobs"); err != nil {
+		return err
+	}
+	return cleanupInvalidSubscriptionLogos(app)
 }
 
 func configureAppSettings(app core.App) error {
@@ -193,6 +196,24 @@ func backfillAutodates(app core.App, names ...string) error {
 	return nil
 }
 
+func cleanupInvalidSubscriptionLogos(app core.App) error {
+	rows, err := app.FindAllRecords("subscriptions")
+	if err != nil {
+		return err
+	}
+	for _, record := range rows {
+		if validateOptionalLogoReference(record.GetString("logo")) == nil {
+			continue
+		}
+		// 破坏性切换只清空不再支持的持久化 Logo 形态；HTTP 外链仍是自托管 HTTP 场景的合法值。
+		record.Set("logo", "")
+		if err := app.SaveNoValidate(record); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func ownerRules(collection *core.Collection) {
 	listRule := "user = @request.auth.id"
 	createRule := "@request.auth.id != '' && user = @request.auth.id"
@@ -229,7 +250,7 @@ func ensureSubscriptionsCollection(app core.App, users *core.Collection) error {
 			&core.TextField{Name: "logo", Max: maxLogoReferenceLength},
 			&core.NumberField{Name: "price", Min: &minZero, Max: &maxPrice},
 			&core.TextField{Name: "currency", Required: true, Max: 8, Pattern: `^[A-Z]{3}$`},
-			&core.SelectField{Name: "billingCycle", Required: true, Values: []string{"weekly", "monthly", "quarterly", "semi-annual", "annual", "custom"}},
+			&core.SelectField{Name: "billingCycle", Required: true, Values: []string{"weekly", "monthly", "quarterly", "semi-annual", "annual", "custom", "one-time"}},
 			&core.NumberField{Name: "customDays", OnlyInt: true, Min: &minZero},
 			&core.TextField{Name: "category", Required: true, Max: 80},
 			&core.SelectField{Name: "status", Required: true, Values: []string{"trial", "active", "expired", "paused", "cancelled"}},
@@ -242,7 +263,7 @@ func ensureSubscriptionsCollection(app core.App, users *core.Collection) error {
 			&core.TextField{Name: "notes", Max: 5000},
 			&core.JSONField{Name: "tags", MaxSize: maxSubscriptionTagsFieldSize},
 			&core.JSONField{Name: "extra", MaxSize: 65536},
-			&core.NumberField{Name: "reminderDays", OnlyInt: true, Min: &minZero},
+			&core.NumberField{Name: "reminderDays", OnlyInt: true, Min: types.Pointer(float64(inheritReminderDays)), Max: types.Pointer(float64(maxReminderDays))},
 			&core.BoolField{Name: "repeatReminderEnabled"},
 			&core.SelectField{Name: "repeatReminderInterval", Values: []string{"1h", "3h", "6h", "12h", "24h"}},
 			&core.SelectField{Name: "repeatReminderWindow", Values: []string{"24h", "48h", "72h", "full"}},

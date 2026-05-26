@@ -147,6 +147,22 @@ export async function expectActionNearContainerBottom(
   expect(gap, `${label}: action-to-bottom gap`).toBeLessThanOrEqual(maxGap);
 }
 
+export async function expectVerticallyCenteredInViewport(
+  page: Page,
+  locator: Locator,
+  label: string,
+  maxOffset = 4,
+) {
+  await expect.poll(async () => {
+    const box = await getRequiredLocatorBoundingBox(locator, label);
+    const viewport = page.viewportSize();
+    if (!viewport) {
+      throw new Error("Missing viewport size");
+    }
+    return Math.abs((box.y + box.height / 2) - viewport.height / 2);
+  }, { message: `${label}: vertical center offset` }).toBeLessThanOrEqual(maxOffset);
+}
+
 export async function expectScrollContentNearFooter(
   scrollRegion: Locator,
   label: string,
@@ -175,6 +191,62 @@ export async function expectScrollContentNearFooter(
 
   expect(gap, `${label}: scroll content to footer gap`).toBeGreaterThanOrEqual(0);
   expect(gap, `${label}: scroll content to footer gap`).toBeLessThanOrEqual(maxGap);
+}
+
+export async function captureLogoSheetScrollMetrics(sheet: Locator, viewportTestId: string | null) {
+  return sheet.evaluate(async (element, testId) => {
+    const wrapper = element.parentElement?.closest<HTMLElement>("[data-radix-popper-content-wrapper]") ?? null;
+    const dialog = element.closest<HTMLElement>(".h5-dialog-panel");
+    const panel =
+      element.querySelector<HTMLElement>(".media-candidate-search-panel") ??
+      element.querySelector<HTMLElement>(".media-candidate-popover-panel");
+    const results = testId
+      ? element.querySelector<HTMLElement>(`[data-testid="${testId}"]`)
+      : element.querySelector<HTMLElement>(".media-candidate-scroll-viewport");
+    const content = results?.querySelector<HTMLElement>(".media-candidate-scroll-content");
+    if (!results || !content) {
+      throw new Error(`Missing Logo sheet scroll viewport or content: ${testId ?? "default"}`);
+    }
+
+    const lastButton = Array.from(content.querySelectorAll<HTMLElement>("button[aria-label]")).at(-1);
+    if (!lastButton) {
+      throw new Error(`Missing Logo sheet last candidate button: ${testId ?? "default"}`);
+    }
+
+    results.scrollTop = results.scrollHeight;
+    results.dispatchEvent(new Event("scroll", { bubbles: true }));
+    await new Promise((resolve) => window.requestAnimationFrame(resolve));
+
+    const rect = (target: Element | null) => {
+      const box = target?.getBoundingClientRect();
+      if (!box) return null;
+      return {
+        top: Math.round(box.top),
+        bottom: Math.round(box.bottom),
+        height: Math.round(box.height),
+      };
+    };
+
+    return {
+      dialog: rect(dialog),
+      wrapper: rect(wrapper),
+      sheet: rect(element),
+      panel: rect(panel),
+      results: rect(results),
+      content: rect(content),
+      last: rect(lastButton),
+      dialogOverflow: dialog ? window.getComputedStyle(dialog).overflow : null,
+      wrapperPosition: wrapper ? window.getComputedStyle(wrapper).position : null,
+      wrapperTransform: wrapper ? window.getComputedStyle(wrapper).transform : null,
+      sheetOverflow: window.getComputedStyle(element).overflow,
+      panelOverflow: panel ? window.getComputedStyle(panel).overflow : null,
+      resultsOverflow: window.getComputedStyle(results).overflowY,
+      scrollTop: Math.round(results.scrollTop),
+      scrollHeight: Math.round(results.scrollHeight),
+      clientHeight: Math.round(results.clientHeight),
+      lastBottomGap: Math.round(results.getBoundingClientRect().bottom - lastButton.getBoundingClientRect().bottom),
+    };
+  }, viewportTestId);
 }
 
 export async function expectOverlayLeavesTopScrim(

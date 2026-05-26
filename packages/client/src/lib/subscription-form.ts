@@ -13,12 +13,17 @@ import {
   type SubscriptionDraft,
 } from "@/types/subscription";
 import type { SubscriptionFormState } from "@/types/subscription-form";
+import {
+  DEFAULT_NOTIFICATION_REMINDER_DAYS,
+  INHERIT_REMINDER_DAYS,
+  MAX_REMINDER_DAYS,
+} from "@/types/subscription";
 import { getApiLocale } from "@/i18n/api-locale";
 import { translate } from "@/i18n/messages";
 import { compareDateOnly } from "@/lib/time/date-only";
 
 const MAX_PRICE = 1_000_000_000;
-const MAX_DAYS = 3650;
+const MAX_DAYS = MAX_REMINDER_DAYS;
 const TAG_SEPARATOR_PATTERN = /[、，,;；\n]+/g;
 
 /** 严格解析非负有限数，拒绝 `1e3` 等浏览器/后端口径可能不一致的写法。 */
@@ -37,6 +42,11 @@ export function parseNonNegativeIntegerInput(input: string, max = MAX_DAYS): num
   const parsed = Number(value);
   if (!Number.isSafeInteger(parsed) || parsed < 0 || parsed > max) return null;
   return parsed;
+}
+
+export function parseReminderDaysInput(input: string): number | null {
+  if (input.trim() === String(INHERIT_REMINDER_DAYS)) return INHERIT_REMINDER_DAYS;
+  return parseNonNegativeIntegerInput(input, MAX_DAYS);
 }
 
 /** 严格解析正整数；用于自定义扣费周期等必须大于 0 的输入。 */
@@ -98,15 +108,19 @@ export function getTagsValidationError(formDataTags: readonly string[]): string 
  * 从表单状态计算 reminderDays（整数）。
  *
  * 规则：
+ * - inherit：保存为 -1，由通知计算读取设置页全局提前天数
  * - preset：严格解析 reminderDays
  * - custom：严格解析 customReminderDays，空值回退为 3
  * - 类似 `3days` / `3.5` 的宽松输入会被拒绝，避免浏览器和后端解析口径不同。
  */
 export function toReminderDays(formData: Pick<SubscriptionFormState, "reminderType" | "reminderDays" | "customReminderDays">): number {
-  if (formData.reminderType === "custom") {
-    return parseNonNegativeIntegerInput(formData.customReminderDays) ?? 3;
+  if (formData.reminderType === "inherit") {
+    return INHERIT_REMINDER_DAYS;
   }
-  return parseNonNegativeIntegerInput(formData.reminderDays) ?? 3;
+  if (formData.reminderType === "custom") {
+    return parseNonNegativeIntegerInput(formData.customReminderDays) ?? DEFAULT_NOTIFICATION_REMINDER_DAYS;
+  }
+  return parseReminderDaysInput(formData.reminderDays) ?? DEFAULT_NOTIFICATION_REMINDER_DAYS;
 }
 
 /**
@@ -130,9 +144,13 @@ export function getSubscriptionDraftValidationError(formData: SubscriptionFormSt
   if (!formData.startDate || !formData.nextBillingDate) return translate(locale, "subscription.validation.datesRequired");
   if (isRenewalDateBeforeStartDate(formData)) return translate(locale, "subscription.validation.dateOrderInvalid");
   if (parseNonNegativeFiniteNumberInput(formData.price) === null) return translate(locale, "subscription.validation.amountInvalid");
-  if (parseNonNegativeIntegerInput(
-    formData.reminderType === "custom" ? formData.customReminderDays : formData.reminderDays,
-  ) === null) {
+  const reminderInput = formData.reminderType === "custom" ? formData.customReminderDays : formData.reminderDays;
+  const reminderValue = formData.reminderType === "inherit"
+    ? INHERIT_REMINDER_DAYS
+    : formData.reminderType === "custom"
+      ? parseNonNegativeIntegerInput(reminderInput)
+      : parseReminderDaysInput(reminderInput);
+  if (reminderValue === null) {
     return translate(locale, "subscription.validation.reminderInvalid");
   }
   if (formData.billingCycle === "custom" && parsePositiveIntegerInput(formData.customDays) === null) {
@@ -178,7 +196,7 @@ export function toSubscriptionDraft(formData: SubscriptionFormState): Subscripti
     paymentMethod: formData.paymentMethod || undefined,
     startDate,
     nextBillingDate,
-    autoCalculateNextBillingDate: formData.autoCalculate,
+    autoCalculateNextBillingDate: formData.billingCycle === "one-time" ? false : formData.autoCalculate,
     trialEndDate: undefined,
     reminderDays,
     repeatReminderEnabled: formData.repeatReminderEnabled,

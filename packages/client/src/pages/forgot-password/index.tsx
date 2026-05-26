@@ -1,12 +1,12 @@
 /**
  * 忘记密码页面入口。
  *
- * 架构位置：当前由后端/部署配置决定 SMTP 可用性；入口组件只把可用性传给客户端表单。
- *
- * TODO： 如果后续开放运行时 SMTP 探测，可在这里接入 `usePasswordResetAvailability`。
+ * 架构位置：Docker/PocketBase 可通过部署邮件启用；Cloudflare 固定关闭，账号恢复走管理员重置。
  */
 import { ForgotPasswordClient } from "./forgot-password-client";
+import { usePasswordResetAvailability } from "@/hooks/use-password-reset-availability";
 
 export default function ForgotPasswordPage() {
-  return <ForgotPasswordClient enabled />;
+  const enabled = usePasswordResetAvailability();
+  return <ForgotPasswordClient enabled={enabled} />;
 }

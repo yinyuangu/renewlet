@@ -81,6 +81,7 @@ export default defineConfig({
     {
       name: "setup",
       testMatch: /.*\.setup\.ts/,
+      testIgnore: "**/cloudflare-check/**",
       use: { ...devices["Desktop Chrome"] },
     },
     // setup 通过真实 Renewlet UI 生成登录态；业务项目只消费 storage state，
@@ -88,7 +89,7 @@ export default defineConfig({
     {
       name: "desktop",
       dependencies: ["setup"],
-      testMatch: ["**/subscriptions.spec.ts", "**/settings.spec.ts"],
+      testMatch: ["**/subscriptions.spec.ts", "**/settings.spec.ts", "**/statistics.spec.ts"],
       use: {
         ...devices["Desktop Chrome"],
         storageState: adminStorageState,

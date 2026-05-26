@@ -15,6 +15,7 @@
  */
 import { useEffect, useMemo, useState, type ImgHTMLAttributes } from "react";
 import { getAuthHeader } from "@/lib/pocketbase";
+import { isExternalHttpImageSrc, resolveDisplayLogoSrc } from "@/lib/logo-url";
 
 type AuthorizedImageProps = Omit<ImgHTMLAttributes<HTMLImageElement>, "src" | "onError"> & {
   src: string;
@@ -31,13 +32,17 @@ function isPrivateAssetUrl(src: string): boolean {
   }
 }
 
-function useAuthorizedImageSrc(src: string): { src: string | undefined; failed: boolean } {
-  const shouldAuthorize = useMemo(() => isPrivateAssetUrl(src), [src]);
-  const [resolvedSrc, setResolvedSrc] = useState<string | undefined>(() => (shouldAuthorize ? undefined : src));
+function useAuthorizedImageSrc(src: string | undefined): { src: string | undefined; failed: boolean } {
+  const shouldAuthorize = useMemo(() => Boolean(src && isPrivateAssetUrl(src)), [src]);
+  const [resolvedSrc, setResolvedSrc] = useState<string | undefined>(() => (src && shouldAuthorize ? undefined : src));
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     setFailed(false);
+    if (!src) {
+      setResolvedSrc(undefined);
+      return;
+    }
     if (!shouldAuthorize) {
       setResolvedSrc(src);
       return;
@@ -75,11 +80,13 @@ function useAuthorizedImageSrc(src: string): { src: string | undefined; failed: 
 }
 
 export function AuthorizedImage({ src, onError, ...props }: AuthorizedImageProps) {
-  const image = useAuthorizedImageSrc(src);
+  const displaySrc = useMemo(() => resolveDisplayLogoSrc(src), [src]);
+  const image = useAuthorizedImageSrc(displaySrc);
+  const referrerPolicy = props.referrerPolicy ?? (displaySrc && isExternalHttpImageSrc(displaySrc) ? "no-referrer" : undefined);
 
   useEffect(() => {
-    if (image.failed) onError?.();
-  }, [image.failed, onError]);
+    if (!displaySrc || image.failed) onError?.();
+  }, [displaySrc, image.failed, onError]);
 
   if (!image.src) return null;
 
@@ -87,6 +94,7 @@ export function AuthorizedImage({ src, onError, ...props }: AuthorizedImageProps
     <img
       {...props}
       src={image.src}
+      referrerPolicy={referrerPolicy}
       onError={() => {
         onError?.();
       }}

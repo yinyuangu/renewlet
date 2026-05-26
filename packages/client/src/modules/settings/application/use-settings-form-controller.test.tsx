@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => ({
   setLocale: vi.fn(),
   testConnection: vi.fn(),
   refetchNotificationHistory: vi.fn(),
+  isCloudflareRuntime: false,
 }));
 
 vi.mock("@/hooks/use-toast", () => ({
@@ -75,6 +76,12 @@ vi.mock("@/contexts/CustomConfigContext", () => ({
   }),
 }));
 
+vi.mock("@/services/runtime", () => ({
+  get isCloudflareRuntime() {
+    return mocks.isCloudflareRuntime;
+  },
+}));
+
 vi.mock("@/i18n/I18nProvider", () => {
   const messages: Record<string, string | ((params: Record<string, string | number>) => string)> = {
     "settings.saved": "设置已保存",
@@ -86,6 +93,7 @@ vi.mock("@/i18n/I18nProvider", () => {
     "settings.exchangeRateProviderSaveFailed": "无法保存汇率来源，请稍后重试",
     "settings.exchangeRateProviderServerOutdated": "无法保存汇率来源。服务端可能还没更新或重启，请重启后端服务后再试。",
     "settings.partialSaveFailedDescription": ({ scope }) => `以下内容未保存：${scope}。请检查后重试。`,
+    "error.code.BUILT_IN_ICON_SOURCE_REQUIRED": "请至少启用一个内置图标来源",
   };
 
   return {
@@ -153,6 +161,7 @@ describe("useSettingsFormController", () => {
     mocks.refetchNotificationHistory.mockReset();
     mocks.remoteSettings = BASE_SETTINGS;
     mocks.customConfig = DEFAULT_CUSTOM_CONFIG;
+    mocks.isCloudflareRuntime = false;
     mocks.updateSettingsMutateAsync.mockImplementation(async (settings: AppSettings) => settings);
     mocks.saveConfig.mockImplementation(async (config: CustomConfig) => config);
     mocks.refreshRates.mockResolvedValue(undefined);
@@ -171,6 +180,14 @@ describe("useSettingsFormController", () => {
     expect(result.current.hasUnsavedChanges).toBe(true);
     expect(mocks.updateSettingsMutateAsync).not.toHaveBeenCalled();
     expect(mocks.refreshRates).not.toHaveBeenCalled();
+  });
+
+  it("does not expose the PocketBase admin entry in Cloudflare runtime", () => {
+    mocks.isCloudflareRuntime = true;
+
+    const { result } = renderHook(() => useSettingsFormController());
+
+    expect(result.current.canAccessPocketBaseAdmin).toBe(false);
   });
 
   it("saves draft settings and refreshes rates only after the provider is saved", async () => {
@@ -276,5 +293,31 @@ describe("useSettingsFormController", () => {
       categories: nextCategories,
     }));
     expect(result.current.hasUnsavedChanges).toBe(false);
+  });
+
+  it("shows a localized message when the server rejects disabling every built-in icon source", async () => {
+    mocks.updateSettingsMutateAsync.mockRejectedValue({
+      code: "BUILT_IN_ICON_SOURCE_REQUIRED",
+      message: "BUILT_IN_ICON_SOURCE_REQUIRED",
+    });
+    const { result } = renderHook(() => useSettingsFormController());
+
+    act(() => {
+      result.current.updateSetting("builtInIconSources", {
+        thesvg: { enabled: false, variantsEnabled: true },
+        selfhst: { enabled: false, variantsEnabled: true },
+        dashboardIcons: { enabled: false, variantsEnabled: true },
+      });
+    });
+
+    await act(async () => {
+      await result.current.handleSaveChanges();
+    });
+
+    expect(mocks.toast).toHaveBeenCalledWith({
+      title: "保存失败",
+      description: "请至少启用一个内置图标来源",
+      variant: "destructive",
+    });
   });
 });

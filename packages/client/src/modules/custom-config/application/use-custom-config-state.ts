@@ -15,11 +15,10 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { getCurrentUserId, pb, type RecordModel } from "@/lib/pocketbase";
 import { DEFAULT_CUSTOM_CONFIG, normalizePaymentMethods, type ConfigItem, type CustomConfig } from "@/types/config";
 import { normalizeCustomConfig } from "../domain/normalize-custom-config";
+import { customConfigService } from "@/services/custom-config-service";
 
-/** localStorage 缓存 key（用于未登录场景/离线场景的兜底）。 */
 const LOCAL_STORAGE_KEY = "renewlet_custom_config";
 
 /**
@@ -35,32 +34,14 @@ export function useCustomConfigState() {
   const { data: remoteConfig } = useQuery<CustomConfig | null>({
     queryKey: ["custom-config"],
     queryFn: async () => {
-      const userId = getCurrentUserId();
-      if (!userId) return null;
-      const rows = await pb.collection("custom_configs").getFullList<RecordModel>({
-        filter: `user = "${userId}"`,
-        perPage: 1,
-      });
-      // SDK 返回值不是运行时安全类型；normalize 会补齐内置项、剔除非法结构并保护默认货币范围。
-      return rows[0] ? normalizeCustomConfig(rows[0]["config"]) : null;
+      return await customConfigService.get();
     },
     retry: false,
   });
 
   const saveMutation = useMutation({
     mutationFn: async (nextConfig: CustomConfig) => {
-      const userId = getCurrentUserId();
-      if (!userId) return;
-      const rows = await pb.collection("custom_configs").getFullList<RecordModel>({
-        filter: `user = "${userId}"`,
-        perPage: 1,
-      });
-      if (rows[0]) {
-        // 每个用户只保留一条配置记录；schema/规则负责唯一性，hook 只做 upsert 编排。
-        await pb.collection("custom_configs").update(rows[0].id, { config: nextConfig });
-      } else {
-        await pb.collection("custom_configs").create({ user: userId, config: nextConfig });
-      }
+      await customConfigService.save(nextConfig);
     },
   });
 

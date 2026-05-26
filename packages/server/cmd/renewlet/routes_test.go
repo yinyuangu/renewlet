@@ -333,6 +333,51 @@ func TestSubscriptionsCollectionCreateAcceptsPrivateAssetLogoPath(t *testing.T) 
 	}
 }
 
+func TestSubscriptionsCollectionCreateValidatesLogoURLContract(t *testing.T) {
+	app := newSchemaTestApp(t)
+	if err := ensureSchema(app); err != nil {
+		t.Fatal(err)
+	}
+	registerRecordHooks(app)
+	user, token := createRouteTestUser(t, app, "logo-url")
+
+	createBody := func(logo string) string {
+		return fmt.Sprintf(`{
+			"user":%q,
+			"name":"logo-url-test",
+			"logo":%q,
+			"price":0,
+			"currency":"CNY",
+			"billingCycle":"monthly",
+			"customDays":null,
+			"category":"productivity",
+			"status":"active",
+			"paymentMethod":null,
+			"startDate":"2026-05-15",
+			"nextBillingDate":"2026-06-15",
+			"autoCalculateNextBillingDate":true,
+			"trialEndDate":null,
+			"website":null,
+			"notes":null,
+			"tags":[],
+			"reminderDays":3
+		}`, user.Id, logo)
+	}
+
+	for _, logo := range []string{"https://example.com/logo.png", "http://example.com/logo.png"} {
+		res := serveTestRequest(t, app, http.MethodPost, "/api/collections/subscriptions/records", createBody(logo), token)
+		if res.Code != http.StatusOK {
+			t.Fatalf("expected logo %q to be accepted, got %d: %s", logo, res.Code, res.Body.String())
+		}
+	}
+	for _, logo := range []string{"data:image/png;base64,aGVsbG8=", "https://user:pass@example.com/logo.png"} {
+		res := serveTestRequest(t, app, http.MethodPost, "/api/collections/subscriptions/records", createBody(logo), token)
+		if res.Code == http.StatusOK {
+			t.Fatalf("expected logo %q to be rejected, got %d: %s", logo, res.Code, res.Body.String())
+		}
+	}
+}
+
 func TestSetupRouteRejectsStrictJSONViolations(t *testing.T) {
 	app := newSchemaTestApp(t)
 	if err := ensureSchema(app); err != nil {
@@ -431,130 +476,6 @@ func TestAdminPatchUserRejectsStrictJSONViolations(t *testing.T) {
 				t.Fatalf("expected admin patch strict JSON violation to return 400, got %d: %s", res.Code, res.Body.String())
 			}
 		})
-	}
-}
-
-func TestFaviconSearchRequiresAuthAndCanServeCachedResult(t *testing.T) {
-	app := newSchemaTestApp(t)
-	if err := ensureSchema(app); err != nil {
-		t.Fatal(err)
-	}
-	_, token := createRouteTestUser(t, app, "user")
-
-	res := serveTestRequest(t, app, http.MethodGet, "/api/app/favicon-search?search=netflix", "", "")
-	if res.Code != http.StatusUnauthorized {
-		t.Fatalf("expected favicon search 401, got %d: %s", res.Code, res.Body.String())
-	}
-
-	setFaviconCache("logo:netflix", []string{"https://netflix.com/favicon.ico"})
-	res = serveTestRequest(t, app, http.MethodGet, "/api/app/favicon-search?search=netflix", "", token)
-	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), "https://netflix.com/favicon.ico") {
-		t.Fatalf("unexpected cached favicon response %d: %s", res.Code, res.Body.String())
-	}
-}
-
-func TestExtractSiteAssetURLsResolvesRelativeIcoLinks(t *testing.T) {
-	urls := extractSiteAssetURLs(
-		`<html><head><link rel="shortcut icon" href="/favicon.ico"><link rel="apple-touch-icon" href="touch.png"></head></html>`,
-		"https://example.com",
-		"logo",
-	)
-	expected := []string{
-		"https://example.com/favicon.ico",
-		"https://example.com/touch.png",
-	}
-	for _, want := range expected {
-		found := false
-		for _, got := range urls {
-			if got == want {
-				found = true
-				break
-			}
-		}
-		if !found {
-			t.Fatalf("expected %q in %#v", want, urls)
-		}
-	}
-}
-
-func TestFaviconCandidateServicesAreAcceptedAsImages(t *testing.T) {
-	for _, candidate := range []string{
-		"https://example.com/favicon.ico",
-		"https://www.google.com/s2/favicons?domain=example.com&sz=128",
-		"https://icons.duckduckgo.com/ip3/example.com.ico",
-	} {
-		if !isLikelyImageURL(candidate) {
-			t.Fatalf("expected favicon candidate to be accepted: %s", candidate)
-		}
-	}
-}
-
-func TestTheSvgRouteValidatesQueryAndSetsPrivateCache(t *testing.T) {
-	app := newSchemaTestApp(t)
-	if err := ensureSchema(app); err != nil {
-		t.Fatal(err)
-	}
-
-	res := serveTestRequest(t, app, http.MethodGet, "/api/app/thesvg-icons", "", "")
-	if res.Code != http.StatusBadRequest {
-		t.Fatalf("expected missing query 400, got %d: %s", res.Code, res.Body.String())
-	}
-
-	res = serveTestRequest(t, app, http.MethodGet, "/api/app/thesvg-icons?search="+strings.Repeat("a", 81), "", "")
-	if res.Code != http.StatusBadRequest {
-		t.Fatalf("expected long query 400, got %d: %s", res.Code, res.Body.String())
-	}
-
-	res = serveTestRequest(t, app, http.MethodGet, "/api/app/thesvg-icons?search=dmit", "", "")
-	if res.Code != http.StatusOK {
-		t.Fatalf("expected dmit thesvg 200, got %d: %s", res.Code, res.Body.String())
-	}
-	var emptyBody struct {
-		Icons []apiTheSvgIcon `json:"icons"`
-	}
-	if err := json.NewDecoder(res.Body).Decode(&emptyBody); err != nil {
-		t.Fatalf("failed to decode empty thesvg response: %v", err)
-	}
-	if len(emptyBody.Icons) != 0 {
-		t.Fatalf("expected dmit to have no built-in icons, got %#v", emptyBody.Icons)
-	}
-
-	res = serveTestRequest(t, app, http.MethodGet, "/api/app/thesvg-icons?search=netflix&limit=1", "", "")
-	if res.Code != http.StatusOK {
-		t.Fatalf("expected thesvg 200, got %d: %s", res.Code, res.Body.String())
-	}
-	if cache := res.Header().Get("Cache-Control"); cache != "private, max-age=300" {
-		t.Fatalf("unexpected cache-control %q", cache)
-	}
-	var netflixBody struct {
-		Icons []apiTheSvgIcon `json:"icons"`
-	}
-	if err := json.NewDecoder(res.Body).Decode(&netflixBody); err != nil {
-		t.Fatalf("failed to decode netflix thesvg response: %v", err)
-	}
-	if len(netflixBody.Icons) != 1 || netflixBody.Icons[0].Slug != "netflix" {
-		t.Fatalf("expected netflix result, got %#v", netflixBody.Icons)
-	}
-
-	res = serveTestRequest(t, app, http.MethodGet, "/api/app/thesvg-icons?search=openai&limit=8", "", "")
-	if res.Code != http.StatusOK {
-		t.Fatalf("expected openai thesvg 200, got %d: %s", res.Code, res.Body.String())
-	}
-	var openaiBody struct {
-		Icons []apiTheSvgIcon `json:"icons"`
-	}
-	if err := json.NewDecoder(res.Body).Decode(&openaiBody); err != nil {
-		t.Fatalf("failed to decode openai thesvg response: %v", err)
-	}
-	foundOpenAI := false
-	for _, icon := range openaiBody.Icons {
-		if strings.Contains(strings.ToLower(icon.Title), "openai") || strings.Contains(strings.ToLower(icon.Slug), "openai") {
-			foundOpenAI = true
-			break
-		}
-	}
-	if !foundOpenAI {
-		t.Fatalf("expected openai result, got %#v", openaiBody.Icons)
 	}
 }
 

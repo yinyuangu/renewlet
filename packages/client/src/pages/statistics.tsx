@@ -18,7 +18,8 @@ import { useMemo } from 'react';
 import type { Subscription } from '@/types/subscription';
 import { Header } from '@/components/header';
 import { StatisticsSkeleton } from '@/components/loading-skeleton';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
+import { RechartsFrame } from '@/components/recharts-frame';
+import { PieChart, Pie, Cell, Tooltip as RechartsTooltip } from 'recharts';
 import { CircleHelp, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useExchangeRates } from '@/hooks/use-exchange-rates';
@@ -34,6 +35,7 @@ import { useI18n } from '@/i18n/I18nProvider';
 
 /** 空订阅数组：用于在数据未加载完成时提供稳定引用，避免 useMemo 依赖抖动。 */
 const EMPTY_SUBSCRIPTIONS: Subscription[] = [];
+const STATISTICS_DONUT_CHART_HEIGHT = 220;
 
 type ChartValueKind = "currency" | "number";
 
@@ -162,45 +164,50 @@ const Statistics = () => {
     return null;
   };
 
-  const renderDonutChart = (data: readonly StatisticsChartDatum[], valueKind: ChartValueKind) => {
+  const renderDonutChart = (data: readonly StatisticsChartDatum[], valueKind: ChartValueKind, chartTitle: string) => {
     const chartData = [...data];
 
     return (
-      <div className="grid gap-2">
-        <div className="h-[220px] w-full">
-          <ResponsiveContainer width="100%" height="100%" debounce={50}>
-            <PieChart margin={{ top: 4, right: 4, bottom: 4, left: 4 }}>
-              <Pie
-                data={chartData}
-                cx="50%"
-                cy="50%"
-                innerRadius="58%"
-                outerRadius="90%"
-                paddingAngle={2}
-                cornerRadius={4}
-                dataKey="value"
-                strokeWidth={0}
-                // 关闭入场动画：避免 SVG 动画在部分设备上导致首次渲染卡顿
-                isAnimationActive={false}
-              >
-                {chartData.map((entry, index) => (
-                  <Cell
-                    key={`cell-${index}`}
-                    fill={entry.color}
-                    className="transition-all duration-300 hover:opacity-80"
-                  />
-                ))}
-              </Pie>
-              <RechartsTooltip
-                content={(props: unknown) => <CustomTooltip {...readChartTooltipProps(props, valueKind)} />}
-                isAnimationActive={false}
-                offset={12}
-                allowEscapeViewBox={{ x: true, y: true }}
-                wrapperStyle={{ pointerEvents: "none" }}
-              />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
+      <div className="grid min-w-0 gap-2">
+        <RechartsFrame height={STATISTICS_DONUT_CHART_HEIGHT} testId="statistics-chart-frame">
+          <PieChart
+            accessibilityLayer
+            margin={{ top: 4, right: 4, bottom: 4, left: 4 }}
+            tabIndex={0}
+            title={chartTitle}
+          >
+            <Pie
+              data={chartData}
+              cx="50%"
+              cy="50%"
+              innerRadius="58%"
+              outerRadius="90%"
+              paddingAngle={2}
+              cornerRadius={4}
+              dataKey="value"
+              rootTabIndex={-1}
+              strokeWidth={0}
+              // 关闭入场动画：避免 SVG 动画在部分设备上导致首次渲染卡顿
+              isAnimationActive={false}
+            >
+              {chartData.map((entry, index) => (
+                <Cell
+                  key={`cell-${index}`}
+                  fill={entry.color}
+                  focusable={false}
+                  className="transition-all duration-300 hover:opacity-80"
+                />
+              ))}
+            </Pie>
+            <RechartsTooltip
+              content={(props: unknown) => <CustomTooltip {...readChartTooltipProps(props, valueKind)} />}
+              isAnimationActive={false}
+              offset={12}
+              allowEscapeViewBox={{ x: true, y: true }}
+              wrapperStyle={{ pointerEvents: "none" }}
+            />
+          </PieChart>
+        </RechartsFrame>
         <div className="flex flex-wrap justify-center gap-x-4 gap-y-2" role="list">
           {chartData.map((entry) => (
             <div key={entry.name} className="flex min-w-0 items-center gap-1.5 text-xs" role="listitem">
@@ -219,7 +226,10 @@ const Statistics = () => {
 
   const renderEmptyChart = () => {
     return (
-      <div className="flex h-[220px] items-center justify-center text-muted-foreground">
+      <div
+        className="flex min-w-0 items-center justify-center text-muted-foreground"
+        style={{ height: STATISTICS_DONUT_CHART_HEIGHT }}
+      >
         {t("common.noData")}
       </div>
     );
@@ -340,34 +350,34 @@ const Statistics = () => {
         {/* 拆分视图 */}
         <section>
           <h2 className="text-lg font-semibold text-foreground mb-4">{t("statistics.breakdown")}</h2>
-          <div className="grid md:grid-cols-2 gap-6">
+          <div className="grid min-w-0 gap-6 md:grid-cols-2">
             {/* 分类视图 */}
-            <div className="rounded-xl border border-border bg-card p-6">
+            <div className="min-w-0 rounded-xl border border-border bg-card p-6">
               <h3 className="text-base font-semibold text-foreground text-center mb-1">{t("statistics.categoryView")}</h3>
               <p className="text-xs text-muted-foreground text-center mb-3">{t("statistics.monthlyCostHint")}</p>
               {stats.categoryData.length > 0 ? (
-                renderDonutChart(stats.categoryData, "currency")
+                renderDonutChart(stats.categoryData, "currency", t("statistics.categoryView"))
               ) : (
                 renderEmptyChart()
               )}
             </div>
 
             {/* 支付方式视图 */}
-            <div className="rounded-xl border border-border bg-card p-6">
+            <div className="min-w-0 rounded-xl border border-border bg-card p-6">
               <h3 className="text-base font-semibold text-foreground text-center mb-1">{t("statistics.paymentView")}</h3>
               <p className="text-xs text-muted-foreground text-center mb-3">{t("statistics.subscriptionCountHint")}</p>
               {stats.paymentData.length > 0 ? (
-                renderDonutChart(stats.paymentData, "number")
+                renderDonutChart(stats.paymentData, "number", t("statistics.paymentView"))
               ) : (
                 renderEmptyChart()
               )}
             </div>
 
             {/* 费用与预算 */}
-            <div className="rounded-xl border border-border bg-card p-6 md:col-span-2">
+            <div className="min-w-0 rounded-xl border border-border bg-card p-6 md:col-span-2">
               <h3 className="text-base font-semibold text-foreground text-center mb-1">{t("statistics.costBudget")}</h3>
               <p className="text-xs text-muted-foreground text-center mb-3">{t("statistics.monthlyBudgetHint", { amount: formatCurrency(monthlyBudget, defaultCurrency) })}</p>
-              {renderDonutChart(stats.budgetChartData, "currency")}
+              {renderDonutChart(stats.budgetChartData, "currency", t("statistics.costBudget"))}
               <div className="mt-4 flex flex-col justify-center gap-4 min-[380px]:flex-row min-[380px]:gap-8">
                 <div className="text-center">
                   <p className="text-2xl font-bold text-foreground">{formatCurrency(Math.min(stats.totalMonthly, monthlyBudget), defaultCurrency)}</p>

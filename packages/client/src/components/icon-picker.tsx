@@ -2,31 +2,26 @@
  * 图标选择器（用于“支付方式”等配置项的 icon）。
  *
  * 支持：
- * - 搜索 theSVG 内置品牌图标（testingcf.jsdelivr.net CDN）
- * - 通过关键词生成候选图标 URL（网站 Favicon / 第三方 Favicon 服务）
+ * - 通过统一 Logo Resolver 搜索内置品牌图标与网站/Favicon 备用候选
  * - 上传本地图片并裁剪（ImageCropDialog）
  *
  * 注意：
- * - 图标自动搜索依赖外部资源（网站 favicon / 第三方 favicon 服务），网络不通时可能加载失败（UI 有降级处理）
+ * - Favicon 备用候选依赖浏览器加载外部资源，网络不通时可能加载失败（UI 有降级处理）
  *
  * 注意： 该组件被 Custom Config 弹窗用于支付方式图标。上传中/失败状态必须传回 controller，
  * 否则配置可能保存临时 data URL 或失效图片。
  */
 
-import { lazy, Suspense, useEffect, useRef } from 'react';
+import { lazy, Suspense } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Upload, Search, X, Loader2, Image as ImageIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { FaviconResultImage } from '@/components/favicon-result-image';
-import { MediaThumbnailButton } from '@/components/media-thumbnail-button';
-import { generateFaviconUrls } from '@/lib/favicon';
-import { PAYMENT_DOMAINS } from '@/lib/favicon-known-domains';
+import { MediaCandidateSearchPanel } from '@/components/media-candidate-search-panel';
 import { IMAGE_UPLOAD_ACCEPT } from '@/lib/upload-constraints';
-import { useFaviconSearch } from '@/hooks/use-favicon-search';
 import { useCroppedImageUpload, type UploadStatus } from '@/hooks/use-cropped-image-upload';
-import { useTheSvgIconSearch } from '@/hooks/use-thesvg-icon-search';
+import { useMediaCandidates } from '@/hooks/use-media-candidates';
 import { useI18n } from '@/i18n/I18nProvider';
 
 /** 透出上传状态类型，方便配置管理弹窗阻止上传中的保存。 */
@@ -61,17 +56,6 @@ interface IconPickerProps {
   size?: 'sm' | 'md';
 }
 
-/** 常见支付/服务关键词 → 域名映射（用于更准确地取 Logo/Favicon）。 */
-// 映射已抽到 `src/lib/favicon-known-domains.ts`，避免与 LogoPicker/服务端重复。
-
-/** 根据名称生成候选图标 URL 列表（去重）。 */
-const generateIconUrls = (name: string): string[] =>
-  generateFaviconUrls({
-    name,
-    knownDomains: PAYMENT_DOMAINS,
-    fallbackTlds: ["com", "io", "co"],
-  });
-
 export function IconPicker({
   value,
   onChange,
@@ -80,13 +64,10 @@ export function IconPicker({
   size = 'md',
 }: IconPickerProps) {
   const { t } = useI18n();
-  const builtInSearch = useTheSvgIconSearch(32);
-  const builtInCloseResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const search = useFaviconSearch({
+  const search = useMediaCandidates({
+    kind: "icon",
     autoQuery: searchHint,
-    generateUrls: generateIconUrls,
-    serverSearch: { kind: "icon" },
-    onSearch: builtInSearch.search,
+    limit: 32,
     closeResetDelayMs: SEARCH_POPOVER_CLOSE_RESET_DELAY_MS,
   });
 
@@ -111,38 +92,10 @@ export function IconPicker({
   const iconSize = size === 'sm' ? 'w-8 h-8' : 'w-10 h-10';
   const buttonSize = size === 'sm' ? 'h-6 text-xs px-2' : 'h-7 text-xs px-2';
   const displayedIcon = previewUrl ?? value;
-  const isAnySearching = search.isSearching || builtInSearch.isSearching;
-  const hasAnySearched = search.hasSearched || builtInSearch.hasSearched;
-  const hasAnyResults = builtInSearch.icons.length > 0 || search.results.length > 0;
-
-  const clearBuiltInCloseResetTimer = () => {
-    if (builtInCloseResetTimerRef.current === null) return;
-    clearTimeout(builtInCloseResetTimerRef.current);
-    builtInCloseResetTimerRef.current = null;
-  };
 
   const handleSearchOpenChange = (nextOpen: boolean) => {
-    clearBuiltInCloseResetTimer();
     search.onOpenChange(nextOpen);
-    if (nextOpen) {
-      builtInSearch.reset();
-      return;
-    }
-
-    builtInSearch.cancel();
-    builtInCloseResetTimerRef.current = setTimeout(() => {
-      builtInCloseResetTimerRef.current = null;
-      builtInSearch.reset();
-    }, SEARCH_POPOVER_CLOSE_RESET_DELAY_MS);
   };
-
-  useEffect(() => {
-    return () => {
-      if (builtInCloseResetTimerRef.current === null) return;
-      clearTimeout(builtInCloseResetTimerRef.current);
-      builtInCloseResetTimerRef.current = null;
-    };
-  }, []);
 
   return (
     <>
@@ -232,109 +185,25 @@ export function IconPicker({
                 {t("media.search")}
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-72 p-3 border-border bg-card z-50" align="start" sideOffset={8}>
-              <div className="grid gap-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">{t("media.searchIcon")}</span>
-                  <button
-                    type="button"
-                    onClick={() => handleSearchOpenChange(false)}
-                    className="text-muted-foreground hover:text-foreground"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <Input
-                    placeholder={t("media.searchIconPlaceholder")}
-                    value={search.query}
-                    onChange={(e) => search.setQuery(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && search.search()}
-                    className="flex-1 h-8 text-sm border-border bg-secondary"
-                    autoFocus
-                  />
-                  <Button
-                    type="button"
-                    size="sm"
-                    className="h-8"
-                    onClick={search.search}
-                    disabled={isAnySearching || !search.query.trim()}
-                  >
-                    {isAnySearching ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <Search className="w-3.5 h-3.5" />
-                    )}
-                  </Button>
-                </div>
-
-                {isAnySearching && !hasAnyResults && (
-                  <div className="flex items-center justify-center py-4">
-                    <Loader2 className="w-5 h-5 animate-spin text-primary" />
-                  </div>
-                )}
-
-                {hasAnyResults && (
-                  <div className="max-h-48 grid gap-3 overflow-y-auto pr-1">
-                    {builtInSearch.icons.length > 0 && (
-                      <div className="grid gap-1.5">
-                        <p className="text-xs text-muted-foreground">{t("media.builtInIcons")}</p>
-                        <div className="grid grid-cols-4 gap-1.5 p-0.5">
-                          {builtInSearch.icons.map((icon) => (
-                            <MediaThumbnailButton
-                              key={icon.slug}
-                              src={icon.iconUrl}
-                              alt={icon.title}
-                              title={icon.title}
-                              size="sm"
-                              selected={value === icon.iconUrl}
-                              onClick={() => {
-                                applyValue(icon.iconUrl);
-                                handleSearchOpenChange(false);
-                              }}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {search.results.length > 0 && (
-                      <div className="grid gap-1.5">
-                        <p className="text-xs text-muted-foreground">{t("media.faviconFallback")}</p>
-                        <div className="grid grid-cols-4 gap-1.5 p-0.5">
-                          {search.results.map((url, index) => (
-                            <MediaThumbnailButton
-                              key={url}
-                              src={url}
-                              alt={`Icon ${index + 1}`}
-                              size="sm"
-                              selected={value === url}
-                              onClick={() => {
-                                applyValue(url);
-                                handleSearchOpenChange(false);
-                              }}
-                              onError={() => search.removeResult(url)}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {isAnySearching && (
-                      <div className="flex items-center justify-center py-1 text-xs text-muted-foreground">
-                        <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin text-primary" />
-                        {t("media.loadingMore")}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {!isAnySearching && hasAnySearched && !hasAnyResults && (
-                  <div className="text-center py-4">
-                    <p className="text-xs text-muted-foreground">{t("media.iconNotFound")}</p>
-                  </div>
-                )}
+            <PopoverContent className="media-candidate-popover media-candidate-popover-icon w-72 border-border bg-card p-3 z-50" align="start" sideOffset={8}>
+              <div className="media-candidate-popover-panel gap-3">
+                <MediaCandidateSearchPanel
+                  search={search}
+                  title={t("media.searchIcon")}
+                  placeholder={t("media.searchIconPlaceholder")}
+                  prompt={t("media.searchIconPrompt")}
+                  notFoundLabel={t("media.iconNotFound")}
+                  selectedValue={value}
+                  onClose={() => handleSearchOpenChange(false)}
+                  onSelect={(candidate) => {
+                    applyValue(candidate.url);
+                    handleSearchOpenChange(false);
+                  }}
+                  size="sm"
+                  columnsClassName="grid-cols-4 gap-1.5"
+                  inputClassName="h-8 text-sm"
+                  searchButtonClassName="h-8"
+                />
 
                 {uploadStatus === "error" && (
                   <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2">

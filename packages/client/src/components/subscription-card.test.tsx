@@ -50,6 +50,12 @@ vi.mock("@/contexts/CustomConfigContext", () => ({
   }),
 }));
 
+vi.mock("@/hooks/use-settings", () => ({
+  useSettings: () => ({
+    data: { notificationReminderDays: 5 },
+  }),
+}));
+
 const baseSubscription: Subscription = {
   id: "sub-1",
   name: "dmit",
@@ -208,5 +214,21 @@ describe("SubscriptionCard", () => {
     expect(expiredDateText.closest("div")).toHaveClass("text-destructive");
     expect(card).toHaveClass("border-destructive/40");
     expect(screen.queryByText("到期: 2026/5/15")).not.toBeInTheDocument();
+  });
+
+  it("renders inherited reminder days with the current global setting", () => {
+    render(
+      <TooltipProvider delayDuration={0}>
+        <SubscriptionCard
+          subscription={createSubscription({ reminderDays: -1 })}
+          viewMode="list"
+          timeZone="Asia/Shanghai"
+          onEdit={vi.fn()}
+          onDelete={vi.fn()}
+        />
+      </TooltipProvider>,
+    );
+
+    expect(screen.getByText("默认提醒：提前 5 天")).toBeInTheDocument();
   });
 });

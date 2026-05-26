@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { subscriptionCreateBodySchema } from "./subscriptions";
+import { apiSubscriptionSchema, subscriptionCreateBodySchema } from "./subscriptions";
 
 const validSubscriptionCreateBody = {
   name: "Logo Test",
@@ -24,8 +24,26 @@ const validSubscriptionCreateBody = {
   repeatReminderWindow: "72h",
 };
 
+const validSubscriptionResponseBody = {
+  id: "sub_1",
+  name: validSubscriptionCreateBody.name,
+  price: validSubscriptionCreateBody.price,
+  currency: validSubscriptionCreateBody.currency,
+  billingCycle: validSubscriptionCreateBody.billingCycle,
+  category: validSubscriptionCreateBody.category,
+  status: validSubscriptionCreateBody.status,
+  startDate: validSubscriptionCreateBody.startDate,
+  nextBillingDate: validSubscriptionCreateBody.nextBillingDate,
+  autoCalculateNextBillingDate: validSubscriptionCreateBody.autoCalculateNextBillingDate,
+  tags: validSubscriptionCreateBody.tags,
+  reminderDays: validSubscriptionCreateBody.reminderDays,
+  repeatReminderEnabled: validSubscriptionCreateBody.repeatReminderEnabled,
+  repeatReminderInterval: validSubscriptionCreateBody.repeatReminderInterval,
+  repeatReminderWindow: validSubscriptionCreateBody.repeatReminderWindow,
+};
+
 describe("subscription API schemas", () => {
-  it("accepts private asset paths and normal URLs for subscription logos", () => {
+  it("accepts private asset paths and http(s) URLs for subscription logos", () => {
     expect(subscriptionCreateBodySchema.safeParse({
       ...validSubscriptionCreateBody,
       logo: "/api/app/assets/2pbs0lgyypqhjoy",
@@ -38,11 +56,11 @@ describe("subscription API schemas", () => {
 
     expect(subscriptionCreateBodySchema.safeParse({
       ...validSubscriptionCreateBody,
-      logo: "data:image/png;base64,aGVsbG8=",
+      logo: "http://example.com/logo.png",
     }).success).toBe(true);
   });
 
-  it("keeps website URLs strict while rejecting unrelated relative logo paths", () => {
+  it("keeps website URLs strict while rejecting unsupported logo references", () => {
     expect(subscriptionCreateBodySchema.safeParse({
       ...validSubscriptionCreateBody,
       website: "/api/app/assets/2pbs0lgyypqhjoy",
@@ -51,6 +69,21 @@ describe("subscription API schemas", () => {
     expect(subscriptionCreateBodySchema.safeParse({
       ...validSubscriptionCreateBody,
       logo: "/other/assets/2pbs0lgyypqhjoy",
+    }).success).toBe(false);
+
+    expect(subscriptionCreateBodySchema.safeParse({
+      ...validSubscriptionCreateBody,
+      logo: "data:image/png;base64,aGVsbG8=",
+    }).success).toBe(false);
+
+    expect(subscriptionCreateBodySchema.safeParse({
+      ...validSubscriptionCreateBody,
+      logo: "javascript:alert(1)",
+    }).success).toBe(false);
+
+    expect(subscriptionCreateBodySchema.safeParse({
+      ...validSubscriptionCreateBody,
+      logo: "https://user:pass@example.com/logo.png",
     }).success).toBe(false);
   });
 
@@ -73,10 +106,52 @@ describe("subscription API schemas", () => {
     }).success).toBe(false);
   });
 
+  it("accepts inherited and explicit reminder day boundaries", () => {
+    for (const reminderDays of [-1, 0, 3, 3650]) {
+      expect(subscriptionCreateBodySchema.safeParse({
+        ...validSubscriptionCreateBody,
+        reminderDays,
+      }).success).toBe(true);
+
+      expect(apiSubscriptionSchema.safeParse({
+        ...validSubscriptionResponseBody,
+        reminderDays,
+      }).success).toBe(true);
+    }
+
+    for (const reminderDays of [-2, 3651]) {
+      expect(subscriptionCreateBodySchema.safeParse({
+        ...validSubscriptionCreateBody,
+        reminderDays,
+      }).success).toBe(false);
+    }
+  });
+
   it("accepts expired as a first-class subscription status", () => {
     expect(subscriptionCreateBodySchema.safeParse({
       ...validSubscriptionCreateBody,
       status: "expired",
+    }).success).toBe(true);
+  });
+
+  it("keeps subscription response logos on the same persistent contract", () => {
+    expect(apiSubscriptionSchema.safeParse({
+      ...validSubscriptionResponseBody,
+      logo: "http://example.com/logo.png",
+    }).success).toBe(true);
+
+    expect(apiSubscriptionSchema.safeParse({
+      ...validSubscriptionResponseBody,
+      logo: "data:image/png;base64,aGVsbG8=",
+    }).success).toBe(false);
+  });
+
+  it("accepts one-time as a first-class billing cycle", () => {
+    expect(subscriptionCreateBodySchema.safeParse({
+      ...validSubscriptionCreateBody,
+      billingCycle: "one-time",
+      customDays: null,
+      autoCalculateNextBillingDate: false,
     }).success).toBe(true);
   });
 });

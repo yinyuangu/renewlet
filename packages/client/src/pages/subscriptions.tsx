@@ -18,13 +18,15 @@ import { BackToTopFloatButton } from '@/components/back-to-top-float-button';
 import { SubscriptionCard } from '@/components/subscription-card';
 import { AddSubscriptionDialog } from '@/components/add-subscription-dialog';
 import { EditSubscriptionDialog } from '@/components/edit-subscription-dialog';
+import { ImportDataDialog } from '@/components/import-data-dialog';
 import { SubscriptionListSkeleton } from '@/components/loading-skeleton';
 import { VirtualizedList } from '@/components/ui/virtualized-list';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { Category, Subscription, SubscriptionStatus } from '@/types/subscription';
-import { Search, Plus, Grid, List as ListIcon, Download } from 'lucide-react';
+import { DEFAULT_SETTINGS } from '@/types/subscription';
+import { Search, Plus, Grid, List as ListIcon, Download, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
@@ -172,6 +174,7 @@ const Subscriptions = () => {
   const { t, label, locale } = useI18n();
   const { convert } = useExchangeRates(exchangeRateProvider);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
   const isMobileTagFilter = useMediaQuery("(max-width: 767px)");
   const {
     editingSubscription,
@@ -200,7 +203,9 @@ const Subscriptions = () => {
     toggleTag,
     clearFilters,
   } = useSubscriptionFilters(subscriptions, { defaultCurrency, convert, locale, timeZone });
-  const { exportToJSON, exportToCSV } = useSubscriptionExport(filteredSubscriptions, config, locale, timeZone);
+  const settings = settingsQuery.data ?? DEFAULT_SETTINGS;
+  const { exportToJSON, exportToJSONWithSecrets, exportToCSV } =
+    useSubscriptionExport(filteredSubscriptions, subscriptions, config, settings, locale, timeZone);
   const categoryFilterLabel =
     categoryFilter === "all"
       ? t("subscriptions.allCategories")
@@ -267,11 +272,24 @@ const Subscriptions = () => {
                 <DropdownMenuItem onClick={exportToJSON}>
                   {t("subscriptions.exportJson")}
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={exportToJSONWithSecrets}>
+                  {t("subscriptions.exportJsonWithSecrets")}
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={exportToCSV}>
                   {t("subscriptions.exportCsv")}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setImportDialogOpen(true)}
+              className="gap-2 border-border"
+              aria-label={t("subscriptions.importData")}
+            >
+              <Upload className="h-4 w-4" />
+              <span className="hidden sm:inline">{t("subscriptions.importData")}</span>
+            </Button>
             <Button
               variant="outline"
               size="icon"
@@ -497,13 +515,19 @@ const Subscriptions = () => {
 
       <BackToTopFloatButton />
 
-      <EditSubscriptionDialog
+        <EditSubscriptionDialog
         subscription={editingSubscription}
         open={editDialogOpen}
         onOpenChange={handleEditDialogOpenChange}
         onSave={handleSaveSubscription}
         availableTags={allTags}
-      />
+        />
+        <ImportDataDialog
+          open={importDialogOpen}
+          onOpenChange={setImportDialogOpen}
+          settings={settings}
+          config={config}
+        />
     </div>
   );
 };

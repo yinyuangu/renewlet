@@ -29,7 +29,7 @@ export function UpcomingRenewals({ subscriptions, timeZone }: UpcomingRenewalsPr
   const today = todayDateOnlyInTimeZone(new Date(), timeZone);
   const upcoming = subscriptions
     // 即将续费只看有效活跃订阅，旧 active/trial 过期记录应进入“已过期”，不能继续占用未来续费提醒位。
-    .filter(s => isEffectivelyActiveSubscription(s, today))
+    .filter(s => isEffectivelyActiveSubscription(s, today) && s.billingCycle !== "one-time")
     .map(s => ({
       ...s,
       daysUntil: daysBetweenDateOnly(today, s.nextBillingDate),

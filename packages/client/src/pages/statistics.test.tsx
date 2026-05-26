@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
   rechartsLegendProps: [] as Array<Record<string, unknown>>,
   rechartsPieChartProps: [] as Array<Record<string, unknown>>,
   rechartsPieProps: [] as Array<Record<string, unknown>>,
+  rechartsResponsiveContainerProps: [] as Array<Record<string, unknown>>,
   rechartsTooltipProps: [] as Array<Record<string, unknown>>,
   useCustomConfig: vi.fn(),
   useSettings: vi.fn(),
@@ -49,7 +50,10 @@ vi.mock("recharts", () => ({
     mocks.rechartsPieChartProps.push(props);
     return <div>{children}</div>;
   },
-  ResponsiveContainer: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  ResponsiveContainer: ({ children, ...props }: { children?: React.ReactNode } & Record<string, unknown>) => {
+    mocks.rechartsResponsiveContainerProps.push(props);
+    return <div>{children}</div>;
+  },
   Tooltip: (props: Record<string, unknown>) => {
     mocks.rechartsTooltipProps.push(props);
     return null;
@@ -137,6 +141,7 @@ describe("Statistics page", () => {
     mocks.rechartsLegendProps.length = 0;
     mocks.rechartsPieChartProps.length = 0;
     mocks.rechartsPieProps.length = 0;
+    mocks.rechartsResponsiveContainerProps.length = 0;
     mocks.rechartsTooltipProps.length = 0;
     mocks.useCustomConfig.mockReturnValue({ config: DEFAULT_CUSTOM_CONFIG });
     mocks.useSettings.mockReturnValue({
@@ -190,10 +195,13 @@ describe("Statistics page", () => {
 
     expect(mocks.rechartsLegendProps).toHaveLength(0);
     expect(mocks.rechartsPieChartProps).toHaveLength(3);
+    expect(mocks.rechartsPieChartProps.map((props) => props["title"])).toEqual(["分类视图", "支付方式视图", "费用与预算"]);
     for (const props of mocks.rechartsPieChartProps) {
       expect(props).toEqual(
         expect.objectContaining({
+          accessibilityLayer: true,
           margin: { top: 4, right: 4, bottom: 4, left: 4 },
+          tabIndex: 0,
         }),
       );
     }
@@ -204,6 +212,7 @@ describe("Statistics page", () => {
           cy: "50%",
           innerRadius: "58%",
           outerRadius: "90%",
+          rootTabIndex: -1,
           strokeWidth: 0,
         }),
       );
@@ -211,11 +220,36 @@ describe("Statistics page", () => {
     expect(screen.getAllByRole("list")).toHaveLength(3);
   });
 
+  it("gives Recharts positive dimensions before ResizeObserver reports layout", () => {
+    renderStatistics();
+
+    for (const frame of screen.getAllByTestId("statistics-chart-frame")) {
+      expect(frame).toHaveClass("recharts-frame");
+    }
+    expect(mocks.rechartsResponsiveContainerProps).toHaveLength(3);
+    for (const props of mocks.rechartsResponsiveContainerProps) {
+      const initialDimension = props["initialDimension"] as { width: number; height: number };
+
+      expect(props).toEqual(
+        expect.objectContaining({
+          width: "100%",
+          height: 220,
+          minWidth: 0,
+          debounce: 50,
+        }),
+      );
+      expect(props["height"]).not.toBe("100%");
+      expect(initialDimension.width).toBeGreaterThan(0);
+      expect(initialDimension.height).toBe(220);
+    }
+  });
+
   it("uses the same subtle hover feedback as the dashboard spending chart", () => {
     renderStatistics();
 
     expect(mocks.rechartsCellProps.length).toBeGreaterThan(0);
     for (const props of mocks.rechartsCellProps) {
+      expect(props["focusable"]).toBe(false);
       expect(props["className"]).toBe("transition-all duration-300 hover:opacity-80");
     }
   });

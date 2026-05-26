@@ -11,7 +11,7 @@
 
 import Link, { NavLink } from '@/components/router-link';
 import { useRouter } from '@/lib/router';
-import { LayoutDashboard, List, CalendarDays, BarChart3, Settings, Sun, Moon, LogOut, Plus } from 'lucide-react';
+import { LayoutDashboard, List, CalendarDays, BarChart3, Settings, Sun, Moon, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { SubscriptionDraft } from '@/types/subscription';
 import { Button } from '@/components/ui/button';
@@ -20,7 +20,6 @@ import { useToast } from '@/hooks/use-toast';
 import { RenewletLogo } from '@/components/icons/renewlet-logo';
 import { writeAppearancePendingToStorage } from '@/lib/theme-storage';
 import { authClient } from '@/lib/auth-client';
-import { useEffect } from 'react';
 import { AddSubscriptionDialog } from '@/components/add-subscription-dialog';
 import { useI18n } from '@/i18n/I18nProvider';
 import type { MessageKey } from '@/i18n/messages';
@@ -58,47 +57,12 @@ function renderNavIcon(icon: NavIconKey, className: string) {
   }
 }
 
-function AddSubscriptionDialogLoading() {
-  const { t } = useI18n();
-
-  return (
-    <Button disabled className="gap-2 bg-primary text-primary-foreground opacity-80">
-      <Plus className="h-4 w-4" />
-      {t("subscription.add")}
-    </Button>
-  );
-}
-
-const loadAddSubscriptionDialog = () => import('./add-subscription-dialog');
-
-type IdleCapableWindow = Window & {
-  requestIdleCallback?: (callback: () => void, options?: { timeout?: number }) => number;
-  cancelIdleCallback?: (handle: number) => void;
-};
-
 /** Header 组件：全局导航 + 主题切换 + 新增订阅入口。 */
 export function Header({ onAddSubscription, availableTags }: HeaderProps) {
   const router = useRouter();
   const { theme, setTheme } = useTheme();
   const { toast } = useToast();
   const { t } = useI18n();
-
-  useEffect(() => {
-    if (!onAddSubscription) return;
-
-    const warmup = () => {
-      void loadAddSubscriptionDialog();
-    };
-
-    const browserWindow = window as IdleCapableWindow;
-    if (browserWindow.requestIdleCallback && browserWindow.cancelIdleCallback) {
-      const idleId = browserWindow.requestIdleCallback(warmup);
-      return () => browserWindow.cancelIdleCallback?.(idleId);
-    }
-
-    const timer = window.setTimeout(warmup, 100);
-    return () => window.clearTimeout(timer);
-  }, [onAddSubscription]);
 
   /**
    * 切换明暗模式（仅本地生效）。

@@ -22,6 +22,9 @@ const mocks = vi.hoisted(() => ({
   handleEditSubscription: vi.fn(),
   handleSaveSubscription: vi.fn(),
   handleEditDialogOpenChange: vi.fn(),
+  exportToJSON: vi.fn(),
+  exportToJSONWithSecrets: vi.fn(),
+  exportToCSV: vi.fn(),
 }));
 
 vi.mock("@/hooks/use-subscriptions", () => ({
@@ -92,9 +95,14 @@ vi.mock("@/modules/subscriptions/application/use-subscription-crud", () => ({
 
 vi.mock("@/modules/subscriptions/application/use-subscription-export", () => ({
   useSubscriptionExport: () => ({
-    exportToJSON: vi.fn(),
-    exportToCSV: vi.fn(),
+    exportToJSON: mocks.exportToJSON,
+    exportToJSONWithSecrets: mocks.exportToJSONWithSecrets,
+    exportToCSV: mocks.exportToCSV,
   }),
+}));
+
+vi.mock("@/components/import-data-dialog", () => ({
+  ImportDataDialog: ({ open }: { open: boolean }) => <div data-testid="import-dialog-state">{String(open)}</div>,
 }));
 
 vi.mock("@/components/header", () => ({
@@ -275,6 +283,30 @@ describe("Subscriptions page sorting", () => {
     expect(searchInput).toHaveAttribute("name", "subscription-search");
     expect(searchInput).toHaveAttribute("enterkeyhint", "search");
     expect(screen.getByTestId("mobile-sort-tag-row")).toBeInTheDocument();
+  });
+
+  it("keeps import as a dedicated action next to the export menu", async () => {
+    const user = userEvent.setup();
+    mocks.exportToJSON.mockClear();
+    mocks.exportToJSONWithSecrets.mockClear();
+    mocks.exportToCSV.mockClear();
+    renderSubscriptionsPage();
+
+    await user.click(screen.getByRole("button", { name: "导出订阅" }));
+    expect(screen.queryByRole("menuitem", { name: "导入数据" })).not.toBeInTheDocument();
+    await user.click(await screen.findByRole("menuitem", { name: "导出备份 ZIP" }));
+    expect(mocks.exportToJSON).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByRole("button", { name: "导出订阅" }));
+    await user.click(await screen.findByRole("menuitem", { name: "导出备份 ZIP（含通知密钥）" }));
+    expect(mocks.exportToJSONWithSecrets).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByRole("button", { name: "导出订阅" }));
+    await user.click(await screen.findByRole("menuitem", { name: "导出 CSV" }));
+    expect(mocks.exportToCSV).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByRole("button", { name: "导入数据" }));
+    expect(screen.getByTestId("import-dialog-state")).toHaveTextContent("true");
   });
 
   it("filters by expired using the effective status of legacy overdue subscriptions", async () => {

@@ -69,6 +69,29 @@ export const DEFAULT_PAYMENT_METHOD_ICONS: Record<BuiltInPaymentMethod, string> 
   google_pay: "/icons/payment-methods/google_pay.svg",
   bank_transfer: "/icons/payment-methods/bank_transfer.svg",
   crypto: "/icons/payment-methods/crypto.svg",
+  direct_debit: "/icons/payment-methods/direct_debit.svg",
+  money: "/icons/payment-methods/money.svg",
+  samsung_pay: "/icons/payment-methods/samsung_pay.svg",
+  klarna: "/icons/payment-methods/klarna.svg",
+  amazon_pay: "/icons/payment-methods/amazon_pay.svg",
+  sepa: "/icons/payment-methods/sepa.svg",
+  skrill: "/icons/payment-methods/skrill.svg",
+  sofort: "/icons/payment-methods/sofort.svg",
+  stripe: "/icons/payment-methods/stripe.svg",
+  affirm: "/icons/payment-methods/affirm.svg",
+  elo: "/icons/payment-methods/elo.svg",
+  facebook_pay: "/icons/payment-methods/facebook_pay.svg",
+  giropay: "/icons/payment-methods/giropay.svg",
+  ideal: "/icons/payment-methods/ideal.svg",
+  union_pay: "/icons/payment-methods/union_pay.svg",
+  interac: "/icons/payment-methods/interac.svg",
+  paysafe: "/icons/payment-methods/paysafe.svg",
+  poli: "/icons/payment-methods/poli.svg",
+  qiwi: "/icons/payment-methods/qiwi.svg",
+  shop_pay: "/icons/payment-methods/shop_pay.svg",
+  venmo: "/icons/payment-methods/venmo.svg",
+  verifone: "/icons/payment-methods/verifone.svg",
+  webmoney: "/icons/payment-methods/webmoney.svg",
   other: "/icons/payment-methods/other.svg",
 };
 
@@ -275,7 +298,7 @@ export function normalizeStatuses(items: ConfigItem[]): ConfigItem[] {
 
 /**
  * 规范化支付方式列表：
- * - 确保内置 10 个支付方式始终存在（不允许被删除）
+ * - 确保内置支付方式始终存在（不允许被删除）
  * - 内置支付方式的 label/icon 固定（不允许被自定义数据覆盖）
  * - 保留用户自定义新增项（可自定义 icon）
  * - 尽量保留用户拖拽后的排序（按传入数组顺序处理）

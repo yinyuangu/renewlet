@@ -91,7 +91,7 @@ export const SubscriptionCalendar = ({ subscriptions, onEditSubscription }: Subs
     
     subscriptions
       // 日历只展示有效活跃订阅的未来扣费安排，避免旧过期记录继续占用日历格和月度预计支出。
-      .filter(sub => isEffectivelyActiveSubscription(sub, today))
+      .filter(sub => isEffectivelyActiveSubscription(sub, today) && sub.billingCycle !== "one-time")
       .forEach(sub => {
         const dateKey = sub.nextBillingDate;
         const existing = map.get(dateKey) || [];
@@ -172,7 +172,7 @@ export const SubscriptionCalendar = ({ subscriptions, onEditSubscription }: Subs
 
   return (
     <>
-      <div className="rounded-xl border border-border bg-card p-4 shadow-card sm:p-6">
+      <div className="min-w-0 rounded-xl border border-border bg-card p-4 shadow-card sm:p-6">
         {/* 顶部栏 */}
         <div className="mb-5 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2">
@@ -351,7 +351,7 @@ export const SubscriptionCalendar = ({ subscriptions, onEditSubscription }: Subs
         {isMobileCalendar ? (
           <>
             {/* 移动端月历概览：只展示续费指示，完整信息放到下方列表。 */}
-            <div className="grid grid-cols-7 gap-1">
+            <div className="grid min-w-0 grid-cols-7 gap-1">
               {calendarDays.map((day) => {
                 const dateKey = format(day, 'yyyy-MM-dd');
                 const daySubs = subscriptionsByDate.get(dateKey) || [];
@@ -415,16 +415,16 @@ export const SubscriptionCalendar = ({ subscriptions, onEditSubscription }: Subs
               })}
             </div>
 
-            <div className="mt-5 border-t border-border pt-4">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <h4 className="text-sm font-semibold text-foreground">{t("calendar.mobileAgendaTitle")}</h4>
-                <span className="text-xs text-muted-foreground">
+            <div className="mt-5 min-w-0 max-w-full border-t border-border pt-4" data-testid="calendar-mobile-agenda">
+              <div className="mb-3 flex min-w-0 items-center justify-between gap-3">
+                <h4 className="min-w-0 truncate text-sm font-semibold text-foreground">{t("calendar.mobileAgendaTitle")}</h4>
+                <span className="shrink-0 text-xs text-muted-foreground">
                   {t("calendar.renewalCount", { count: monthlySummary.renewalsCount })}
                 </span>
               </div>
 
               {monthlyAgendaGroups.length > 0 ? (
-                <div className="grid gap-4">
+                <div className="grid min-w-0 max-w-full grid-cols-1 gap-4" data-testid="calendar-mobile-agenda-list">
                   {monthlyAgendaGroups.map((group) => {
                     const groupLabel = formatDateTime(group.date, {
                       month: "short",
@@ -433,31 +433,32 @@ export const SubscriptionCalendar = ({ subscriptions, onEditSubscription }: Subs
                     });
 
                     return (
-                      <section key={group.dateKey} className="grid gap-2">
-                        <div className="flex items-center justify-between gap-3 text-xs">
-                          <span className="font-medium text-muted-foreground">{groupLabel}</span>
-                          <span className="text-primary">
+                      <section key={group.dateKey} className="grid min-w-0 max-w-full grid-cols-1 gap-2">
+                        <div className="flex min-w-0 items-center justify-between gap-3 text-xs">
+                          <span className="min-w-0 truncate font-medium text-muted-foreground">{groupLabel}</span>
+                          <span className="shrink-0 text-primary">
                             {t("calendar.dayRenewalCount", {
                               date: formatDateTime(group.date, { month: "short", day: "numeric" }),
                               count: group.subscriptions.length,
                             })}
                           </span>
                         </div>
-                        <div className="grid gap-2">
+                        <div className="grid min-w-0 max-w-full grid-cols-1 gap-2">
                           {group.subscriptions.map((sub) => (
                             <button
                               key={sub.id}
                               type="button"
                               onClick={() => handleSubscriptionClick(sub)}
-                              className="flex min-h-14 w-full items-center justify-between gap-3 rounded-lg border border-border bg-secondary/30 px-3 py-3 text-left transition-colors hover:bg-secondary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                              className="flex min-h-14 min-w-0 max-w-full items-center justify-between gap-3 rounded-lg border border-border bg-secondary/30 px-3 py-3 text-left transition-colors hover:bg-secondary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                              data-testid="calendar-mobile-agenda-item"
                             >
-                              <div className="min-w-0">
+                              <div className="min-w-0 flex-1">
                                 <p className="truncate text-sm font-medium text-foreground">{sub.name}</p>
                                 <p className="mt-0.5 text-xs text-muted-foreground">
                                   {label(CYCLE_LABELS[sub.billingCycle])}
                                 </p>
                               </div>
-                              <p className="shrink-0 text-sm font-semibold text-foreground">
+                              <p className="max-w-[45%] shrink-0 truncate text-right text-sm font-semibold text-foreground">
                                 {formatCurrency(sub.price, sub.currency)}
                               </p>
                             </button>

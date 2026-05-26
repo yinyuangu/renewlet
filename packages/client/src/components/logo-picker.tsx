@@ -2,37 +2,35 @@
  * 订阅 Logo 选择器（用于新增/编辑订阅的 logo）。
  *
  * 支持：
- * - 搜索 theSVG 内置品牌图标（testingcf.jsdelivr.net CDN）
- * - 根据服务名生成候选 Logo（网站 Favicon / 第三方 Favicon 服务）
+ * - 通过统一 Logo Resolver 搜索内置品牌图标与网站/Favicon 备用候选
  * - 上传本地图片并裁剪（ImageCropDialog）
  *
  * 注意：
- * - Logo 自动搜索依赖外部资源（网站 favicon / 第三方 favicon 服务），网络不通时可能加载失败（UI 有降级处理）
+ * - Favicon 备用候选依赖浏览器加载外部资源，网络不通时可能加载失败（UI 有降级处理）
  *
  * 状态链路：
  * ```
- * serviceName -> useFaviconSearch -> 选择 URL
+ * serviceName -> useMediaCandidates -> 选择 URL
  * 文件上传 -> 裁剪 -> useCroppedImageUpload -> /api/app/assets/{id}
  * ```
  *
- * 注意： 外层表单必须关注 uploadStatus，上传中不允许保存订阅，避免 data URL 被持久化。
+ * 注意： 外层表单必须关注 uploadStatus，上传中不允许保存订阅，避免临时预览值被持久化。
  */
 
-import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Upload, Search, X, Loader2, Image as ImageIcon, Images, RefreshCw } from 'lucide-react';
+import { Upload, Search, X, Loader2, Image as ImageIcon, Images, RefreshCw, Link } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { FaviconResultImage } from '@/components/favicon-result-image';
+import { MediaCandidateSearchPanel } from '@/components/media-candidate-search-panel';
+import { MediaCandidateViewport } from '@/components/media-candidate-viewport';
 import { MediaThumbnailButton } from '@/components/media-thumbnail-button';
-import { generateFaviconUrls } from '@/lib/favicon';
-import { SERVICE_DOMAINS } from '@/lib/favicon-known-domains';
+import { LogoUrlInputPanel } from '@/components/logo-url-input-panel';
 import { IMAGE_UPLOAD_ACCEPT } from '@/lib/upload-constraints';
-import { useFaviconSearch } from '@/hooks/use-favicon-search';
 import { useCroppedImageUpload, type UploadStatus } from '@/hooks/use-cropped-image-upload';
-import { useTheSvgIconSearch } from '@/hooks/use-thesvg-icon-search';
+import { useMediaCandidates } from '@/hooks/use-media-candidates';
 import { useUploadedLogoAssets } from '@/hooks/use-uploaded-logo-assets';
 import { useI18n } from '@/i18n/I18nProvider';
 
@@ -51,7 +49,7 @@ const preloadImageCropDialog = () => {
 };
 
 interface LogoPickerProps {
-  /** 当前 logo（URL 或 data URL）。 */
+  /** 当前 logo（私有资产路径或 http(s) 外链）。 */
   value?: string | undefined;
   /** logo 变更回调（传 undefined 表示清空）。 */
   onChange: (logo: string | undefined) => void;
@@ -59,23 +57,12 @@ interface LogoPickerProps {
    * 上传状态变更回调（可选）。
    *
    * 用途：
-   * - 外层表单/弹窗在上传未完成时禁用“保存/确认”，彻底杜绝把临时 data URL 写入数据库。
+   * - 外层表单/弹窗在上传未完成时禁用“保存/确认”，彻底杜绝把临时预览值写入数据库。
    */
   onUploadStatusChange?: ((status: UploadStatus) => void) | undefined;
   /** 服务名提示：打开弹窗时可自动填入并触发搜索。 */
   serviceName?: string | undefined;
 }
-
-/** 常见订阅服务关键词 → 域名映射（用于更准确地取 Logo/Favicon）。 */
-// 映射已抽到 `src/lib/favicon-known-domains.ts`，避免与 IconPicker/服务端重复。
-
-/** 根据服务名生成候选 Logo URL 列表（去重）。 */
-const generateLogoUrls = (name: string): string[] =>
-  generateFaviconUrls({
-    name,
-    knownDomains: SERVICE_DOMAINS,
-    fallbackTlds: ["com", "io", "co", "app", "org"],
-  });
 
 /** LogoPicker 组件。 */
 export function LogoPicker({
@@ -85,15 +72,13 @@ export function LogoPicker({
   serviceName = '',
 }: LogoPickerProps) {
   const { t } = useI18n();
-  const builtInSearch = useTheSvgIconSearch(32);
   const uploadedLogos = useUploadedLogoAssets();
   const [uploadedLogosOpen, setUploadedLogosOpen] = useState(false);
-  const builtInCloseResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const search = useFaviconSearch({
+  const [linkOpen, setLinkOpen] = useState(false);
+  const search = useMediaCandidates({
+    kind: "logo",
     autoQuery: serviceName,
-    generateUrls: generateLogoUrls,
-    serverSearch: { kind: "logo" },
-    onSearch: builtInSearch.search,
+    limit: 32,
     closeResetDelayMs: SEARCH_POPOVER_CLOSE_RESET_DELAY_MS,
   });
 
@@ -116,31 +101,9 @@ export function LogoPicker({
   });
 
   const displayedLogo = previewUrl ?? value;
-  const isAnySearching = search.isSearching || builtInSearch.isSearching;
-  const hasAnySearched = search.hasSearched || builtInSearch.hasSearched;
-  const hasAnyResults = builtInSearch.icons.length > 0 || search.results.length > 0;
-  const shouldShowResultsArea = hasAnyResults || (!isAnySearching && hasAnySearched);
-  const shouldShowBuiltInSection = builtInSearch.hasSearched || builtInSearch.icons.length > 0;
-
-  const clearBuiltInCloseResetTimer = () => {
-    if (builtInCloseResetTimerRef.current === null) return;
-    clearTimeout(builtInCloseResetTimerRef.current);
-    builtInCloseResetTimerRef.current = null;
-  };
 
   const handleSearchOpenChange = (nextOpen: boolean) => {
-    clearBuiltInCloseResetTimer();
     search.onOpenChange(nextOpen);
-    if (nextOpen) {
-      builtInSearch.reset();
-      return;
-    }
-
-    builtInSearch.cancel();
-    builtInCloseResetTimerRef.current = setTimeout(() => {
-      builtInCloseResetTimerRef.current = null;
-      builtInSearch.reset();
-    }, SEARCH_POPOVER_CLOSE_RESET_DELAY_MS);
   };
 
   const handleUploadedLogosOpenChange = (nextOpen: boolean) => {
@@ -150,6 +113,10 @@ export function LogoPicker({
     }
   };
 
+  const handleLinkOpenChange = (nextOpen: boolean) => {
+    setLinkOpen(nextOpen);
+  };
+
   const retryUploadedLogos = () => {
     void uploadedLogos.loadInitial();
   };
@@ -157,14 +124,6 @@ export function LogoPicker({
   const loadMoreUploadedLogos = () => {
     void uploadedLogos.loadMore();
   };
-
-  useEffect(() => {
-    return () => {
-      if (builtInCloseResetTimerRef.current === null) return;
-      clearTimeout(builtInCloseResetTimerRef.current);
-      builtInCloseResetTimerRef.current = null;
-    };
-  }, []);
 
   return (
     <>
@@ -241,7 +200,7 @@ export function LogoPicker({
             {t("media.uploadLogo")}
           </Button>
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             <Popover open={uploadedLogosOpen} onOpenChange={handleUploadedLogosOpenChange}>
               <PopoverTrigger asChild>
                 <Button
@@ -256,13 +215,13 @@ export function LogoPicker({
               </PopoverTrigger>
               <PopoverContent
                 aria-label={t("media.uploadedLogo")}
-                className="h5-logo-sheet h5-uploaded-logo-sheet w-80 p-3 border-border bg-card"
+                className="media-candidate-popover media-candidate-popover-logo h5-logo-sheet h5-uploaded-logo-sheet w-80 border-border bg-card p-3"
                 align="start"
                 sideOffset={8}
                 mobileDetent="large"
                 data-testid="uploaded-logo-sheet"
               >
-                <div className="h5-logo-sheet-panel h5-uploaded-logo-panel grid gap-3">
+                <div className="media-candidate-popover-panel h5-uploaded-logo-panel gap-3">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">{t("media.uploadedLogo")}</span>
                     <button
@@ -274,19 +233,19 @@ export function LogoPicker({
                     </button>
                   </div>
 
-                  <div
-                    className="h5-logo-sheet-results h5-uploaded-logo-results h5-mobile-sheet-scroll grid max-h-72 gap-3 overflow-y-auto pr-1"
-                    data-testid="uploaded-logo-results"
+                  <MediaCandidateViewport
+                    className="h5-logo-sheet-results h5-uploaded-logo-results"
+                    dataTestId="uploaded-logo-results"
                   >
                     {uploadedLogos.isLoading && uploadedLogos.assets.length === 0 && (
-                      <div className="h5-logo-sheet-message flex items-center justify-center py-4">
+                      <div className="media-candidate-message flex items-center justify-center py-4">
                         <Loader2 className="w-5 h-5 animate-spin text-primary" />
                         <span className="ml-2 text-sm text-muted-foreground">{t("media.loadingUploadedLogo")}</span>
                       </div>
                     )}
 
                     {uploadedLogos.error && uploadedLogos.assets.length === 0 && (
-                      <div className="h5-logo-sheet-message grid gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2">
+                      <div className="media-candidate-message grid gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2">
                         <p className="text-sm text-destructive">{t("media.uploadedLogoLoadFailed")}</p>
                         <Button
                           type="button"
@@ -307,7 +266,7 @@ export function LogoPicker({
                     )}
 
                     {!uploadedLogos.isLoading && !uploadedLogos.error && uploadedLogos.hasLoaded && uploadedLogos.assets.length === 0 && (
-                      <div className="h5-logo-sheet-message text-center py-3">
+                      <div className="media-candidate-message text-center py-3">
                         <ImageIcon className="w-8 h-8 mx-auto text-muted-foreground/50 mb-2" />
                         <p className="text-sm text-muted-foreground">{t("media.noUploadedLogo")}</p>
                       </div>
@@ -323,7 +282,7 @@ export function LogoPicker({
                                 key={asset.id}
                                 src={asset.url}
                                 alt={label}
-                                title={label}
+                                tooltip={label}
                                 selected={value === asset.url}
                                 onClick={() => {
                                   applyValue(asset.url);
@@ -366,7 +325,7 @@ export function LogoPicker({
                         )}
                       </>
                     )}
-                  </div>
+                  </MediaCandidateViewport>
                 </div>
               </PopoverContent>
             </Popover>
@@ -385,138 +344,73 @@ export function LogoPicker({
               </PopoverTrigger>
               <PopoverContent
                 aria-label={t("media.searchLogo")}
-                className="h5-logo-sheet h5-logo-search-sheet w-80 p-4 border-border bg-card"
+                className="media-candidate-popover media-candidate-popover-logo h5-logo-sheet h5-logo-search-sheet w-80 border-border bg-card p-4"
                 align="start"
                 sideOffset={8}
                 mobileDetent="large"
                 data-testid="logo-search-sheet"
               >
-                <div className="h5-logo-sheet-panel h5-logo-search-panel grid gap-4">
+                <MediaCandidateSearchPanel
+                  search={search}
+                  title={t("media.searchLogo")}
+                  placeholder={t("media.searchLogoPlaceholder")}
+                  prompt={t("media.searchLogoPrompt")}
+                  notFoundLabel={t("media.logoNotFound")}
+                  notFoundHint={t("media.logoNotFoundHint")}
+                  selectedValue={value}
+                  onClose={() => handleSearchOpenChange(false)}
+                  onSelect={(candidate) => {
+                    applyValue(candidate.url);
+                    handleSearchOpenChange(false);
+                  }}
+                  panelClassName="h5-logo-search-panel gap-4"
+                  inputRowClassName="h5-logo-search-input-row"
+                  searchButtonClassName="bg-primary text-primary-foreground"
+                  resultsClassName="h5-logo-sheet-results h5-logo-search-results"
+                  dataTestId="logo-search-results"
+                  showEmptyIcon
+                />
+              </PopoverContent>
+            </Popover>
+
+            <Popover open={linkOpen} onOpenChange={handleLinkOpenChange}>
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 w-full gap-1.5 border-border px-2 text-xs"
+                >
+                  <Link className="w-3.5 h-3.5" />
+                  {t("media.link")}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent
+                aria-label={t("media.logoLink")}
+                className="media-candidate-popover media-candidate-popover-logo h5-logo-sheet h5-logo-link-sheet w-80 border-border bg-card p-4"
+                align="start"
+                sideOffset={8}
+                mobileDetent="large"
+                data-testid="logo-link-sheet"
+              >
+                <div className="media-candidate-popover-panel h5-logo-link-panel gap-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">{t("media.searchLogo")}</span>
+                    <span className="text-sm font-medium">{t("media.logoLink")}</span>
                     <button
                       type="button"
-                      onClick={() => handleSearchOpenChange(false)}
+                      onClick={() => handleLinkOpenChange(false)}
                       className="text-muted-foreground hover:text-foreground"
                     >
                       <X className="w-4 h-4" />
                     </button>
                   </div>
-
-                  <div className="h5-logo-search-input-row flex items-center gap-2">
-                    <Input
-                      placeholder={t("media.searchLogoPlaceholder")}
-                      value={search.query}
-                      onChange={(e) => search.setQuery(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && search.search()}
-                      className="flex-1 border-border bg-secondary"
-                      autoFocus
-                    />
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={search.search}
-                      disabled={isAnySearching || !search.query.trim()}
-                      className="bg-primary text-primary-foreground"
-                    >
-                      {isAnySearching ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Search className="w-4 h-4" />
-                      )}
-                    </Button>
-                  </div>
-
-                  <div
-                    className="h5-logo-sheet-results h5-logo-search-results h5-mobile-sheet-scroll grid max-h-72 gap-4 overflow-y-auto pr-1"
-                    data-testid="logo-search-results"
-                  >
-                    {isAnySearching && !hasAnyResults && (
-                      <div className="flex items-center justify-center py-6">
-                        <Loader2 className="w-6 h-6 animate-spin text-primary" />
-                        <span className="ml-2 text-sm text-muted-foreground">{t("media.searching")}</span>
-                      </div>
-                    )}
-
-                    {shouldShowResultsArea ? (
-                      <>
-                        {shouldShowBuiltInSection && (
-                          <div className="grid gap-2">
-                            <p className="text-xs text-muted-foreground">{t("media.builtInIcons")}</p>
-                            {builtInSearch.icons.length > 0 ? (
-                              <div className="grid grid-cols-4 gap-2 p-1">
-                                {builtInSearch.icons.map((icon) => (
-                                  <MediaThumbnailButton
-                                    key={icon.slug}
-                                    src={icon.iconUrl}
-                                    alt={icon.title}
-                                    title={icon.title}
-                                    selected={value === icon.iconUrl}
-                                    onClick={() => {
-                                      applyValue(icon.iconUrl);
-                                      handleSearchOpenChange(false);
-                                    }}
-                                  />
-                                ))}
-                              </div>
-                            ) : (
-                              <p className="rounded-md border border-dashed border-border bg-secondary/40 px-3 py-2 text-xs text-muted-foreground">
-                                {builtInSearch.isSearching
-                                  ? t("media.searchingBuiltIn")
-                                  : builtInSearch.error ?? t("media.noBuiltInMatch")}
-                              </p>
-                            )}
-                          </div>
-                        )}
-
-                        {search.results.length > 0 && (
-                          <div className="grid gap-2">
-                            <p className="text-xs text-muted-foreground">{t("media.faviconFallback")}</p>
-                            <div className="grid grid-cols-4 gap-2 p-1">
-                              {search.results.map((url, index) => (
-                                <MediaThumbnailButton
-                                  key={url}
-                                  src={url}
-                                  alt={`Logo option ${index + 1}`}
-                                  selected={value === url}
-                                  onClick={() => {
-                                    applyValue(url);
-                                    handleSearchOpenChange(false);
-                                  }}
-                                  onError={() => search.removeResult(url)}
-                                />
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {isAnySearching && (
-                          <div className="flex items-center justify-center py-2 text-xs text-muted-foreground">
-                            <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin text-primary" />
-                            {t("media.loadingMore")}
-                          </div>
-                        )}
-
-                        {!isAnySearching && hasAnySearched && !hasAnyResults && (
-                          <div className="text-center py-2">
-                            <ImageIcon className="w-10 h-10 mx-auto text-muted-foreground/50 mb-2" />
-                            <p className="text-sm text-muted-foreground">
-                              {t("media.logoNotFound")}
-                            </p>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {t("media.logoNotFoundHint")}
-                            </p>
-                          </div>
-                        )}
-                      </>
-                    ) : null}
-
-                    {!isAnySearching && !hasAnySearched && (
-                      <p className="h5-logo-sheet-message text-xs text-center text-muted-foreground py-2">
-                        {t("media.searchLogoPrompt")}
-                      </p>
-                    )}
-                  </div>
+                  <LogoUrlInputPanel
+                    value={value}
+                    onApply={(url) => {
+                      applyValue(url);
+                      handleLinkOpenChange(false);
+                    }}
+                  />
                 </div>
               </PopoverContent>
             </Popover>

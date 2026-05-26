@@ -13,13 +13,16 @@ import { localizedLabel } from "@/i18n/locales";
 import { todayDateOnlyInTimeZone } from "@/lib/time/date-only";
 import { downloadFile } from "@/shared/browser/download-file";
 import type { CustomConfig } from "@/types/config";
-import type { Subscription } from "@/types/subscription";
-import { buildSubscriptionsCsv, buildSubscriptionsJsonExport } from "../domain/subscription-export";
+import type { AppSettings, Subscription } from "@/types/subscription";
+import { exportRenewletBackup } from "@/modules/import-export/domain/renewlet-export";
+import { buildSubscriptionsCsv } from "../domain/subscription-export";
 
 /** 订阅导出控制器。 */
 export function useSubscriptionExport(
   subscriptions: readonly Subscription[],
+  backupSubscriptions: readonly Subscription[],
   config: CustomConfig,
+  settings: AppSettings,
   locale: Locale,
   timeZone = "UTC",
 ) {
@@ -33,9 +36,11 @@ export function useSubscriptionExport(
   );
 
   const exportToJSON = () => {
-    const data = buildSubscriptionsJsonExport(subscriptions);
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-    downloadFile(blob, "subscriptions.json");
+    void exportRenewletBackup({ subscriptions: backupSubscriptions, settings, customConfig: config, includeSecrets: false });
+  };
+
+  const exportToJSONWithSecrets = () => {
+    void exportRenewletBackup({ subscriptions: backupSubscriptions, settings, customConfig: config, includeSecrets: true });
   };
 
   const exportToCSV = () => {
@@ -50,5 +55,5 @@ export function useSubscriptionExport(
     downloadFile(blob, "subscriptions.csv");
   };
 
-  return { exportToJSON, exportToCSV };
+  return { exportToJSON, exportToJSONWithSecrets, exportToCSV };
 }

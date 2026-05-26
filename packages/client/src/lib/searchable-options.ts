@@ -11,6 +11,7 @@ import { formatTimeZoneOffset } from "@/lib/time/time-zone";
 import type { ConfigItem } from "@/types/config";
 import type { CurrencyOption, CurrencyRegion } from "@/types/subscription";
 import { localizedLabel, type Locale } from "@/i18n/locales";
+import { translateStaticMessage } from "@/i18n/static-catalogs";
 
 /** 可搜索 Select/Command 组件使用的通用选项结构。 */
 export interface SearchableSelectOption {
@@ -177,7 +178,7 @@ export function createCurrencySelectOptions(params: {
     const label = params.formatLabel?.(selected, option, locale) ?? (option ? localizedLabel(option.labels, locale) : localizedLabel(selected.labels, locale));
     items.push({
       value: selected.value,
-      label: locale === "zh-CN" ? `${label}（已禁用）` : `${label} (disabled)`,
+      label: translateStaticMessage(locale, "common.optionDisabled", { label }),
       disabled: true,
       keywords: option ? createCurrencyKeywords(option) : uniq([selected.value, localizedLabel(selected.labels, "zh-CN"), localizedLabel(selected.labels, "en-US")]),
     });

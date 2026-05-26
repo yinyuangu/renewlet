@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { assertDateOnly } from "@/lib/time/date-only";
-import { calculateNextBillingDate } from "./subscription-billing";
+import { calculateNextBillingDate, toMonthlyAmount } from "./subscription-billing";
 
 describe("subscription-billing", () => {
   it("calculates the next billing date by adding one cycle to the start date", () => {
@@ -44,5 +44,12 @@ describe("subscription-billing", () => {
       undefined,
       assertDateOnly("2025-03-01"),
     )).toBe("2026-02-28");
+  });
+
+  it("keeps one-time purchases out of recurrence and monthly cost calculations", () => {
+    const startDate = assertDateOnly("2026-05-15");
+
+    expect(calculateNextBillingDate(startDate, "one-time", undefined, assertDateOnly("2027-01-01"))).toBe(startDate);
+    expect(toMonthlyAmount(199, "one-time")).toBe(0);
   });
 });

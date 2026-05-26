@@ -7,19 +7,28 @@
  * 注意： date-only、本地时间和 custom 周期是核心不变量；新增字段时要同步 Go schema/hooks 与前端 schema。
  */
 import type { CustomThemeColor, ThemeMode, ThemeVariant } from './theme';
-import { DEFAULT_CUSTOM_THEME_COLOR } from './theme';
+import type { BuiltInIconSourceSettings } from "@renewlet/shared/built-in-icons";
+import { labelsFromCatalog } from "@/i18n/label-messages";
 import { getInitialLocale, labels, type Locale, type LocalizedLabels } from '@/i18n/locales';
 import { SUPPORTED_EXCHANGE_RATE_CURRENCIES, getIntlCurrencyOptionLabel } from '@/lib/currency-data';
 import type { ExchangeRateProvider } from '@/lib/api/schemas/exchange-rates';
 import type { DateOnly } from '@/lib/time/date-only';
 import type { LocalTime } from '@/lib/time/local-time';
+import { createDefaultAppSettings } from "@renewlet/shared/settings-defaults";
+import {
+  DEFAULT_NOTIFICATION_REMINDER_DAYS,
+  INHERIT_REMINDER_DAYS,
+  MAX_REMINDER_DAYS,
+} from "@renewlet/shared/runtime";
+
+export { DEFAULT_NOTIFICATION_REMINDER_DAYS, INHERIT_REMINDER_DAYS, MAX_REMINDER_DAYS };
 
 export const SUBSCRIPTION_STATUSES = ['trial', 'active', 'expired', 'paused', 'cancelled'] as const;
 /** 订阅状态（影响展示、统计与提醒逻辑）。 */
 export type SubscriptionStatus = (typeof SUBSCRIPTION_STATUSES)[number];
 
-export const BILLING_CYCLES = ['weekly', 'monthly', 'quarterly', 'semi-annual', 'annual', 'custom'] as const;
-/** 扣费周期（用于计算月度/年度支出与续费日期）。 */
+export const BILLING_CYCLES = ['weekly', 'monthly', 'quarterly', 'semi-annual', 'annual', 'custom', 'one-time'] as const;
+/** 扣费周期（用于计算月度/年度支出与续费日期；one-time 表示买断/一次性购买）。 */
 export type BillingCycle = (typeof BILLING_CYCLES)[number];
 
 export const CATEGORIES = [
@@ -68,9 +77,32 @@ export const PAYMENT_METHODS = [
   'google_pay',
   'bank_transfer',
   'crypto',
+  'direct_debit',
+  'money',
+  'samsung_pay',
+  'klarna',
+  'amazon_pay',
+  'sepa',
+  'skrill',
+  'sofort',
+  'stripe',
+  'affirm',
+  'elo',
+  'facebook_pay',
+  'giropay',
+  'ideal',
+  'union_pay',
+  'interac',
+  'paysafe',
+  'poli',
+  'qiwi',
+  'shop_pay',
+  'venmo',
+  'verifone',
+  'webmoney',
   'other',
 ] as const;
-/** 内置支付方式（默认 10 个，图标固定）。 */
+/** 内置支付方式（图标固定，覆盖 Renewlet 与 Wallos 的默认支付方式并集）。 */
 export type BuiltInPaymentMethod = (typeof PAYMENT_METHODS)[number];
 /**
  * 支付方式值。
@@ -132,7 +164,7 @@ interface SubscriptionBase {
   notes: string | undefined;
   /** 标签。 */
   tags: string[];
-  /** 提前多少天提醒（整数，>=0）。 */
+  /** 提前多少天提醒；-1 表示继承设置页的全局提醒提前时间。 */
   reminderDays: number;
   /** 是否为该订阅启用重复提醒。 */
   repeatReminderEnabled: boolean;
@@ -140,6 +172,8 @@ interface SubscriptionBase {
   repeatReminderInterval: RepeatReminderInterval;
   /** 重复提醒窗口。 */
   repeatReminderWindow: RepeatReminderWindow;
+  /** 非展示元数据；导入幂等键等跨运行面状态保存在这里。 */
+  extra?: Record<string, unknown> | undefined;
 }
 
 export interface CustomCycleSubscription extends SubscriptionBase {
@@ -190,6 +224,8 @@ export interface AppSettings {
   defaultCurrency: string;
   /** 首选汇率来源；另一个远端来源仍作为兜底。 */
   exchangeRateProvider: ExchangeRateProvider;
+  /** 内置 Logo/Icon 来源配置；影响搜索候选和导入自动匹配。 */
+  builtInIconSources: BuiltInIconSourceSettings;
   
   // 预算
   /** 月度预算（用于统计页预算占比）。 */
@@ -202,6 +238,8 @@ export interface AppSettings {
   // 通知总开关
   /** 每天发送通知的本地墙上时间（格式 HH:mm，需结合 timezone 解释）。 */
   notificationTimeLocal: LocalTime;
+  /** 订阅选择“继承全局”时使用的提前提醒天数。 */
+  notificationReminderDays: number;
   /** 启用的通知渠道（可多选）。 */
   enabledChannels: NotificationChannel[];
   /** 第三方 API 测试号码（部分渠道测试用）。 */
@@ -269,68 +307,92 @@ export interface AppSettings {
 }
 
 export const CATEGORY_LABELS: Record<BuiltInCategory, LocalizedLabels> = {
-  productivity: labels('生产力', 'Productivity'),
-  entertainment: labels('娱乐', 'Entertainment'),
-  lifestyle: labels('生活', 'Lifestyle'),
-  finance: labels('理财', 'Finance'),
-  streaming: labels('影音流媒体', 'Streaming'),
-  music: labels('音乐', 'Music'),
-  gaming: labels('游戏', 'Gaming'),
-  utilities: labels('公用事业', 'Utilities'),
-  cloud_storage: labels('云存储', 'Cloud Storage'),
-  education: labels('教育', 'Education'),
-  health_fitness: labels('健康健身', 'Health & Fitness'),
-  food_dining: labels('餐饮', 'Food & Dining'),
-  shopping: labels('购物', 'Shopping'),
-  travel: labels('旅行出行', 'Travel'),
-  business: labels('商务', 'Business'),
-  communication: labels('通讯与邮件', 'Communication & Email'),
-  developer_tools: labels('开发工具', 'Developer Tools'),
-  design: labels('设计创意', 'Design'),
-  ai_tools: labels('AI 工具', 'AI Tools'),
-  security_vpn: labels('安全与 VPN', 'Security & VPN'),
-  hosting_domains: labels('域名与托管', 'Domains & Hosting'),
-  news_media: labels('新闻媒体', 'News & Media'),
-  other: labels('其他', 'Other'),
+  productivity: labelsFromCatalog("category.productivity"),
+  entertainment: labelsFromCatalog("category.entertainment"),
+  lifestyle: labelsFromCatalog("category.lifestyle"),
+  finance: labelsFromCatalog("category.finance"),
+  streaming: labelsFromCatalog("category.streaming"),
+  music: labelsFromCatalog("category.music"),
+  gaming: labelsFromCatalog("category.gaming"),
+  utilities: labelsFromCatalog("category.utilities"),
+  cloud_storage: labelsFromCatalog("category.cloudStorage"),
+  education: labelsFromCatalog("category.education"),
+  health_fitness: labelsFromCatalog("category.healthFitness"),
+  food_dining: labelsFromCatalog("category.foodDining"),
+  shopping: labelsFromCatalog("category.shopping"),
+  travel: labelsFromCatalog("category.travel"),
+  business: labelsFromCatalog("category.business"),
+  communication: labelsFromCatalog("category.communication"),
+  developer_tools: labelsFromCatalog("category.developerTools"),
+  design: labelsFromCatalog("category.design"),
+  ai_tools: labelsFromCatalog("category.aiTools"),
+  security_vpn: labelsFromCatalog("category.securityVpn"),
+  hosting_domains: labelsFromCatalog("category.hostingDomains"),
+  news_media: labelsFromCatalog("category.newsMedia"),
+  other: labelsFromCatalog("category.other"),
 };
 
 export const STATUS_LABELS: Record<SubscriptionStatus, LocalizedLabels> = {
-  trial: labels('试用中', 'Trial'),
-  active: labels('活跃', 'Active'),
-  expired: labels('已过期', 'Expired'),
-  paused: labels('已暂停', 'Paused'),
-  cancelled: labels('已取消', 'Cancelled'),
+  trial: labelsFromCatalog("status.trial"),
+  active: labelsFromCatalog("status.active"),
+  expired: labelsFromCatalog("status.expired"),
+  paused: labelsFromCatalog("status.paused"),
+  cancelled: labelsFromCatalog("status.cancelled"),
 };
 
 export const CYCLE_LABELS: Record<BillingCycle, LocalizedLabels> = {
-  weekly: labels('每周', 'Weekly'),
-  monthly: labels('每月', 'Monthly'),
-  quarterly: labels('每季', 'Quarterly'),
-  'semi-annual': labels('每半年', 'Semiannual'),
-  annual: labels('每年', 'Annual'),
-  custom: labels('自定义', 'Custom'),
+  weekly: labelsFromCatalog("cycle.weekly"),
+  monthly: labelsFromCatalog("cycle.monthly"),
+  quarterly: labelsFromCatalog("cycle.quarterly"),
+  'semi-annual': labelsFromCatalog("cycle.semiAnnual"),
+  annual: labelsFromCatalog("cycle.annual"),
+  custom: labelsFromCatalog("cycle.custom"),
+  'one-time': labelsFromCatalog("cycle.oneTime"),
 };
 
 export const CHANNEL_LABELS: Record<NotificationChannel, LocalizedLabels> = {
-  telegram: labels('Telegram', 'Telegram'),
-  notifyx: labels('Notifyx', 'Notifyx'),
-  webhook: labels('Webhook 通知', 'Webhook'),
-  wechat: labels('企业微信机器人', 'WeCom Bot'),
-  email: labels('邮件通知', 'Email'),
-  bark: labels('Bark', 'Bark'),
+  telegram: labelsFromCatalog("channel.telegram"),
+  notifyx: labelsFromCatalog("channel.notifyx"),
+  webhook: labelsFromCatalog("channel.webhook"),
+  wechat: labelsFromCatalog("channel.wechat"),
+  email: labelsFromCatalog("channel.email"),
+  bark: labelsFromCatalog("channel.bark"),
 };
 
 export const PAYMENT_METHOD_LABELS: Record<BuiltInPaymentMethod, LocalizedLabels> = {
-  alipay: labels('支付宝', 'Alipay'),
-  wechat: labels('微信支付', 'WeChat Pay'),
-  credit_card: labels('信用卡', 'Credit card'),
-  debit_card: labels('借记卡', 'Debit card'),
-  paypal: labels('PayPal', 'PayPal'),
-  apple_pay: labels('Apple Pay', 'Apple Pay'),
-  google_pay: labels('Google Pay', 'Google Pay'),
-  bank_transfer: labels('银行转账', 'Bank transfer'),
-  crypto: labels('加密货币', 'Crypto'),
-  other: labels('其他', 'Other'),
+  alipay: labelsFromCatalog("payment.alipay"),
+  wechat: labelsFromCatalog("payment.wechat"),
+  credit_card: labelsFromCatalog("payment.creditCard"),
+  debit_card: labelsFromCatalog("payment.debitCard"),
+  paypal: labelsFromCatalog("payment.paypal"),
+  apple_pay: labelsFromCatalog("payment.applePay"),
+  google_pay: labelsFromCatalog("payment.googlePay"),
+  bank_transfer: labelsFromCatalog("payment.bankTransfer"),
+  crypto: labelsFromCatalog("payment.crypto"),
+  direct_debit: labelsFromCatalog("payment.directDebit"),
+  money: labelsFromCatalog("payment.money"),
+  samsung_pay: labelsFromCatalog("payment.samsungPay"),
+  klarna: labelsFromCatalog("payment.klarna"),
+  amazon_pay: labelsFromCatalog("payment.amazonPay"),
+  sepa: labelsFromCatalog("payment.sepa"),
+  skrill: labelsFromCatalog("payment.skrill"),
+  sofort: labelsFromCatalog("payment.sofort"),
+  stripe: labelsFromCatalog("payment.stripe"),
+  affirm: labelsFromCatalog("payment.affirm"),
+  elo: labelsFromCatalog("payment.elo"),
+  facebook_pay: labelsFromCatalog("payment.facebookPay"),
+  giropay: labelsFromCatalog("payment.giropay"),
+  ideal: labelsFromCatalog("payment.ideal"),
+  union_pay: labelsFromCatalog("payment.unionPay"),
+  interac: labelsFromCatalog("payment.interac"),
+  paysafe: labelsFromCatalog("payment.paysafe"),
+  poli: labelsFromCatalog("payment.poli"),
+  qiwi: labelsFromCatalog("payment.qiwi"),
+  shop_pay: labelsFromCatalog("payment.shopPay"),
+  venmo: labelsFromCatalog("payment.venmo"),
+  verifone: labelsFromCatalog("payment.verifone"),
+  webmoney: labelsFromCatalog("payment.webmoney"),
+  other: labelsFromCatalog("payment.other"),
 };
 
 /** 货币选项所属地区（仅用于 UI 搜索关键词）。 */
@@ -356,7 +418,7 @@ export interface TimezoneOption {
 
 /** 提醒天数下拉选项（用于新增/编辑订阅）。 */
 export interface ReminderDaysOption {
-  /** 提前多少天提醒（整数）。 */
+  /** 提前多少天提醒；-1 表示继承设置页全局值。 */
   value: number;
   /** UI 展示文案。 */
   labels: LocalizedLabels;
@@ -401,64 +463,34 @@ export const TIMEZONE_OPTIONS = [
 ] as const satisfies readonly TimezoneOption[];
 
 export const REMINDER_DAYS_OPTIONS = [
-  { value: 1, labels: labels('提前 1 天', '1 day before') },
-  { value: 3, labels: labels('提前 3 天', '3 days before') },
-  { value: 7, labels: labels('提前 7 天', '7 days before') },
-  { value: 14, labels: labels('提前 14 天', '14 days before') },
-  { value: 30, labels: labels('提前 30 天', '30 days before') },
+  { value: 1, labels: labelsFromCatalog("reminder.days1") },
+  { value: 3, labels: labelsFromCatalog("reminder.days3") },
+  { value: 7, labels: labelsFromCatalog("reminder.days7") },
+  { value: 14, labels: labelsFromCatalog("reminder.days14") },
+  { value: 30, labels: labelsFromCatalog("reminder.days30") },
 ] as const satisfies readonly ReminderDaysOption[];
 
 export const REPEAT_REMINDER_INTERVAL_OPTIONS = [
-  { value: '1h', labels: labels('每 1 小时', 'Every 1 hour') },
-  { value: '3h', labels: labels('每 3 小时', 'Every 3 hours') },
-  { value: '6h', labels: labels('每 6 小时', 'Every 6 hours') },
-  { value: '12h', labels: labels('每 12 小时', 'Every 12 hours') },
-  { value: '24h', labels: labels('每 24 小时', 'Every 24 hours') },
+  { value: '1h', labels: labelsFromCatalog("repeat.interval1h") },
+  { value: '3h', labels: labelsFromCatalog("repeat.interval3h") },
+  { value: '6h', labels: labelsFromCatalog("repeat.interval6h") },
+  { value: '12h', labels: labelsFromCatalog("repeat.interval12h") },
+  { value: '24h', labels: labelsFromCatalog("repeat.interval24h") },
 ] as const satisfies readonly RepeatReminderIntervalOption[];
 
+export const REPEAT_REMINDER_SENTENCE_INTERVAL_LABELS: Record<RepeatReminderInterval, LocalizedLabels> = {
+  '1h': labelsFromCatalog("repeat.sentenceInterval1h"),
+  '3h': labelsFromCatalog("repeat.sentenceInterval3h"),
+  '6h': labelsFromCatalog("repeat.sentenceInterval6h"),
+  '12h': labelsFromCatalog("repeat.sentenceInterval12h"),
+  '24h': labelsFromCatalog("repeat.sentenceInterval24h"),
+};
+
 export const REPEAT_REMINDER_WINDOW_OPTIONS = [
-  { value: '24h', labels: labels('到期前 24 小时内', 'Within 24 hours before renewal') },
-  { value: '48h', labels: labels('到期前 48 小时内', 'Within 48 hours before renewal') },
-  { value: '72h', labels: labels('到期前 72 小时内', 'Within 72 hours before renewal') },
-  { value: 'full', labels: labels('从首次提醒后开始', 'After first reminder') },
+  { value: '24h', labels: labelsFromCatalog("repeat.window24h") },
+  { value: '48h', labels: labelsFromCatalog("repeat.window48h") },
+  { value: '72h', labels: labelsFromCatalog("repeat.window72h") },
+  { value: 'full', labels: labelsFromCatalog("repeat.windowFull") },
 ] as const satisfies readonly RepeatReminderWindowOption[];
 
-export const DEFAULT_SETTINGS: AppSettings = {
-  adminUsername: 'admin',
-  themeMode: 'dark',
-  themeVariant: 'emerald',
-  themeCustomColor: DEFAULT_CUSTOM_THEME_COLOR,
-  locale: getInitialLocale(),
-  showExpired: true,
-  defaultCurrency: 'CNY',
-  exchangeRateProvider: 'floatrates',
-  monthlyBudget: 1500,
-  timezone: 'UTC',
-  notificationTimeLocal: '08:00' as LocalTime,
-  enabledChannels: [],
-  testPhone: '',
-  telegramBotToken: '',
-  telegramChatId: '',
-  notifyxApiKey: '',
-  webhookUrl: '',
-  webhookMethod: 'POST',
-  webhookHeaders: '',
-  webhookPayload: '',
-  wechatWebhookUrl: '',
-  wechatMessageType: 'text',
-  wechatAddModeTag: false,
-  wechatAtPhones: '',
-  wechatAtAll: false,
-  smtpHost: '',
-  smtpPort: '',
-  smtpSecure: false,
-  smtpUser: '',
-  smtpPassword: '',
-  smtpFrom: '',
-  smtpReplyTo: '',
-  notifyMultipleAddresses: false,
-  recipientEmail: '',
-  barkServerUrl: 'https://api.day.app',
-  barkDeviceKey: '',
-  barkSilentPush: false,
-};
+export const DEFAULT_SETTINGS: AppSettings = createDefaultAppSettings({ locale: getInitialLocale() });

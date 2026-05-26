@@ -14,14 +14,19 @@ type SubscriptionOverrides = Partial<Omit<Subscription, "billingCycle" | "custom
 );
 
 const mocks = vi.hoisted(() => ({
+  rechartsCellProps: [] as Array<Record<string, unknown>>,
   rechartsLegendProps: [] as Array<Record<string, unknown>>,
   rechartsPieChartProps: [] as Array<Record<string, unknown>>,
   rechartsPieProps: [] as Array<Record<string, unknown>>,
+  rechartsResponsiveContainerProps: [] as Array<Record<string, unknown>>,
   rechartsTooltipProps: [] as Array<Record<string, unknown>>,
 }));
 
 vi.mock("recharts", () => ({
-  Cell: () => null,
+  Cell: (props: Record<string, unknown>) => {
+    mocks.rechartsCellProps.push(props);
+    return null;
+  },
   Legend: (props: Record<string, unknown>) => {
     mocks.rechartsLegendProps.push(props);
     return <div data-testid="recharts-legend" />;
@@ -34,7 +39,10 @@ vi.mock("recharts", () => ({
     mocks.rechartsPieChartProps.push(props);
     return <div>{children}</div>;
   },
-  ResponsiveContainer: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
+  ResponsiveContainer: ({ children, ...props }: { children?: ReactNode } & Record<string, unknown>) => {
+    mocks.rechartsResponsiveContainerProps.push(props);
+    return <div>{children}</div>;
+  },
   Tooltip: (props: Record<string, unknown>) => {
     mocks.rechartsTooltipProps.push(props);
     const renderContent = props["content"] as
@@ -113,9 +121,11 @@ function subscription(overrides: SubscriptionOverrides = {}): Subscription {
 
 describe("SpendingChart", () => {
   beforeEach(() => {
+    mocks.rechartsCellProps.length = 0;
     mocks.rechartsLegendProps.length = 0;
     mocks.rechartsPieChartProps.length = 0;
     mocks.rechartsPieProps.length = 0;
+    mocks.rechartsResponsiveContainerProps.length = 0;
     mocks.rechartsTooltipProps.length = 0;
   });
 
@@ -140,7 +150,10 @@ describe("SpendingChart", () => {
     expect(mocks.rechartsLegendProps).toHaveLength(0);
     expect(mocks.rechartsPieChartProps).toEqual([
       expect.objectContaining({
+        accessibilityLayer: true,
         margin: { top: 4, right: 4, bottom: 4, left: 4 },
+        tabIndex: 0,
+        title: "支出分布",
       }),
     ]);
     expect(mocks.rechartsPieProps).toEqual([
@@ -148,8 +161,34 @@ describe("SpendingChart", () => {
         cy: "50%",
         innerRadius: "56%",
         outerRadius: "90%",
+        rootTabIndex: -1,
       }),
     ]);
+    expect(mocks.rechartsCellProps.length).toBeGreaterThan(0);
+    for (const props of mocks.rechartsCellProps) {
+      expect(props["focusable"]).toBe(false);
+    }
     expect(within(screen.getByRole("list")).getByText("生产力")).toBeInTheDocument();
+  });
+
+  it("gives Recharts positive dimensions before ResizeObserver reports layout", () => {
+    render(<SpendingChart subscriptions={[subscription()]} />);
+
+    expect(screen.getByTestId("spending-chart-frame")).toHaveClass("recharts-frame");
+    expect(mocks.rechartsResponsiveContainerProps).toHaveLength(1);
+    const props = mocks.rechartsResponsiveContainerProps[0]!;
+    const initialDimension = props["initialDimension"] as { width: number; height: number };
+
+    expect(props).toEqual(
+      expect.objectContaining({
+        width: "100%",
+        height: 190,
+        minWidth: 0,
+        debounce: 50,
+      }),
+    );
+    expect(props["height"]).not.toBe("100%");
+    expect(initialDimension.width).toBeGreaterThan(0);
+    expect(initialDimension.height).toBe(190);
   });
 });

@@ -1,0 +1,48 @@
+name: Release Candidate
+
+# RC workflow 只负责在 release 分支上打候选 tag；实际镜像和 prerelease 由 release-publish 接管。
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Stable SemVer version without the leading v, for example 0.1.0."
+        required: true
+        type: string
+      rc:
+        description: "RC number, for example 1."
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout release branch
+        uses: actions/checkout@v6.0.2
+        with:
+          ref: release/v${{ inputs.version }}
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6.0.0
+        with:
+          node-version: 24
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Create RC tag
+        # RC tag 会触发 release-publish，但不会更新 latest，也不会进入 Cloudflare 生产部署。
+        run: |
+          VERSION="$(node scripts/release.mjs validate-version "${{ inputs.version }}-rc.${{ inputs.rc }}")"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "v${VERSION}" -m "Renewlet v${VERSION}"
+          git push origin "v${VERSION}"

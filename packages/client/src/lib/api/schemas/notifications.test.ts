@@ -132,4 +132,36 @@ describe("notification API schemas", () => {
 
     expect(notificationHistoryResponseSchema.safeParse(response).success).toBe(true);
   });
+
+  it("rejects inherited reminder sentinel values in notification history payloads", () => {
+    const response = {
+      ...normalizedSkippedHistoryResponse,
+      history: {
+        ...normalizedSkippedHistoryResponse.history,
+        jobs: [{
+          ...skippedJob,
+          result: {
+            ...skippedJob.result,
+            message: {
+              ...skippedJob.result.message,
+              hasPayload: true,
+              items: [{
+                type: "renewal",
+                subscriptionId: "sub-1",
+                name: "Critical SaaS",
+                price: 99,
+                currency: "USD",
+                status: "active",
+                targetDate: "2026-05-17",
+                reminderDays: -1,
+                daysUntil: 2,
+              }],
+            },
+          },
+        }],
+      },
+    };
+
+    expect(notificationHistoryResponseSchema.safeParse(response).success).toBe(false);
+  });
 });

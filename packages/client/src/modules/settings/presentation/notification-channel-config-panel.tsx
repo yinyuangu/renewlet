@@ -24,6 +24,15 @@ import { CheckboxSettingRow, LoadingButtonContent, type UpdateSetting } from './
 
 type Translate = (key: MessageKey, params?: Record<string, string | number>) => string;
 
+const NOTIFICATION_TEST_LABEL_KEYS: Record<NotificationChannel, MessageKey> = {
+  telegram: "settings.testChannel.telegram",
+  notifyx: "settings.testChannel.notifyx",
+  webhook: "settings.testChannel.webhook",
+  wechat: "settings.testChannel.wechat",
+  email: "settings.testChannel.email",
+  bark: "settings.testChannel.bark",
+};
+
 function NotificationTestButton({
   channel,
   label,
@@ -92,6 +101,7 @@ export function NotificationChannelConfigPanel({
   const { t, label } = useI18n();
   const help = getNotificationChannelHelp(channel, t);
   const channelLabel = label(CHANNEL_LABELS[channel]);
+  const testChannelLabel = t(NOTIFICATION_TEST_LABEL_KEYS[channel], { channel: channelLabel });
 
   return (
     <div className="rounded-lg border border-border bg-secondary/30 p-4">
@@ -142,7 +152,7 @@ export function NotificationChannelConfigPanel({
           <div className="mt-4 flex flex-col items-start gap-2 sm:items-end">
             <NotificationTestButton
               channel="telegram"
-              label={t("settings.testChannel", { channel: channelLabel })}
+              label={testChannelLabel}
               testingChannel={testingChannel}
               onTest={onTest}
             />
@@ -166,7 +176,7 @@ export function NotificationChannelConfigPanel({
           <div className="mt-4 flex justify-end">
             <NotificationTestButton
               channel="notifyx"
-              label={t("settings.testChannel", { channel: channelLabel })}
+              label={testChannelLabel}
               testingChannel={testingChannel}
               onTest={onTest}
             />
@@ -241,7 +251,7 @@ export function NotificationChannelConfigPanel({
           <div className="mt-4 flex justify-end">
             <NotificationTestButton
               channel="webhook"
-              label={t("settings.testChannel", { channel: channelLabel })}
+              label={testChannelLabel}
               testingChannel={testingChannel}
               onTest={onTest}
             />
@@ -318,7 +328,7 @@ export function NotificationChannelConfigPanel({
           <div className="mt-4 flex justify-end">
             <NotificationTestButton
               channel="wechat"
-              label={t("settings.testChannel", { channel: channelLabel })}
+              label={testChannelLabel}
               testingChannel={testingChannel}
               onTest={onTest}
             />
@@ -436,7 +446,7 @@ export function NotificationChannelConfigPanel({
           <div className="mt-4 flex justify-end">
             <NotificationTestButton
               channel="email"
-              label={t("settings.testChannel", { channel: channelLabel })}
+              label={testChannelLabel}
               testingChannel={testingChannel}
               onTest={onTest}
             />
@@ -482,7 +492,7 @@ export function NotificationChannelConfigPanel({
           <div className="mt-4 flex justify-end">
             <NotificationTestButton
               channel="bark"
-              label={t("settings.testChannel", { channel: channelLabel })}
+              label={testChannelLabel}
               testingChannel={testingChannel}
               onTest={onTest}
             />

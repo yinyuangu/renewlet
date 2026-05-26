@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -233,6 +233,25 @@ describe("SettingsScreen SMTP email settings", () => {
     expect(screen.queryByRole("spinbutton", { name: "月度预算金额" })).not.toBeInTheDocument();
   });
 
+  it("lets users edit the global notification reminder lead time", async () => {
+    const user = userEvent.setup();
+    const controller = createControllerState({
+      settings: { notificationReminderDays: 5 },
+    });
+    mocks.useSettingsFormController.mockReturnValue(controller);
+
+    renderSettingsScreen();
+
+    const input = screen.getByLabelText("默认提前提醒天数");
+    expect(input).toHaveValue("5");
+    expect(input).toHaveAttribute("inputmode", "numeric");
+
+    await user.clear(input);
+    await user.type(input, "14");
+
+    expect(controller.updateSetting).toHaveBeenLastCalledWith("notificationReminderDays", 14);
+  });
+
   it("uses H5 layout classes and native phone metadata for settings", () => {
     const { container } = renderSettingsScreen();
 
@@ -244,6 +263,60 @@ describe("SettingsScreen SMTP email settings", () => {
     expect(phoneInput).toHaveAttribute("inputmode", "tel");
     expect(phoneInput).toHaveAttribute("autocomplete", "tel");
     expect(phoneInput).toHaveAttribute("enterkeyhint", "done");
+  });
+
+  it("updates built-in icon source and variant settings without allowing all sources off", async () => {
+    const user = userEvent.setup();
+    const controller = createControllerState();
+    mocks.useSettingsFormController.mockReturnValue(controller);
+
+    renderSettingsScreen();
+
+    expect(screen.getByText("已启用 3 个来源 · 变体 3/3")).toBeInTheDocument();
+    expect(screen.getByText("TheSVG / selfh.st / Dashboard")).toBeInTheDocument();
+    expect(screen.queryByRole("switch", { name: "切换 selfh.st icons 来源" })).not.toBeInTheDocument();
+
+    const configureButton = screen.getByRole("button", { name: "配置" });
+    await user.click(configureButton);
+
+    const dialog = await screen.findByRole("dialog", { name: "配置内置图标来源" });
+    expect(within(dialog).getByText("选择 Logo 和自定义图标搜索可使用的内置 SVG 图标库，并控制是否展示上游变体。")).toBeInTheDocument();
+    expect(within(dialog).getByRole("switch", { name: "切换 TheSVG 来源" })).toBeEnabled();
+    expect(within(dialog).getByRole("switch", { name: "切换 selfh.st icons 来源" })).toBeEnabled();
+    expect(within(dialog).getByRole("switch", { name: "切换 Dashboard Icons 来源" })).toBeEnabled();
+
+    await user.click(within(dialog).getByRole("switch", { name: "切换 selfh.st icons 来源" }));
+    expect(controller.updateSetting).toHaveBeenLastCalledWith("builtInIconSources", {
+      ...DEFAULT_SETTINGS.builtInIconSources,
+      selfhst: { enabled: false, variantsEnabled: true },
+    });
+
+    await user.click(within(dialog).getByRole("switch", { name: "切换 Dashboard Icons 变体" }));
+    expect(controller.updateSetting).toHaveBeenLastCalledWith("builtInIconSources", {
+      ...DEFAULT_SETTINGS.builtInIconSources,
+      dashboardIcons: { enabled: true, variantsEnabled: false },
+    });
+
+    await user.click(within(dialog).getByRole("button", { name: "完成" }));
+    expect(screen.queryByRole("dialog", { name: "配置内置图标来源" })).not.toBeInTheDocument();
+    expect(configureButton).toHaveFocus();
+
+    mocks.useSettingsFormController.mockReturnValue(createControllerState({
+      settings: {
+        builtInIconSources: {
+          thesvg: { enabled: true, variantsEnabled: true },
+          selfhst: { enabled: false, variantsEnabled: true },
+          dashboardIcons: { enabled: false, variantsEnabled: true },
+        },
+      },
+    }));
+    cleanup();
+    renderSettingsScreen();
+
+    expect(screen.getByText("已启用 1 个来源 · 变体 1/3")).toBeInTheDocument();
+    expect(screen.getByText("TheSVG")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "配置" }));
+    expect(await screen.findByRole("switch", { name: "切换 TheSVG 来源" })).toBeDisabled();
   });
 
   it("uses test wording for the Notifyx channel button", () => {

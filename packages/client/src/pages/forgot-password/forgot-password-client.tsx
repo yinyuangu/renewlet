@@ -1,7 +1,7 @@
 /**
  * 忘记密码客户端表单。
  *
- * 架构位置：直接调用 PocketBase password reset API，页面入口只决定该功能是否可见。
+ * 架构位置：调用当前运行时的认证服务，页面入口只决定该功能是否可见。
  *
  * 注意： 发送失败可能来自 SMTP 未配置或网络问题，展示层只反馈通用错误，避免泄漏账号存在性。
  */
@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { RenewletLogo } from "@/components/icons/renewlet-logo";
 import { getDisplayErrorMessage } from "@/lib/display-error";
 import { toast } from "@/components/ui/sonner";
-import { pb } from "@/lib/pocketbase";
+import { authClient } from "@/lib/auth-client";
 import { useI18n } from "@/i18n/I18nProvider";
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -51,7 +51,7 @@ export function ForgotPasswordClient({ enabled }: ForgotPasswordClientProps) {
     setIsSubmitting(true);
     setEmailError("");
     try {
-      await pb.collection("users").requestPasswordReset(email.trim());
+      await authClient.requestPasswordReset(email.trim());
       setSubmitted(true);
       toast.success(t("passwordReset.mailHandled"));
     } catch (err: unknown) {

@@ -16,10 +16,11 @@ import type {
   RepeatReminderWindow,
   SubscriptionStatus,
 } from "@/types/subscription";
+import { effectiveReminderDays } from "@renewlet/shared/runtime";
 import { daysBetweenDateOnly, isValidDateOnly, todayDateOnlyInTimeZone, type DateOnly } from "@/lib/time/date-only";
 import { isValidTimeZone } from "@/lib/time/time-zone";
 import { normalizeLocale, type Locale } from "@/i18n/locales";
-import { translate } from "@/i18n/messages";
+import { translateStaticMessage, type MessageKey, type MessageParams } from "@/i18n/static-catalogs";
 
 /**
  * 生成通知内容（不负责发送）。
@@ -125,24 +126,37 @@ function formatAmount(amount: number): string {
   return fixed.replace(/\.00$/, "").replace(/(\.\d)0$/, "$1");
 }
 
+function repeatIntervalHours(interval: string): number {
+  const hours = Number.parseInt(interval, 10);
+  return Number.isFinite(hours) && hours > 0 ? hours : 0;
+}
+
+function translateNotification(locale: Locale, key: MessageKey, params: MessageParams = {}): string {
+  return translateStaticMessage(locale, key, params);
+}
+
 function formatItemLine(item: NotificationContentItem, locale: Locale): string {
   let extra: string;
   if (item.type === "trial") {
-    extra = translate(locale, "notification.content.trialBeforeDays", { days: item.reminderDays });
+    extra = translateNotification(locale, "notification.content.trialBeforeDays", { days: item.reminderDays });
   } else if (item.type === "expired") {
-    extra = translate(locale, "notification.content.expiredStatus");
+    extra = translateNotification(locale, "notification.content.expiredStatus");
   } else {
-    extra = translate(locale, "notification.content.beforeDays", { days: item.reminderDays });
+    extra = translateNotification(locale, "notification.content.beforeDays", { days: item.reminderDays });
   }
   if (item.repeatReminder) {
-    extra += locale === "en-US"
-      ? `; ${translate(locale, "notification.content.repeatEvery", { interval: item.repeatReminder.interval })}`
-      : `；${translate(locale, "notification.content.repeatEvery", { interval: item.repeatReminder.interval })}`;
+    const repeat = translateNotification(locale, "notification.content.repeatEvery", {
+      hours: repeatIntervalHours(item.repeatReminder.interval),
+    });
+    extra = translateNotification(locale, "notification.content.extraWithRepeat", { extra, repeat });
   }
-  if (locale === "en-US") {
-    return `- ${item.name}: ${item.targetDate}, ${formatAmount(item.price)} ${item.currency} (${extra})`;
-  }
-  return `- ${item.name}：${item.targetDate}，${formatAmount(item.price)} ${item.currency}（${extra}）`;
+  return translateNotification(locale, "notification.content.itemLine", {
+    name: item.name,
+    date: item.targetDate,
+    amount: formatAmount(item.price),
+    currency: item.currency,
+    extra,
+  });
 }
 
 function buildNotificationContentFromItems(
@@ -157,17 +171,17 @@ function buildNotificationContentFromItems(
   const expired = items.filter((item) => item.type === "expired").map((item) => formatItemLine(item, locale));
 
   const blocks: string[] = [];
-  if (renewals.length > 0) blocks.push([translate(locale, "notification.content.renewalBlock"), ...renewals].join("\n"));
-  if (trials.length > 0) blocks.push([translate(locale, "notification.content.trialBlock"), ...trials].join("\n"));
-  if (expired.length > 0) blocks.push([translate(locale, "notification.content.expiredBlock"), ...expired].join("\n"));
+  if (renewals.length > 0) blocks.push([translateNotification(locale, "notification.content.renewalBlock"), ...renewals].join("\n"));
+  if (trials.length > 0) blocks.push([translateNotification(locale, "notification.content.trialBlock"), ...trials].join("\n"));
+  if (expired.length > 0) blocks.push([translateNotification(locale, "notification.content.expiredBlock"), ...expired].join("\n"));
 
   const hasPayload = blocks.length > 0;
   const content = hasPayload
     ? blocks.join("\n\n")
-    : translate(locale, "notification.content.empty");
+    : translateNotification(locale, "notification.content.empty");
 
   return {
-    title: translate(locale, "notification.content.title"),
+    title: translateNotification(locale, "notification.content.title"),
     content,
     timestamp: formatNotificationDisplayTime(now, timeZone, locale),
     items,
@@ -178,8 +192,8 @@ function buildNotificationContentFromItems(
 /** 构造固定测试通知，用于验证单个渠道配置。 */
 export function buildTestNotification(now: Date, timeZone: string, locale: Locale = "zh-CN"): NotificationContent {
   return {
-    title: translate(locale, "notification.content.testTitle"),
-    content: translate(locale, "notification.content.testBody"),
+    title: translateNotification(locale, "notification.content.testTitle"),
+    content: translateNotification(locale, "notification.content.testBody"),
     timestamp: formatNotificationDisplayTime(now, timeZone, locale),
     items: [],
     hasPayload: true,
@@ -202,6 +216,8 @@ export function collectNotificationItemsForLocalDate(
 
   for (const sub of subscriptions) {
     if (!isValidDateOnly(sub.nextBillingDate)) continue;
+    // -1 只在订阅存储和表单里表示继承；通知预览/历史 payload 必须保存用户可解释的有效天数。
+    const reminderDays = effectiveReminderDays(sub.reminderDays, settings.notificationReminderDays);
     const daysUntilNext = daysBetweenDateOnly(localDate, sub.nextBillingDate);
 
     if (daysUntilNext < 0) {
@@ -215,11 +231,11 @@ export function collectNotificationItemsForLocalDate(
           currency: sub.currency,
           status: sub.status,
           targetDate: sub.nextBillingDate,
-          reminderDays: sub.reminderDays,
+          reminderDays,
           daysUntil: daysUntilNext,
         });
       }
-    } else if (daysUntilNext === sub.reminderDays) {
+    } else if (daysUntilNext === reminderDays) {
       items.push({
         type: "renewal",
         subscriptionId: sub.id,
@@ -228,7 +244,7 @@ export function collectNotificationItemsForLocalDate(
         currency: sub.currency,
         status: sub.status,
         targetDate: sub.nextBillingDate,
-        reminderDays: sub.reminderDays,
+        reminderDays,
         daysUntil: daysUntilNext,
       });
     }
@@ -236,7 +252,7 @@ export function collectNotificationItemsForLocalDate(
     if (sub.status === "trial" && sub.trialEndDate) {
       if (!isValidDateOnly(sub.trialEndDate)) continue;
       const daysUntilTrialEnd = daysBetweenDateOnly(localDate, sub.trialEndDate);
-      if (daysUntilTrialEnd === sub.reminderDays) {
+      if (daysUntilTrialEnd === reminderDays) {
         items.push({
           type: "trial",
           subscriptionId: sub.id,
@@ -245,7 +261,7 @@ export function collectNotificationItemsForLocalDate(
           currency: sub.currency,
           status: sub.status,
           targetDate: sub.trialEndDate,
-          reminderDays: sub.reminderDays,
+          reminderDays,
           daysUntil: daysUntilTrialEnd,
         });
       }

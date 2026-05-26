@@ -1,9 +1,12 @@
 import type { MouseEventHandler } from "react";
 import { Check } from "lucide-react";
 import { FaviconResultImage } from "@/components/favicon-result-image";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { cn } from "@/lib/utils";
 
 type MediaThumbnailSize = "sm" | "md";
+const MEDIA_THUMBNAIL_TOOLTIP_QUERY = "(hover: hover) and (pointer: fine) and (min-width: 768px)";
 
 interface MediaThumbnailButtonProps {
   src: string;
@@ -13,7 +16,12 @@ interface MediaThumbnailButtonProps {
   className?: string | undefined;
   onError?: (() => void) | undefined;
   size?: MediaThumbnailSize | undefined;
-  title?: string | undefined;
+  tooltip?: string | undefined;
+}
+
+export function useMediaThumbnailTooltipEnabled() {
+  // 缩略图候选常在 H5 sheet 的滚动区里；窄屏/触控不挂 Tooltip，避免长按、悬浮和拖动滚动抢同一套指针事件。
+  return useMediaQuery(MEDIA_THUMBNAIL_TOOLTIP_QUERY);
 }
 
 export function MediaThumbnailButton({
@@ -24,14 +32,14 @@ export function MediaThumbnailButton({
   className,
   onError,
   size = "md",
-  title,
+  tooltip,
 }: MediaThumbnailButtonProps) {
   const isSmall = size === "sm";
+  const tooltipEnabled = useMediaThumbnailTooltipEnabled();
 
-  return (
+  const button = (
     <button
       type="button"
-      title={title ?? alt}
       aria-label={alt}
       aria-pressed={selected}
       onClick={onClick}
@@ -61,5 +69,20 @@ export function MediaThumbnailButton({
         </span>
       )}
     </button>
+  );
+
+  if (!tooltip || !tooltipEnabled) return button;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{button}</TooltipTrigger>
+      <TooltipContent
+        side="top"
+        align="center"
+        className="max-w-[calc(100vw-2rem)] whitespace-normal break-words text-xs leading-relaxed sm:max-w-md"
+      >
+        {tooltip}
+      </TooltipContent>
+    </Tooltip>
   );
 }

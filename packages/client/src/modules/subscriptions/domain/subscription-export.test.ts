@@ -14,29 +14,7 @@ describe("subscription-export", () => {
   });
 
   it("uses configured labels when building CSV rows", () => {
-    const subscription: Subscription = {
-      id: "sub-1",
-      name: "=Formula",
-      logo: undefined,
-      price: 10,
-      currency: "USD",
-      billingCycle: "monthly",
-      customDays: undefined,
-      category: "productivity",
-      status: "active",
-      paymentMethod: undefined,
-      startDate: assertDateOnly("2026-01-01"),
-      nextBillingDate: assertDateOnly("2026-02-01"),
-      autoCalculateNextBillingDate: true,
-      trialEndDate: undefined,
-      website: undefined,
-      notes: undefined,
-      reminderDays: 3,
-      repeatReminderEnabled: false,
-      repeatReminderInterval: "1h",
-      repeatReminderWindow: "72h",
-      tags: ["SaaS", "Work"],
-    };
+    const subscription: Subscription = makeSubscription();
 
     const csv = buildSubscriptionsCsv([subscription], {
       categoryLabelByValue: new Map([["productivity", "生产力"]]),
@@ -50,4 +28,43 @@ describe("subscription-export", () => {
     expect(csv).toContain('"活跃"');
     expect(csv).toContain('"SaaS;Work"');
   });
+
+  it("renders inherited reminder days as a user-facing CSV label", () => {
+    const csv = buildSubscriptionsCsv([makeSubscription({ reminderDays: -1 })], {
+      categoryLabelByValue: new Map([["productivity", "生产力"]]),
+      statusLabelByValue: new Map([["active", "活跃"]]),
+      locale: "zh-CN",
+      today: assertDateOnly("2026-01-01"),
+    });
+
+    expect(csv).toContain('"默认值从设置中获取"');
+    expect(csv).not.toContain('"-1"');
+  });
 });
+
+function makeSubscription(overrides: Partial<Subscription> = {}): Subscription {
+  return {
+    id: "sub-1",
+    name: "=Formula",
+    logo: undefined,
+    price: 10,
+    currency: "USD",
+    billingCycle: "monthly",
+    customDays: undefined,
+    category: "productivity",
+    status: "active",
+    paymentMethod: undefined,
+    startDate: assertDateOnly("2026-01-01"),
+    nextBillingDate: assertDateOnly("2026-02-01"),
+    autoCalculateNextBillingDate: true,
+    trialEndDate: undefined,
+    website: undefined,
+    notes: undefined,
+    reminderDays: 3,
+    repeatReminderEnabled: false,
+    repeatReminderInterval: "1h",
+    repeatReminderWindow: "72h",
+    tags: ["SaaS", "Work"],
+    ...overrides,
+  } as Subscription;
+}

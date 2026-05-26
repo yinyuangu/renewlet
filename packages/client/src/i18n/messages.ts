@@ -1,59 +1,98 @@
 /**
- * i18n 文案聚合入口。
+ * Lingui catalog 入口。
  *
- * 架构位置：业务分片位于 `./messages/*`，本文件只组合 zh/en map 并提供 translate，
- * 避免调用方感知拆分后的文件结构。
- *
- * 注意： 不要在这里新增具体文案；新增 key 应放入对应领域分片并保持双语对齐。
+ * 架构位置：本文件是前端唯一翻译引擎边界，业务代码继续通过 `t/translate`
+ * 读取文案，但底层不再维护自研函数 map。
  */
+import { setupI18n, type I18n, type Messages } from "@lingui/core";
 import type { Locale } from "@/i18n/locales";
-import type { MessageValue } from "./messages/types";
-import { zhCN as commonZhCN, enUS as commonEnUS } from "./messages/common";
-import { zhCN as legalZhCN, enUS as legalEnUS } from "./messages/legal";
-import { zhCN as customConfigZhCN, enUS as customConfigEnUS } from "./messages/custom-config";
-import { zhCN as subscriptionZhCN, enUS as subscriptionEnUS } from "./messages/subscription";
-import { zhCN as authZhCN, enUS as authEnUS } from "./messages/auth";
-import { zhCN as settingsZhCN, enUS as settingsEnUS } from "./messages/settings";
-import { zhCN as notificationZhCN, enUS as notificationEnUS } from "./messages/notification";
-import { zhCN as labelsZhCN, enUS as labelsEnUS } from "./messages/labels";
-import { zhCN as adminZhCN, enUS as adminEnUS } from "./messages/admin";
-import { zhCN as errorZhCN, enUS as errorEnUS } from "./messages/error";
+import { DEFAULT_LOCALE } from "@/i18n/locales";
+import {
+  getStaticCatalog,
+  STATIC_CATALOGS,
+  translateStaticMessage,
+  type MessageKey,
+  type MessageParams,
+} from "@/i18n/static-catalogs";
 
-const zhCN = {
-  ...commonZhCN,
-  ...legalZhCN,
-  ...customConfigZhCN,
-  ...subscriptionZhCN,
-  ...authZhCN,
-  ...settingsZhCN,
-  ...notificationZhCN,
-  ...labelsZhCN,
-  ...adminZhCN,
-  ...errorZhCN,
-} satisfies Record<string, MessageValue>;
+export type { MessageKey, MessageParams } from "@/i18n/static-catalogs";
 
-const enUS = {
-  ...commonEnUS,
-  ...legalEnUS,
-  ...customConfigEnUS,
-  ...subscriptionEnUS,
-  ...authEnUS,
-  ...settingsEnUS,
-  ...notificationEnUS,
-  ...labelsEnUS,
-  ...adminEnUS,
-  ...errorEnUS,
-} satisfies Record<keyof typeof zhCN, MessageValue>;
-
-export type MessageKey = keyof typeof zhCN;
-
-const MESSAGES: Record<Locale, Record<MessageKey, MessageValue>> = {
-  "zh-CN": zhCN,
-  "en-US": enUS,
+type CatalogModule = {
+  messages: Messages;
 };
 
-export function translate(locale: Locale, key: MessageKey, params: Record<string, string | number> = {}): string {
-  const value = MESSAGES[locale][key];
-  if (typeof value === "function") return value(params);
-  return value;
+type DomainCatalogModules = Record<string, CatalogModule>;
+
+function mergeDomainCatalogs(modules: DomainCatalogModules): Messages {
+  const messages: Messages = {};
+  for (const module of Object.values(modules)) {
+    for (const [key, value] of Object.entries(module.messages)) {
+      messages[key] = value;
+    }
+  }
+  return messages;
+}
+
+const zhCNCatalogs = import.meta.glob<CatalogModule>("./catalogs/zh-CN/*.po", {
+  eager: true,
+});
+const enUSCatalogs = import.meta.glob<CatalogModule>("./catalogs/en-US/*.po", {
+  eager: true,
+});
+
+const catalogLoaders = {
+  "zh-CN": async () => ({ messages: mergeDomainCatalogs(zhCNCatalogs) }),
+  "en-US": async () => ({ messages: mergeDomainCatalogs(enUSCatalogs) }),
+} satisfies Record<Locale, () => Promise<CatalogModule>>;
+
+const defaultMessages = getStaticCatalog(DEFAULT_LOCALE);
+const loadedCatalogs = new Map<Locale, Messages>([[DEFAULT_LOCALE, defaultMessages]]);
+const localeI18nCache = new Map<Locale, I18n>();
+
+function createMissingHandler(locale: string, id: string) {
+  if (import.meta.env.DEV) {
+    console.warn(`[i18n] missing message "${id}" for ${locale}`);
+  }
+  return id;
+}
+
+function createLocaleI18n(locale: Locale, messages: Messages) {
+  return setupI18n({
+    locale,
+    messages: { [locale]: messages },
+    missing: createMissingHandler,
+  });
+}
+
+localeI18nCache.set(DEFAULT_LOCALE, createLocaleI18n(DEFAULT_LOCALE, defaultMessages));
+
+export const linguiI18n = setupI18n({
+  locale: DEFAULT_LOCALE,
+  messages: { [DEFAULT_LOCALE]: defaultMessages },
+  missing: createMissingHandler,
+});
+
+export function isLocaleCatalogLoaded(locale: Locale) {
+  return loadedCatalogs.has(locale);
+}
+
+export async function loadLocaleCatalog(locale: Locale): Promise<Messages> {
+  const loaded = loadedCatalogs.get(locale);
+  if (loaded) return loaded;
+  // 生产构建必须消费 Vite Lingui 插件预编译后的 `.po` catalog；不要恢复 raw TS catalog 或 runtime compiler。
+  const module = await catalogLoaders[locale]();
+  loadedCatalogs.set(locale, module.messages);
+  localeI18nCache.set(locale, createLocaleI18n(locale, module.messages));
+  return module.messages;
+}
+
+export async function activateLinguiLocale(locale: Locale) {
+  const messages = await loadLocaleCatalog(locale);
+  // 只激活当前 UI locale；同步 translate 使用独立实例，避免后台格式化偷偷切换全局 React 语言。
+  linguiI18n.loadAndActivate({ locale, messages });
+}
+
+export function translate(locale: Locale, key: MessageKey, params: MessageParams = {}): string {
+  const instance = localeI18nCache.get(locale);
+  return instance ? instance._(key, params) : translateStaticMessage(locale, key, params);
 }

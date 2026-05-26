@@ -13,6 +13,7 @@
   <img alt="React" src="https://img.shields.io/badge/React-19-149eca?style=flat-square">
   <img alt="Go and PocketBase" src="https://img.shields.io/badge/Go%20%2B%20PocketBase-00a884?style=flat-square">
   <img alt="Docker" src="https://img.shields.io/badge/Docker-ready-2496ed?style=flat-square">
+  <img alt="Cloudflare Workers" src="https://img.shields.io/badge/Cloudflare%20Workers-ready-f38020?style=flat-square">
   <img alt="Mobile web ready" src="https://img.shields.io/badge/mobile%20web-ready-2563eb?style=flat-square">
   <img alt="Memory 20-30MiB" src="https://img.shields.io/badge/memory-20--30MiB-10b981?style=flat-square">
   <img alt="MIT License" src="https://img.shields.io/badge/license-MIT-111827?style=flat-square">
@@ -37,8 +38,15 @@ Idle memory usage is around 20-30MiB in local testing, making it comfortable for
 - Handle multiple currencies: choose Exchange API or FloatRates JSON Feeds, with fallback rates when remote providers are unavailable.
 - Customize your lists: categories, payment methods, and currencies can be adjusted in settings, with built-in icons for common payment methods.
 - Self-host one container: React frontend, Go/PocketBase backend, SQLite data, and static assets run together, with data persisted to `data/`.
+- Deploy to Cloudflare Workers: React static assets, Worker API, D1, R2, and Cron Triggers can run without the Go/PocketBase server.
 - Mobile-web friendly: bottom navigation, subscription cards, tag-filter drawers, and settings screens are adapted for small screens.
 - Switch languages in the app: Simplified Chinese and English are supported.
+
+## Cloudflare Workers Deploy
+
+<a href="https://deploy.workers.cloudflare.com/?url=https://github.com/zhiyingzzhou/renewlet"><img src="https://deploy.workers.cloudflare.com/button" alt="Deploy to Cloudflare"></a>
+
+[Cloudflare Workers Deploy](docs/cloudflare-workers-deploy.md)
 
 ## Quick Deploy
 
@@ -64,12 +72,15 @@ If Docker Hub is unavailable, switch the image in `.env` to GHCR:
 RENEWLET_IMAGE="ghcr.io/zhiyingzzhou/renewlet:latest"
 ```
 
-Then pull and restart:
+Then pin a released version when you use Renewlet in production, pull, and restart:
 
 ```bash
+sed -i.bak 's#RENEWLET_IMAGE=.*#RENEWLET_IMAGE="ghcr.io/zhiyingzzhou/renewlet:0.1.0"#' .env
 docker compose pull
 docker compose up -d
 ```
+
+`latest` only moves on stable GitHub Releases. For production, prefer a concrete version tag such as `0.1.0`; release candidates use tags like `0.1.0-rc.1` and never update `latest`.
 
 ### Upgrade
 
@@ -79,9 +90,10 @@ Back up data and config before upgrading:
 tar -czf renewlet-backup-$(date +%F).tgz .env docker-compose.yml data
 ```
 
-Upgrade to the latest image:
+Upgrade to a specific stable image:
 
 ```bash
+sed -i.bak 's#RENEWLET_IMAGE=.*#RENEWLET_IMAGE="zhiyingzzhou/renewlet:0.1.0"#' .env
 docker compose pull
 docker compose up -d
 docker compose logs -f
@@ -107,13 +119,21 @@ Common settings live in `.env`:
 | Variable | Purpose |
 | --- | --- |
 | `PORT` | Public port, `3000` by default. |
-| `APP_URL` | Public app URL used for links in emails and notifications. |
 | `RENEWLET_IMAGE` | Docker image, `zhiyingzzhou/renewlet:latest` by default. |
 | `TZ` | Container time zone, mainly for logs; reminders use each user's time zone. |
 | `PB_ENCRYPTION_KEY` | Encryption key for sensitive PocketBase settings. Do not rotate it casually after deployment. |
 | `CRON_SECRET` | Bearer secret for external Cron calls to `/api/cron/notifications`. |
 | `NOTIFICATION_SCHEDULER_ENABLED` | Enables the built-in notification scheduler. Defaults to `true`. |
-| `SMTP_HOST` / `SMTP_FROM` | Enables PocketBase password-reset email when configured. |
+
+The full Docker environment template is in `.env.example`.
+
+## Releases
+
+Renewlet publishes stable versions from GitHub tags such as `v0.1.0`. Each stable release includes Docker Hub and GHCR images plus a `renewlet-docker-vX.Y.Z.zip` deployment package. Release candidates are published as prereleases with `rc` Docker tags and are meant for validation before a stable release.
+
+Development happens on `dev`; `main` represents the latest stable release. Release and hotfix work use `release/vX.Y.Z` and `hotfix/vX.Y.Z` branches. Pull requests and commits should follow Conventional Commits, for example `feat: add notification channel` or `fix: prevent duplicate reminders`.
+
+See [Release Process](docs/release-process.md) for the full workflow.
 
 ## Screenshots
 

@@ -10,8 +10,9 @@
  * PERF： Recharts tooltip payload 来自第三方库，保持 unknown 入口并做窄化，避免为了图表库内部结构扩宽全局类型。
  */
 
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import { PieChart, Pie, Cell, Tooltip } from 'recharts';
 import type { Subscription } from '@/types/subscription';
+import { RechartsFrame } from '@/components/recharts-frame';
 import { toMonthlyAmount } from '@/lib/subscription-billing';
 import { useExchangeRates } from '@/hooks/use-exchange-rates';
 import { useSettings } from '@/hooks/use-settings';
@@ -37,6 +38,7 @@ const FALLBACK_COLORS = [
   'hsl(45 90% 50%)',
   'hsl(320 70% 55%)',
 ];
+const SPENDING_CHART_HEIGHT = 190;
 
 function fallbackColorAt(index: number): string {
   return FALLBACK_COLORS[index % FALLBACK_COLORS.length] ?? 'hsl(160 84% 45%)';
@@ -134,42 +136,47 @@ export function SpendingChart({ subscriptions }: SpendingChartProps) {
   }
 
   return (
-    <div className="grid gap-2">
-      <div className="h-[190px] w-full">
-        <ResponsiveContainer width="100%" height="100%" debounce={50}>
-          <PieChart margin={{ top: 4, right: 4, bottom: 4, left: 4 }}>
-            <Pie
-              data={data}
-              cx="50%"
-              cy="50%"
-              innerRadius="56%"
-              outerRadius="90%"
-              paddingAngle={4}
-              cornerRadius={4}
-              dataKey="value"
-              strokeWidth={0}
-              // Recharts 饼图默认会做 SVG 动画，在部分设备上会导致首次渲染掉帧/卡顿；
-              // 这里关闭“入场动画”，保持视觉样式不变，但显著降低初始化开销。
-              isAnimationActive={false}
-            >
-              {data.map((entry, index) => (
-                <Cell
-                  key={`cell-${index}`}
-                  fill={entry.color}
-                  className="transition-all duration-300 hover:opacity-80"
-                />
-              ))}
-            </Pie>
-            <Tooltip
-              content={(props: unknown) => <CustomTooltip {...readChartTooltipProps(props)} />}
-              isAnimationActive={false}
-              offset={12}
-              allowEscapeViewBox={{ x: true, y: true }}
-              wrapperStyle={{ pointerEvents: "none" }}
-            />
-          </PieChart>
-        </ResponsiveContainer>
-      </div>
+    <div className="grid min-w-0 gap-2">
+      <RechartsFrame height={SPENDING_CHART_HEIGHT} testId="spending-chart-frame">
+        <PieChart
+          accessibilityLayer
+          margin={{ top: 4, right: 4, bottom: 4, left: 4 }}
+          tabIndex={0}
+          title={t("dashboard.spendingDistribution")}
+        >
+          <Pie
+            data={data}
+            cx="50%"
+            cy="50%"
+            innerRadius="56%"
+            outerRadius="90%"
+            paddingAngle={4}
+            cornerRadius={4}
+            dataKey="value"
+            rootTabIndex={-1}
+            strokeWidth={0}
+            // Recharts 饼图默认会做 SVG 动画，在部分设备上会导致首次渲染掉帧/卡顿；
+            // 这里关闭“入场动画”，保持视觉样式不变，但显著降低初始化开销。
+            isAnimationActive={false}
+          >
+            {data.map((entry, index) => (
+              <Cell
+                key={`cell-${index}`}
+                fill={entry.color}
+                focusable={false}
+                className="transition-all duration-300 hover:opacity-80"
+              />
+            ))}
+          </Pie>
+          <Tooltip
+            content={(props: unknown) => <CustomTooltip {...readChartTooltipProps(props)} />}
+            isAnimationActive={false}
+            offset={12}
+            allowEscapeViewBox={{ x: true, y: true }}
+            wrapperStyle={{ pointerEvents: "none" }}
+          />
+        </PieChart>
+      </RechartsFrame>
       <div className="flex flex-wrap justify-center gap-x-4 gap-y-2" role="list">
         {data.map((entry) => (
           <div key={entry.name} className="flex min-w-0 items-center gap-2" role="listitem">

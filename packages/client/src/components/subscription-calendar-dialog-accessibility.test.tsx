@@ -32,7 +32,7 @@ vi.mock("@/hooks/use-exchange-rates", () => ({
 
 vi.mock("@/hooks/use-settings", () => ({
   useSettings: () => ({
-    data: { defaultCurrency: "USD" },
+    data: { defaultCurrency: "USD", notificationReminderDays: 5 },
   }),
 }));
 
@@ -175,6 +175,17 @@ describe("SubscriptionCalendar dialogs", () => {
     expect(initials).toHaveClass("subscription-logo-fallback");
     expect(logoTile).not.toBeNull();
     expect(logoTile).toHaveClass("subscription-logo-tile");
+  });
+
+  it("renders inherited reminder days in the detail dialog", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-14T12:00:00Z"));
+
+    renderCalendar([subscription({ reminderDays: -1 })]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Aws" }));
+
+    expect(screen.getByText("默认提醒：提前 5 天")).toBeInTheDocument();
   });
 
   it("describes the day subscription list dialog", async () => {

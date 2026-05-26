@@ -1,13 +1,15 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import type { ReactNode } from "react";
+import { render as renderComponent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { IMAGE_UPLOAD_ACCEPT } from "@/lib/upload-constraints";
 import { LogoPicker } from "./logo-picker";
 
 type ApiFetchMock = (
   url: string,
   responseSchema: unknown,
-  init?: { signal?: AbortSignal },
+  init?: RequestInit & { signal?: AbortSignal },
 ) => Promise<unknown>;
 
 type UploadedLogoAssetFixture = {
@@ -85,10 +87,60 @@ vi.mock("@/components/image-crop-dialog", () => ({
   ImageCropDialog: () => null,
 }));
 
-function expectApiFetchCallWithSignal(urlPart: string) {
-  const call = mocks.apiFetch.mock.calls.find(([url]) => url.includes(urlPart));
-  expect(call?.[0]).toContain(urlPart);
+function expectMediaCandidateRequest(name: string) {
+  const call = mocks.apiFetch.mock.calls.find(([url]) => url === "/api/app/media/candidates");
+  expect(call?.[0]).toBe("/api/app/media/candidates");
+  expect(JSON.parse(String(call?.[2]?.body))).toMatchObject({
+    kind: "logo",
+    mode: "search",
+    items: [{ id: "search", name }],
+  });
   expect(call?.[2]?.signal).toBeInstanceOf(AbortSignal);
+}
+
+function render(ui: ReactNode) {
+  const result = renderComponent(<TooltipProvider delayDuration={0}>{ui}</TooltipProvider>);
+  return {
+    ...result,
+    rerender: (nextUi: ReactNode) => result.rerender(<TooltipProvider delayDuration={0}>{nextUi}</TooltipProvider>),
+  };
+}
+
+const netflixCandidate = {
+  id: "builtin:thesvg:netflix:default",
+  kind: "logo",
+  source: "builtIn",
+  provider: "thesvg",
+  label: "Netflix",
+  variant: "default",
+  url: "https://testingcf.jsdelivr.net/gh/glincker/thesvg@main/public/icons/netflix/default.svg",
+  confidence: "exact",
+  autoAssignable: true,
+  matchedQuery: "netflix",
+  rank: 0,
+};
+
+const netflixLabel = "Netflix - TheSVG / Default";
+const linearLabel = "Linear - TheSVG / Default";
+const googleDefaultLabel = "Google - TheSVG / Default";
+const googleWordmarkLabel = "Google - TheSVG / Wordmark";
+const desktopTooltipQuery = "(hover: hover) and (pointer: fine) and (min-width: 768px)";
+
+function mockMatchMedia(matchesByQuery: Record<string, boolean> = {}) {
+  Object.defineProperty(window, "matchMedia", {
+    configurable: true,
+    writable: true,
+    value: vi.fn().mockImplementation((query: string) => ({
+      matches: matchesByQuery[query] ?? false,
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  });
 }
 
 describe("LogoPicker", () => {
@@ -109,22 +161,23 @@ describe("LogoPicker", () => {
     };
     vi.spyOn(console, "debug").mockImplementation(() => undefined);
     mocks.apiFetch.mockImplementation((url: string) => {
-      if (url.startsWith("/api/app/thesvg-icons")) {
+      if (url === "/api/app/media/candidates") {
         return Promise.resolve({
-          icons: [
-            {
-              slug: "netflix",
-              title: "Netflix",
-              iconUrl: "https://testingcf.jsdelivr.net/gh/glincker/thesvg@main/public/icons/netflix/default.svg",
-              aliases: [],
-              categories: ["Entertainment"],
+          items: [{
+            id: "search",
+            autoCandidate: null,
+            candidates: {
+              best: netflixCandidate,
+              builtIn: [netflixCandidate],
+              favicon: [],
             },
-          ],
+          }],
         });
       }
 
-      return Promise.resolve({ imageUrls: [], kind: "logo" });
+      return Promise.resolve({});
     });
+    mockMatchMedia({ [desktopTooltipQuery]: true });
   });
 
   it("searches and selects a built-in theSVG logo from the unified Logo search", async () => {
@@ -136,13 +189,16 @@ describe("LogoPicker", () => {
     await user.click(screen.getByRole("button", { name: "搜索" }));
 
     await waitFor(() => {
-      expectApiFetchCallWithSignal("/api/app/thesvg-icons?search=Netflix");
+      expectMediaCandidateRequest("Netflix");
     });
 
     expect(await screen.findByText("内置图标：")).toBeInTheDocument();
-    const netflixButton = await screen.findByTitle("Netflix");
+    const netflixButton = await screen.findByRole("button", { name: netflixLabel });
     expect(netflixButton).toHaveClass("media-thumbnail-canvas");
-    expect(await screen.findByAltText("Netflix")).toHaveClass("media-thumbnail-image");
+    expect(netflixButton).not.toHaveAttribute("title");
+    expect(await screen.findByAltText(netflixLabel)).toHaveClass("media-thumbnail-image");
+    await user.hover(netflixButton);
+    expect(await screen.findByRole("tooltip")).toHaveTextContent(netflixLabel);
     await user.click(netflixButton);
 
     expect(onChange).toHaveBeenCalledWith(
@@ -154,43 +210,53 @@ describe("LogoPicker", () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     mocks.apiFetch.mockImplementation((url: string) => {
-      if (url.startsWith("/api/app/thesvg-icons")) {
+      if (url === "/api/app/media/candidates") {
+        const linearCandidate = {
+          ...netflixCandidate,
+          id: "builtin:thesvg:linear:default",
+          label: "Linear",
+          variant: "default",
+          url: "https://testingcf.jsdelivr.net/gh/glincker/thesvg@main/public/icons/linear/default.svg",
+          matchedQuery: "linear",
+        };
         return Promise.resolve({
-          icons: [
-            {
-              slug: "linear",
-              title: "Linear",
-              iconUrl: "https://testingcf.jsdelivr.net/gh/glincker/thesvg@main/public/icons/linear/default.svg",
-              aliases: [],
-              categories: ["Software"],
+          items: [{
+            id: "search",
+            autoCandidate: null,
+            candidates: {
+              best: linearCandidate,
+              builtIn: [linearCandidate],
+              favicon: [],
             },
-          ],
+          }],
         });
       }
 
-      return Promise.resolve({ imageUrls: [], kind: "logo" });
+      return Promise.resolve({});
     });
 
     render(<LogoPicker value={undefined} onChange={onChange} />);
 
     await user.click(screen.getByRole("button", { name: "搜索" }));
     const sheet = screen.getByTestId("logo-search-sheet");
-    expect(sheet).toHaveClass("h5-logo-sheet", "h5-logo-search-sheet", "h5-mobile-sheet-content", "h5-mobile-sheet-large");
+    expect(sheet).toHaveClass("media-candidate-popover", "h5-logo-sheet", "h5-logo-search-sheet", "h5-mobile-sheet-content", "h5-mobile-sheet-large");
     expect(sheet).toHaveAttribute("aria-label", "搜索 Logo");
     const resultsViewport = screen.getByTestId("logo-search-results");
-    expect(resultsViewport).toHaveClass("h5-logo-sheet-results", "h5-logo-search-results", "h5-mobile-sheet-scroll");
+    expect(resultsViewport).toHaveClass("media-candidate-scroll-viewport", "h5-logo-sheet-results", "h5-logo-search-results");
     expect(resultsViewport).toHaveTextContent("输入服务名称后点击搜索");
 
     const searchInput = screen.getByPlaceholderText("输入服务名称或品牌...");
     await user.type(searchInput, "Linear{enter}");
 
     await waitFor(() => {
-      expectApiFetchCallWithSignal("/api/app/thesvg-icons?search=Linear");
+      expectMediaCandidateRequest("Linear");
     });
     expect(searchInput).toHaveValue("Linear");
     expect(screen.getByTestId("logo-search-results")).toBe(resultsViewport);
 
-    await user.click(await screen.findByTitle("Linear"));
+    await screen.findByRole("button", { name: linearLabel });
+    expect(resultsViewport.querySelector(".media-candidate-scroll-content")).not.toBeNull();
+    await user.click(screen.getByRole("button", { name: linearLabel }));
 
     expect(onChange).toHaveBeenCalledWith(
       "https://testingcf.jsdelivr.net/gh/glincker/thesvg@main/public/icons/linear/default.svg",
@@ -198,6 +264,23 @@ describe("LogoPicker", () => {
     await waitFor(() => {
       expect(screen.queryByTestId("logo-search-sheet")).not.toBeInTheDocument();
     });
+  });
+
+  it("does not attach thumbnail tooltips inside the mobile Logo sheet", async () => {
+    const user = userEvent.setup();
+    mockMatchMedia({
+      "(max-width: 767px)": true,
+      [desktopTooltipQuery]: false,
+    });
+
+    render(<LogoPicker value={undefined} onChange={vi.fn()} serviceName="Netflix" />);
+
+    await user.click(screen.getByRole("button", { name: "搜索" }));
+    const netflixButton = await screen.findByRole("button", { name: netflixLabel });
+
+    expect(netflixButton).not.toHaveAttribute("title");
+    await user.hover(netflixButton);
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
   });
 
   it("uses the shared low-noise canvas for the current Logo preview", () => {
@@ -248,18 +331,56 @@ describe("LogoPicker", () => {
 
     expect(mocks.loadUploadedLogosInitial).toHaveBeenCalledTimes(1);
     const uploadedSheet = screen.getByTestId("uploaded-logo-sheet");
-    expect(uploadedSheet).toHaveClass("h5-logo-sheet", "h5-uploaded-logo-sheet", "h5-mobile-sheet-large");
+    expect(uploadedSheet).toHaveClass("media-candidate-popover", "h5-logo-sheet", "h5-uploaded-logo-sheet", "h5-mobile-sheet-large");
     expect(screen.getByTestId("uploaded-logo-results")).toHaveClass(
+      "media-candidate-scroll-viewport",
       "h5-logo-sheet-results",
       "h5-uploaded-logo-results",
-      "h5-mobile-sheet-scroll",
     );
+    expect(screen.getByTestId("uploaded-logo-results").querySelector(".media-candidate-scroll-content")).not.toBeNull();
     const uploadedLogoButton = await screen.findByRole("button", { name: "netflix.png" });
     expect(uploadedLogoButton).toHaveClass("media-thumbnail-canvas");
     expect(uploadedLogoButton).toHaveAttribute("aria-pressed", "false");
     await user.click(uploadedLogoButton);
 
     expect(onChange).toHaveBeenCalledWith("/api/app/assets/asset-1");
+  });
+
+  it("adds a custom Logo link entry and saves the original HTTP URL", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+
+    render(<LogoPicker value={undefined} onChange={onChange} />);
+
+    expect(screen.getByRole("button", { name: "已上传" })).toHaveClass("h-8");
+    expect(screen.getByRole("button", { name: "搜索" })).toHaveClass("h-8");
+    expect(screen.getByRole("button", { name: "链接" })).toHaveClass("h-8");
+    await user.click(screen.getByRole("button", { name: "链接" }));
+
+    const sheet = screen.getByTestId("logo-link-sheet");
+    expect(sheet).toHaveClass("media-candidate-popover", "h5-logo-sheet", "h5-logo-link-sheet");
+    const input = screen.getByPlaceholderText("https://example.com/logo.svg");
+    await user.type(input, "http://example.com/logo.png");
+    await user.click(screen.getByRole("button", { name: "使用链接" }));
+
+    expect(onChange).toHaveBeenCalledWith("http://example.com/logo.png");
+  });
+
+  it("rejects unsupported custom Logo link values before applying", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+
+    render(<LogoPicker value={undefined} onChange={onChange} />);
+    await user.click(screen.getByRole("button", { name: "链接" }));
+
+    const input = screen.getByPlaceholderText("https://example.com/logo.svg");
+    const apply = screen.getByRole("button", { name: "使用链接" });
+    await user.type(input, "data:image/png;base64,aGVsbG8=");
+
+    expect(input).toHaveAttribute("aria-invalid", "true");
+    expect(await screen.findByText("Logo 链接只支持 http:// 或 https://")).toBeInTheDocument();
+    expect(apply).toBeDisabled();
+    expect(onChange).not.toHaveBeenCalled();
   });
 
   it("shows empty, retry, load-more, and selected states in the uploaded Logo picker", async () => {
@@ -320,42 +441,110 @@ describe("LogoPicker", () => {
     expect(mocks.loadUploadedLogosMore).toHaveBeenCalledTimes(1);
   });
 
-  it("shows a clear built-in icon empty state while keeping favicon fallback results", async () => {
+  it("shows favicon fallback results when there is no built-in match", async () => {
     const user = userEvent.setup();
     mocks.apiFetch.mockImplementation((url: string) => {
-      if (url.startsWith("/api/app/thesvg-icons")) {
-        return Promise.resolve({ icons: [] });
+      if (url === "/api/app/media/candidates") {
+        const faviconCandidate = {
+          id: "favicon:site:dmit.io:0",
+          kind: "logo",
+          source: "favicon",
+          provider: "site",
+          label: "dmit.io",
+          variant: null,
+          url: "https://dmit.io/favicon.ico",
+          confidence: "weak",
+          autoAssignable: false,
+          matchedQuery: "dmit.io",
+          rank: 0,
+        };
+        return Promise.resolve({
+          items: [{
+            id: "search",
+            autoCandidate: null,
+            candidates: {
+              best: faviconCandidate,
+              builtIn: [],
+              favicon: [faviconCandidate],
+            },
+          }],
+        });
       }
 
-      return Promise.resolve({ imageUrls: [], kind: "logo" });
+      return Promise.resolve({});
     });
 
     render(<LogoPicker value={undefined} onChange={vi.fn()} serviceName="DMIT" />);
 
     await user.click(screen.getByRole("button", { name: "搜索" }));
 
-    expect(await screen.findByText("内置图标：")).toBeInTheDocument();
-    expect(await screen.findByText("内置图标未命中")).toBeInTheDocument();
-    expect(screen.getByText("网站/Favicon 备用：")).toBeInTheDocument();
+    expect(await screen.findByText("网站/Favicon 备用：")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "dmit.io" })).toBeInTheDocument();
   });
 
-  it("shows a built-in icon failure state when the theSVG endpoint fails", async () => {
+  it("shows and selects multiple theSVG Logo variants as direct candidates", async () => {
     const user = userEvent.setup();
+    const onChange = vi.fn();
+    const wordmarkUrl = "https://testingcf.jsdelivr.net/gh/glincker/thesvg@main/public/icons/google/wordmark.svg";
     mocks.apiFetch.mockImplementation((url: string) => {
-      if (url.startsWith("/api/app/thesvg-icons")) {
-        return Promise.reject(new Error("theSVG offline"));
+      if (url === "/api/app/media/candidates") {
+        const defaultCandidate = {
+          ...netflixCandidate,
+          id: "builtin:thesvg:google:default",
+          label: "Google",
+          variant: "default",
+          url: "https://testingcf.jsdelivr.net/gh/glincker/thesvg@main/public/icons/google/default.svg",
+          matchedQuery: "google",
+        };
+        const wordmarkCandidate = {
+          ...defaultCandidate,
+          id: "builtin:thesvg:google:wordmark",
+          variant: "wordmark",
+          url: wordmarkUrl,
+          rank: 1,
+        };
+        return Promise.resolve({
+          items: [{
+            id: "search",
+            autoCandidate: null,
+            candidates: {
+              best: defaultCandidate,
+              builtIn: [defaultCandidate, wordmarkCandidate],
+              favicon: [],
+            },
+          }],
+        });
       }
 
-      return Promise.resolve({ imageUrls: [], kind: "logo" });
+      return Promise.resolve({});
+    });
+
+    render(<LogoPicker value={wordmarkUrl} onChange={onChange} serviceName="Google" />);
+
+    await user.click(screen.getByRole("button", { name: "搜索" }));
+    expect(await screen.findByRole("button", { name: googleDefaultLabel })).toHaveAttribute("aria-pressed", "false");
+    const wordmarkButton = await screen.findByRole("button", { name: googleWordmarkLabel });
+    expect(wordmarkButton).toHaveAttribute("aria-pressed", "true");
+    await user.click(wordmarkButton);
+
+    expect(onChange).toHaveBeenCalledWith(wordmarkUrl);
+  });
+
+  it("shows a unified failure state when media candidates fail", async () => {
+    const user = userEvent.setup();
+    mocks.apiFetch.mockImplementation((url: string) => {
+      if (url === "/api/app/media/candidates") {
+        return Promise.reject(new Error("media offline"));
+      }
+
+      return Promise.resolve({});
     });
 
     render(<LogoPicker value={undefined} onChange={vi.fn()} serviceName="DMIT" />);
 
     await user.click(screen.getByRole("button", { name: "搜索" }));
 
-    expect(await screen.findByText("内置图标：")).toBeInTheDocument();
-    expect(await screen.findByText("内置图标搜索失败")).toBeInTheDocument();
-    expect(screen.getByText("网站/Favicon 备用：")).toBeInTheDocument();
+    expect(await screen.findByText("搜索失败，请稍后重试")).toBeInTheDocument();
   });
 
   it("keeps the search box empty after clearing the auto-filled service name", async () => {
@@ -369,7 +558,7 @@ describe("LogoPicker", () => {
     await waitFor(() => {
       expect(searchInput).toHaveValue("youtube");
     });
-    expectApiFetchCallWithSignal("/api/app/thesvg-icons?search=youtube");
+    expectMediaCandidateRequest("youtube");
 
     await user.clear(searchInput);
 

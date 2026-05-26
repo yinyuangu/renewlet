@@ -110,7 +110,7 @@ export function SubscriptionTagInput({
     onClearError?.();
   }, [onChange, onClearError]);
 
-  const appendTags = React.useCallback((rawTags: readonly string[]) => {
+  const appendTags = React.useCallback((rawTags: readonly string[], options: { refocus?: boolean } = {}) => {
     const incoming = normalizeTagsArray(rawTags);
     if (incoming.length === 0) return false;
 
@@ -129,9 +129,20 @@ export function SubscriptionTagInput({
     updateTags(merged);
     setInputValue("");
     setActiveIndex(null);
-    window.setTimeout(() => inputRef.current?.focus(), 0);
+    if (options.refocus ?? true) {
+      window.setTimeout(() => inputRef.current?.focus(), 0);
+    }
     return true;
   }, [normalizedValue, t, updateTags]);
+
+  const commitInputValue = React.useCallback((rawValue = inputValue) => {
+    const parsed = parseTagsInput(rawValue);
+    if (parsed.length === 0) {
+      setInputValue("");
+      return false;
+    }
+    return appendTags(parsed, { refocus: false });
+  }, [appendTags, inputValue]);
 
   const removeTag = React.useCallback((tagToRemove: string) => {
     updateTags(normalizedValue.filter((tag) => tag !== tagToRemove));
@@ -143,7 +154,11 @@ export function SubscriptionTagInput({
     setActiveIndex(null);
     if (/[、，,;；\n]/.test(nextValue)) {
       const parsed = parseTagsInput(nextValue);
-      appendTags(parsed);
+      if (parsed.length === 0) {
+        setInputValue("");
+        return;
+      }
+      if (!appendTags(parsed)) setInputValue(nextValue);
       return;
     }
     setInputValue(nextValue);
@@ -152,6 +167,13 @@ export function SubscriptionTagInput({
 
   const handleInputEvent = (event: React.ChangeEvent<HTMLInputElement>) => {
     handleInputChange(event.target.value);
+  };
+
+  const handleInputBlur = (event: React.FocusEvent<HTMLInputElement>) => {
+    if (isInsideTagComposite(event.relatedTarget)) return;
+    // 直接填完标签后切日期或点保存不会触发 Enter；离开复合输入时提交 pending 文本，避免 UI 态标签丢失。
+    commitInputValue(event.currentTarget.value);
+    setOpen(false);
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
@@ -256,10 +278,12 @@ export function SubscriptionTagInput({
                 ref={inputRef}
                 id={id}
                 name={id}
+                data-subscription-tag-pending-input=""
                 size={1}
                 value={inputValue}
                 onChange={handleInputEvent}
                 onKeyDown={handleKeyDown}
+                onBlur={handleInputBlur}
                 onFocus={() => setOpen(true)}
                 placeholder={hasTags ? "" : placeholder}
                 enterKeyHint="done"

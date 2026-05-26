@@ -30,7 +30,7 @@ import { ThemeSelector } from '@/components/theme-selector';
 import { NotificationHistoryPanel } from './notification-history-panel';
 import { Settings2, FolderKanban, Activity, CreditCard, Coins, Palette } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { CURRENCY_OPTIONS, type NotificationChannel } from '@/types/subscription';
+import { CURRENCY_OPTIONS, MAX_REMINDER_DAYS, type NotificationChannel } from '@/types/subscription';
 import { isBuiltInPaymentMethodValue } from '@/types/config';
 import { assertLocalTime } from '@/lib/time/local-time';
 import { getSupportedTimeZones } from '@/lib/time/time-zone';
@@ -42,6 +42,7 @@ import { AccountSettingsSection } from './account-settings-section';
 import { NotificationChannelConfigPanel } from './notification-channel-config-panel';
 import { NotificationChannelList } from './notification-channel-list';
 import { ExchangeRatesSection } from './exchange-rates-section';
+import { BuiltInIconSourcesSection } from './built-in-icon-sources-section';
 import { CheckboxSettingRow, LoadingButtonContent } from './settings-shared-controls';
 
 function useUnsavedChangesGuard(enabled: boolean, message: string, onConfirmLeave: () => void) {
@@ -163,16 +164,26 @@ export function SettingsScreen() {
       `${getCurrencySymbol(item.value)} ${option ? localizeLabel(option.labels) : localizeLabel(item.labels)}`,
   });
   const [selectedNotificationChannel, setSelectedNotificationChannel] = useState<NotificationChannel | null>(null);
+  const [notificationReminderDaysInput, setNotificationReminderDaysInput] = useState(String(settings.notificationReminderDays));
   const activeNotificationChannel = selectedNotificationChannel ?? settings.enabledChannels[0] ?? 'telegram';
   const handleNotificationChannelToggle = (channel: NotificationChannel) => {
     setSelectedNotificationChannel(channel);
     toggleChannel(channel);
+  };
+  const handleNotificationReminderDaysInputChange = (value: string) => {
+    setNotificationReminderDaysInput(value);
+    const parsed = Number.parseInt(value, 10);
+    if (!Number.isSafeInteger(parsed) || parsed < 0 || parsed > MAX_REMINDER_DAYS) return;
+    updateSetting("notificationReminderDays", parsed);
   };
   const handleLocaleChange = (value: string) => {
     const nextLocale = value as Locale;
     updateSetting('locale', nextLocale);
     setLocale(nextLocale, { persist: false });
   };
+  useEffect(() => {
+    setNotificationReminderDaysInput(String(settings.notificationReminderDays));
+  }, [settings.notificationReminderDays]);
   useUnsavedChangesGuard(hasUnsavedChanges, t("settings.unsavedLeavePrompt"), handleDiscardChanges);
 
   return (
@@ -246,6 +257,11 @@ export function SettingsScreen() {
                 />
             </div>
           </section>
+
+          <BuiltInIconSourcesSection
+            sources={settings.builtInIconSources}
+            onChange={(sources) => updateSetting('builtInIconSources', sources)}
+          />
 
           {/* 预算设置 */}
           <section className="rounded-xl border border-border bg-card p-6">
@@ -409,6 +425,23 @@ export function SettingsScreen() {
                   />
                   <p className="text-xs text-muted-foreground">
                     {t("settings.notificationTimeHelp")}
+                  </p>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="notificationReminderDays">{t("settings.notificationReminderDays")}</Label>
+                  <NumericInput
+                    id="notificationReminderDays"
+                    name="notificationReminderDays"
+                    allowNegative={false}
+                    decimalScale={0}
+                    inputMode="numeric"
+                    enterKeyHint="done"
+                    value={notificationReminderDaysInput}
+                    onRawValueChange={handleNotificationReminderDaysInputChange}
+                    className="border-border bg-secondary"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {t("settings.notificationReminderDaysHelp")}
                   </p>
                 </div>
                 <div className="grid content-start gap-2">

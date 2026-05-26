@@ -1,0 +1,140 @@
+name: Release Publish
+
+# 唯一公开发布入口：任何 Docker 镜像、GitHub Release 和生产 Cloudflare 部署都从 v* tag 开始。
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+  packages: write
+
+concurrency:
+  # 同一个 tag 的发布必须串行，避免重跑时同时写 GitHub Release 或移动镜像标签。
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  metadata:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      is-stable: ${{ steps.version.outputs.is-stable }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6.0.0
+        with:
+          node-version: 24
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Resolve release metadata
+        id: version
+        # 下游用 is-stable 决定 draft/prerelease 和 Cloudflare 生产部署；RC 永远不能碰 latest/生产。
+        run: |
+          VERSION="$(node scripts/release.mjs validate-version "${GITHUB_REF_NAME}")"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          if [[ "$VERSION" == *"-rc."* ]]; then
+            echo "is-stable=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "is-stable=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  docker:
+    needs: metadata
+    uses: ./.github/workflows/docker-image.yml
+    permissions:
+      contents: read
+      packages: write
+    with:
+      version: ${{ needs.metadata.outputs.version }}
+    secrets: inherit
+
+  cloudflare-check:
+    needs: metadata
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6.0.0
+        with:
+          node-version: 24
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check Cloudflare build
+        run: pnpm check:cloudflare
+
+      - name: Build Cloudflare assets
+        run: pnpm build:cloudflare
+
+  github-release:
+    needs:
+      - metadata
+      - docker
+      - cloudflare-check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6.0.0
+        with:
+          node-version: 24
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build release body
+        # Release 正文来自人工维护的 CHANGELOG 短摘要，不把全量 git log 刷进发布页。
+        run: node scripts/release.mjs release-body --version "${{ needs.metadata.outputs.version }}" > tmp-release-body.md
+
+      - name: Build Docker deployment asset
+        # 附件里的 compose/env 会 pin 到当前版本，避免用户下载历史 Release 却拉到 future latest。
+        run: node scripts/release.mjs package-docker "${{ needs.metadata.outputs.version }}"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2.6.2
+        with:
+          tag_name: v${{ needs.metadata.outputs.version }}
+          prerelease: ${{ needs.metadata.outputs.is-stable != 'true' }}
+          draft: ${{ needs.metadata.outputs.is-stable == 'true' }}
+          body_path: tmp-release-body.md
+          files: tmp/release/renewlet-docker-v${{ needs.metadata.outputs.version }}.zip
+
+  cloudflare-deploy:
+    needs:
+      - metadata
+      - github-release
+    if: ${{ needs.metadata.outputs.is-stable == 'true' }}
+    # 稳定版才进入生产审批；RC 只保留 Cloudflare check/build 作为发布前验证。
+    uses: ./.github/workflows/cloudflare-production.yml
+    permissions:
+      contents: read
+    with:
+      version: ${{ needs.metadata.outputs.version }}
+    secrets: inherit

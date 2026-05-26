@@ -8,7 +8,13 @@ import {
   subscriptionCard,
   uniqueE2EName,
 } from "./support/subscriptions";
-import { expectActionNearContainerBottom, expectScrollContentNearFooter } from "./support/layout";
+import {
+  expectActionNearContainerBottom,
+  captureLogoSheetScrollMetrics,
+  expectScrollContentNearFooter,
+  expectVerticallyCenteredInViewport,
+} from "./support/layout";
+import { installLogoCandidateRoute } from "./support/media-candidates";
 
 test("desktop tall subscription dialog keeps footer tight to the panel bottom", async ({ page }) => {
   await page.setViewportSize({ width: 1024, height: 900 });
@@ -16,6 +22,7 @@ test("desktop tall subscription dialog keeps footer tight to the panel bottom", 
   await expect(page.getByRole("heading", { name: "订阅列表" })).toBeVisible();
 
   const dialog = await openAddSubscriptionDialog(page);
+  await expectVerticallyCenteredInViewport(page, dialog, "desktop tall subscription dialog");
   await expectActionNearContainerBottom(
     dialog,
     dialog.getByRole("button", { name: "添加订阅" }),
@@ -61,6 +68,7 @@ test("desktop subscription create, tag filter, edit, and reload persistence", as
   await expect(subscriptionCard(page, plainName)).toBeVisible();
 
   const editDialog = await openSubscriptionEditDialog(page, taggedName);
+  await expectVerticallyCenteredInViewport(page, editDialog, "desktop edit subscription dialog");
   await editDialog.getByLabel("服务名称", { exact: true }).fill(editedName);
   const desktopTagInput = editDialog.getByLabel("标签", { exact: true });
   await desktopTagInput.fill("Writing、test、Docs、Research");
@@ -106,4 +114,45 @@ test("desktop subscription create, tag filter, edit, and reload persistence", as
   await page.goto("/subscriptions");
   await expect(subscriptionCard(page, plainName)).toBeVisible();
   await expect(subscriptionCard(page, editedName)).toBeVisible();
+});
+
+test("desktop import Logo editor gives search candidates a real scroll viewport", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await installLogoCandidateRoute(page);
+
+  await page.goto("/subscriptions");
+  await expect(page.getByRole("heading", { name: "订阅列表" })).toBeVisible();
+
+  await page.getByRole("button", { name: "导入数据" }).click();
+  const importDialog = page.getByRole("dialog", { name: "导入数据" });
+  await expect(importDialog).toBeVisible();
+
+  await importDialog.getByRole("tab", { name: "粘贴 JSON" }).click();
+  await importDialog.getByPlaceholder("粘贴 Renewlet 或 Wallos JSON...").fill(JSON.stringify([{
+    Name: "Linear",
+    "Payment Cycle": "Monthly",
+    "Next Payment": "2026-06-01",
+    Price: "$10",
+    Category: "Software",
+    "Payment Method": "Visa",
+  }]));
+  await Promise.all([
+    page.waitForResponse((response) =>
+      response.url().includes("/api/app/import/preview") && response.request().method() === "POST",
+    ),
+    importDialog.getByRole("button", { name: "生成预览" }).click(),
+  ]);
+
+  await importDialog.getByRole("button", { name: "修改 Logo" }).first().click();
+  const importLogoSheet = page.locator(".h5-import-logo-sheet");
+  await expect(importLogoSheet).toBeVisible();
+  await expect(importLogoSheet.getByTitle("Linear 1").first()).toBeVisible({ timeout: 10_000 });
+
+  const scroll = await captureLogoSheetScrollMetrics(importLogoSheet, "import-logo-search-results");
+  expect(scroll.scrollHeight, JSON.stringify(scroll, null, 2)).toBeGreaterThan(scroll.clientHeight);
+  expect(scroll.clientHeight, JSON.stringify(scroll, null, 2)).toBeGreaterThanOrEqual(220);
+  expect(scroll.scrollTop, JSON.stringify(scroll, null, 2)).toBeGreaterThanOrEqual(
+    scroll.scrollHeight - scroll.clientHeight - 1,
+  );
+  expect(scroll.lastBottomGap, JSON.stringify(scroll, null, 2)).toBeGreaterThanOrEqual(8);
 });

@@ -145,6 +145,20 @@ describe("subscription-form", () => {
     expect(toSubscriptionDraft({ ...valid, customReminderDays: "1day" })).toBeNull();
   });
 
+  it("uses inherited reminders for new subscription drafts by default", () => {
+    const form = createSubscriptionFormState({
+      name: "Inherited Reminder",
+      price: "10",
+      startDate: assertDateOnly("2026-01-01"),
+      nextBillingDate: assertDateOnly("2026-02-01"),
+    });
+
+    expect(form.reminderType).toBe("inherit");
+    expect(toSubscriptionDraft(form)).toMatchObject({
+      reminderDays: -1,
+    });
+  });
+
   it("preserves the auto-calculate switch in the draft", () => {
     const base = createSubscriptionFormState({
       name: "Manual renewal",
@@ -155,6 +169,24 @@ describe("subscription-form", () => {
 
     expect(toSubscriptionDraft({ ...base, autoCalculate: true })?.autoCalculateNextBillingDate).toBe(true);
     expect(toSubscriptionDraft({ ...base, autoCalculate: false })?.autoCalculateNextBillingDate).toBe(false);
+  });
+
+  it("saves one-time purchases without auto-calculation or custom days", () => {
+    const form = createSubscriptionFormState({
+      name: "Lifetime license",
+      price: "199",
+      billingCycle: "one-time",
+      autoCalculate: true,
+      customDays: "30",
+      startDate: assertDateOnly("2026-05-14"),
+      nextBillingDate: assertDateOnly("2026-05-14"),
+    });
+
+    expect(toSubscriptionDraft(form)).toMatchObject({
+      billingCycle: "one-time",
+      customDays: undefined,
+      autoCalculateNextBillingDate: false,
+    });
   });
 
   it("keeps repeat reminder presets in the draft", () => {

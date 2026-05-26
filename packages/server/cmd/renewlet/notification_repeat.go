@@ -90,11 +90,12 @@ func getRepeatScheduleDecision(now time.Time, settings appSettings, subscription
 			Window:   normalizeRepeatReminderWindow(sub.RepeatReminderWindow),
 		}
 		// 先检查续费，再检查试用；同一个 tick 只需要命中一次，真正的 items 收集会再聚合所有订阅。
-		if occurrence, ok := repeatReminderDueOccurrence(now, settings, sub.ReminderDays, sub.NextBillingDate, repeat, windowMinutes); ok {
+		reminderDays := effectiveReminderDays(sub, settings)
+		if occurrence, ok := repeatReminderDueOccurrence(now, settings, reminderDays, sub.NextBillingDate, repeat, windowMinutes); ok {
 			return localScheduleDecision{localScheduleOccurrence: occurrence, Due: true, Reason: "repeat_reminder_due"}
 		}
 		if sub.Status == "trial" {
-			if occurrence, ok := repeatReminderDueOccurrence(now, settings, sub.ReminderDays, sub.TrialEndDate, repeat, windowMinutes); ok {
+			if occurrence, ok := repeatReminderDueOccurrence(now, settings, reminderDays, sub.TrialEndDate, repeat, windowMinutes); ok {
 				return localScheduleDecision{localScheduleOccurrence: occurrence, Due: true, Reason: "repeat_reminder_due"}
 			}
 		}
@@ -180,8 +181,9 @@ func getNextRepeatScheduleOccurrence(now time.Time, settings appSettings, subscr
 		if sub.Status == "trial" {
 			candidates = append(candidates, sub.TrialEndDate)
 		}
+		reminderDays := effectiveReminderDays(sub, settings)
 		for _, targetDate := range candidates {
-			occurrence, ok := nextRepeatOccurrenceAfter(now, settings, sub.ReminderDays, targetDate, repeat)
+			occurrence, ok := nextRepeatOccurrenceAfter(now, settings, reminderDays, targetDate, repeat)
 			if !ok {
 				continue
 			}
@@ -261,8 +263,9 @@ func collectUpcomingRepeatBatches(now time.Time, settings appSettings, subscript
 		if sub.Status == "trial" {
 			targets = append(targets, sub.TrialEndDate)
 		}
+		reminderDays := effectiveReminderDays(sub, settings)
 		for _, targetDate := range targets {
-			occurrence, ok := nextRepeatOccurrenceAfter(now, settings, sub.ReminderDays, targetDate, repeat)
+			occurrence, ok := nextRepeatOccurrenceAfter(now, settings, reminderDays, targetDate, repeat)
 			for ok {
 				instant, err := time.Parse(time.RFC3339, occurrence.ScheduledInstantUTC)
 				if err != nil || instant.After(end) {
@@ -271,7 +274,7 @@ func collectUpcomingRepeatBatches(now time.Time, settings appSettings, subscript
 				items := collectRepeatNotificationItems(occurrence, settings, subscriptions)
 				appendUpcomingBatch(batchesByKey, occurrence, items)
 				// 下一轮从当前 occurrence 后一分钟开始，避免 nextRepeatOccurrenceAfter 返回同一个时间点造成死循环。
-				occurrence, ok = nextRepeatOccurrenceAfter(instant.Add(time.Minute), settings, sub.ReminderDays, targetDate, repeat)
+				occurrence, ok = nextRepeatOccurrenceAfter(instant.Add(time.Minute), settings, reminderDays, targetDate, repeat)
 			}
 		}
 	}

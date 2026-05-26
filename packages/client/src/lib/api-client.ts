@@ -27,19 +27,10 @@ import { getApiLocale, getLocaleHeaders } from "@/i18n/api-locale";
 import { translate } from "@/i18n/messages";
 import { z } from "zod";
 
-/**
- * 统一的 API 请求错误类型。
- *
- * 用途：
- * - 让调用方可以通过 `status` 区分 401/400/500 等场景
- * - 通过 `details` 携带后端返回的结构化错误（如 Zod flatten 结果），便于排查
- */
 export class ApiError extends Error {
-  /** HTTP 状态码（例如 401/400/500）。 */
+  // status/details/code 是 UI 错误展示和表单字段定位的唯一结构化通道。
   status: number;
-  /** 后端返回的错误细节（结构不固定）。 */
   details: unknown;
-  /** 前端本地错误分类；HTTP 错误通常为空。 */
   code: "timeout" | "aborted" | "network" | (string & {}) | undefined;
 
   constructor(
@@ -56,13 +47,8 @@ export class ApiError extends Error {
   }
 }
 
-/**
- * API fetch 选项。
- *
- * 额外的 `timeoutMs` 由客户端封装处理，不会传给原生 fetch。
- */
 export type ApiFetchInit = RequestInit & {
-  /** 请求超时时间；设为 0 或负数表示不启用本地超时。 */
+  // timeoutMs 是前端本地保护，不传给原生 fetch，避免不同运行时忽略未知字段。
   timeoutMs?: number;
 };
 
@@ -117,7 +103,6 @@ function createAbortSignal(
   };
 }
 
-/** 尝试解析响应体为 JSON；解析失败/空内容时返回 null。 */
 async function parseJsonSafely(response: Response): Promise<unknown> {
   const text = await response.text();
   if (!text) return null;
@@ -185,7 +170,6 @@ function isGenericLegacyError(message: string | undefined): boolean {
   return message === "Invalid payload" || message === translate(getApiLocale(), "error.invalidParams");
 }
 
-/** 从后端统一错误结构里提取可展示信息。 */
 function getErrorMessage(payload: unknown): string | undefined {
   if (!isRecord(payload)) return undefined;
 
@@ -214,8 +198,8 @@ function getClientTimeZoneHeader(): string | null {
  * 带运行时 schema 校验的 fetch 封装（默认 JSON）。
  *
  * 约定：
- * - 自动加 `content-type: application/json`
- * - 自动携带 Cookie（本地认证会话依赖）
+ * - 自动加 JSON content-type，但 FormData 保留浏览器 multipart boundary
+ * - 自动携带 Cookie 和当前运行面的 Bearer token
  * - 非 2xx 时抛出 `ApiError`
  * - 2xx 响应必须通过调用方传入的 Zod schema，否则抛出 `ApiError`
  */
@@ -226,8 +210,9 @@ export async function apiFetch<Schema extends z.ZodType>(
 ): Promise<z.infer<Schema>> {
   const { timeoutMs = DEFAULT_JSON_TIMEOUT_MS, signal: externalSignal, ...fetchInit } = init ?? {};
   const headers = new Headers(init?.headers);
-  // 默认 JSON；调用方显式传入 content-type 时保留其选择。
-  if (!headers.has("content-type")) {
+  const isFormDataBody = typeof FormData !== "undefined" && fetchInit.body instanceof FormData;
+  // 默认 JSON；FormData 必须让浏览器自己补 multipart boundary。
+  if (!headers.has("content-type") && !isFormDataBody) {
     headers.set("content-type", "application/json");
   }
   if (!headers.has("x-client-time-zone")) {

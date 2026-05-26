@@ -1,7 +1,7 @@
 /**
  * 重置密码客户端表单。
  *
- * 架构位置：负责本地密码一致性校验和 PocketBase confirmPasswordReset 调用。
+ * 架构位置：负责本地密码一致性校验和当前运行时认证服务的密码重置确认调用。
  *
  * 注意： 成功后立即清空本地密码 state，避免用户离开页面前明文继续停留在内存和输入框中。
  */
@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { RenewletLogo } from "@/components/icons/renewlet-logo";
 import { getDisplayErrorMessage } from "@/lib/display-error";
 import { toast } from "@/components/ui/sonner";
-import { pb } from "@/lib/pocketbase";
+import { authClient } from "@/lib/auth-client";
 import { useI18n } from "@/i18n/I18nProvider";
 
 type ResetPasswordClientProps = {
@@ -74,7 +74,7 @@ export function ResetPasswordClient({ token }: ResetPasswordClientProps) {
     setIsSubmitting(true);
     setErrors({});
     try {
-      await pb.collection("users").confirmPasswordReset(token, password, password);
+      await authClient.confirmPasswordReset(token, password);
       setSucceeded(true);
       setPassword("");
       setConfirm("");

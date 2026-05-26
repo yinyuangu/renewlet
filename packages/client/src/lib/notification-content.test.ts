@@ -76,6 +76,35 @@ describe("notification-content", () => {
     expect(content.content).toContain("试用结束");
   });
 
+  it("uses global reminder days for inherited subscription reminders", () => {
+    const content = buildDueNotification(
+      new Date("2026-01-10T00:00:00.000Z"),
+      { ...DEFAULT_SETTINGS, timezone: "UTC", notificationReminderDays: 5, showExpired: false },
+      [
+        {
+          id: "sub-inherit",
+          name: "Inherited SaaS",
+          price: 10,
+          currency: "USD",
+          status: "active",
+          nextBillingDate: "2026-01-15",
+          reminderDays: -1,
+        },
+      ],
+    );
+
+    expect(content.hasPayload).toBe(true);
+    expect(content.items).toEqual([
+      expect.objectContaining({
+        subscriptionId: "sub-inherit",
+        type: "renewal",
+        targetDate: "2026-01-15",
+        reminderDays: 5,
+      }),
+    ]);
+    expect(content.items[0]?.reminderDays).not.toBe(-1);
+  });
+
   it("builds English notification content when settings locale is English", () => {
     const content = buildDueNotification(
       new Date("2026-01-10T00:00:00.000Z"),

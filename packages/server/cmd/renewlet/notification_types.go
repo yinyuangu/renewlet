@@ -22,6 +22,10 @@ const (
 
 	legacyWebhookHeadersExample = `{"Authorization": "Bearer your-token", "Content-Type": "application/json"}`
 	legacyWebhookPayloadExample = `{"title": "{title}", "content": "{content}", "timestamp": "{timestamp}"}`
+
+	inheritReminderDays             = -1
+	defaultNotificationReminderDays = 3
+	maxReminderDays                 = 3650
 )
 
 var (
@@ -39,43 +43,45 @@ var (
 // appSettings 是 settings JSON 字段的后端强类型表示。
 // 注意： 字段必须与前端 DEFAULT_SETTINGS/settings schema 同步，否则临时测试配置和持久化设置会分叉。
 type appSettings struct {
-	AdminUsername           string           `json:"adminUsername"`
-	ThemeMode               string           `json:"themeMode"`
-	ThemeVariant            string           `json:"themeVariant"`
-	ThemeCustomColor        themeCustomColor `json:"themeCustomColor"`
-	ShowExpired             bool             `json:"showExpired"`
-	Locale                  string           `json:"locale"`
-	DefaultCurrency         string           `json:"defaultCurrency"`
-	ExchangeRateProvider    string           `json:"exchangeRateProvider"`
-	MonthlyBudget           float64          `json:"monthlyBudget"`
-	Timezone                string           `json:"timezone"`
-	NotificationTimeLocal   string           `json:"notificationTimeLocal"`
-	EnabledChannels         []string         `json:"enabledChannels"`
-	TestPhone               string           `json:"testPhone"`
-	TelegramBotToken        string           `json:"telegramBotToken"`
-	TelegramChatID          string           `json:"telegramChatId"`
-	NotifyxAPIKey           string           `json:"notifyxApiKey"`
-	WebhookURL              string           `json:"webhookUrl"`
-	WebhookMethod           string           `json:"webhookMethod"`
-	WebhookHeaders          string           `json:"webhookHeaders"`
-	WebhookPayload          string           `json:"webhookPayload"`
-	WechatWebhookURL        string           `json:"wechatWebhookUrl"`
-	WechatMessageType       string           `json:"wechatMessageType"`
-	WechatAddModeTag        bool             `json:"wechatAddModeTag"`
-	WechatAtPhones          string           `json:"wechatAtPhones"`
-	WechatAtAll             bool             `json:"wechatAtAll"`
-	SMTPHost                string           `json:"smtpHost"`
-	SMTPPort                string           `json:"smtpPort"`
-	SMTPSecure              bool             `json:"smtpSecure"`
-	SMTPUser                string           `json:"smtpUser"`
-	SMTPPassword            string           `json:"smtpPassword"`
-	SMTPFrom                string           `json:"smtpFrom"`
-	SMTPReplyTo             string           `json:"smtpReplyTo"`
-	NotifyMultipleAddresses bool             `json:"notifyMultipleAddresses"`
-	RecipientEmail          string           `json:"recipientEmail"`
-	BarkServerURL           string           `json:"barkServerUrl"`
-	BarkDeviceKey           string           `json:"barkDeviceKey"`
-	BarkSilentPush          bool             `json:"barkSilentPush"`
+	AdminUsername            string                    `json:"adminUsername"`
+	ThemeMode                string                    `json:"themeMode"`
+	ThemeVariant             string                    `json:"themeVariant"`
+	ThemeCustomColor         themeCustomColor          `json:"themeCustomColor"`
+	ShowExpired              bool                      `json:"showExpired"`
+	Locale                   string                    `json:"locale"`
+	DefaultCurrency          string                    `json:"defaultCurrency"`
+	ExchangeRateProvider     string                    `json:"exchangeRateProvider"`
+	BuiltInIconSources       builtInIconSourceSettings `json:"builtInIconSources"`
+	MonthlyBudget            float64                   `json:"monthlyBudget"`
+	Timezone                 string                    `json:"timezone"`
+	NotificationTimeLocal    string                    `json:"notificationTimeLocal"`
+	NotificationReminderDays int                       `json:"notificationReminderDays"`
+	EnabledChannels          []string                  `json:"enabledChannels"`
+	TestPhone                string                    `json:"testPhone"`
+	TelegramBotToken         string                    `json:"telegramBotToken"`
+	TelegramChatID           string                    `json:"telegramChatId"`
+	NotifyxAPIKey            string                    `json:"notifyxApiKey"`
+	WebhookURL               string                    `json:"webhookUrl"`
+	WebhookMethod            string                    `json:"webhookMethod"`
+	WebhookHeaders           string                    `json:"webhookHeaders"`
+	WebhookPayload           string                    `json:"webhookPayload"`
+	WechatWebhookURL         string                    `json:"wechatWebhookUrl"`
+	WechatMessageType        string                    `json:"wechatMessageType"`
+	WechatAddModeTag         bool                      `json:"wechatAddModeTag"`
+	WechatAtPhones           string                    `json:"wechatAtPhones"`
+	WechatAtAll              bool                      `json:"wechatAtAll"`
+	SMTPHost                 string                    `json:"smtpHost"`
+	SMTPPort                 string                    `json:"smtpPort"`
+	SMTPSecure               bool                      `json:"smtpSecure"`
+	SMTPUser                 string                    `json:"smtpUser"`
+	SMTPPassword             string                    `json:"smtpPassword"`
+	SMTPFrom                 string                    `json:"smtpFrom"`
+	SMTPReplyTo              string                    `json:"smtpReplyTo"`
+	NotifyMultipleAddresses  bool                      `json:"notifyMultipleAddresses"`
+	RecipientEmail           string                    `json:"recipientEmail"`
+	BarkServerURL            string                    `json:"barkServerUrl"`
+	BarkDeviceKey            string                    `json:"barkDeviceKey"`
+	BarkSilentPush           bool                      `json:"barkSilentPush"`
 }
 
 type themeCustomColor struct {
@@ -93,6 +99,7 @@ type notificationSubscription struct {
 	Price                  float64 `json:"price"`
 	Currency               string  `json:"currency"`
 	Status                 string  `json:"status"`
+	BillingCycle           string  `json:"billingCycle"`
 	NextBillingDate        string  `json:"nextBillingDate"`
 	TrialEndDate           string  `json:"trialEndDate,omitempty"`
 	ReminderDays           int     `json:"reminderDays"`
@@ -353,21 +360,23 @@ type webhookDefaultPayload struct {
 
 func defaultAppSettings() appSettings {
 	return appSettings{
-		AdminUsername:         "admin",
-		ThemeMode:             "dark",
-		ThemeVariant:          "emerald",
-		ThemeCustomColor:      themeCustomColor{H: 160, S: 84, L: 39},
-		ShowExpired:           true,
-		Locale:                string(localeZhCN),
-		DefaultCurrency:       "CNY",
-		ExchangeRateProvider:  "floatrates",
-		MonthlyBudget:         1500,
-		Timezone:              "UTC",
-		NotificationTimeLocal: "08:00",
-		EnabledChannels:       []string{},
-		TestPhone:             "",
-		WebhookMethod:         "POST",
-		WechatMessageType:     "text",
-		BarkServerURL:         "https://api.day.app",
+		AdminUsername:            "admin",
+		ThemeMode:                "dark",
+		ThemeVariant:             "emerald",
+		ThemeCustomColor:         themeCustomColor{H: 160, S: 84, L: 39},
+		ShowExpired:              true,
+		Locale:                   string(localeZhCN),
+		DefaultCurrency:          "CNY",
+		ExchangeRateProvider:     "floatrates",
+		BuiltInIconSources:       defaultBuiltInIconSourceSettings(),
+		MonthlyBudget:            1500,
+		Timezone:                 "UTC",
+		NotificationTimeLocal:    "08:00",
+		NotificationReminderDays: defaultNotificationReminderDays,
+		EnabledChannels:          []string{},
+		TestPhone:                "",
+		WebhookMethod:            "POST",
+		WechatMessageType:        "text",
+		BarkServerURL:            "https://api.day.app",
 	}
 }

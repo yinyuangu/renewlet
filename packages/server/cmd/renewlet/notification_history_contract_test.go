@@ -164,6 +164,50 @@ func TestNotificationHistoryRouteNormalizesNoDueItemsMessageArrays(t *testing.T)
 	}
 }
 
+func TestNotificationHistoryRouteReturnsEffectiveReminderDays(t *testing.T) {
+	app := newSchemaTestApp(t)
+	if err := ensureSchema(app); err != nil {
+		t.Fatal(err)
+	}
+	user, token := createRouteTestUser(t, app, "authenticated")
+	settings := defaultAppSettings()
+	settings.Timezone = "UTC"
+	settings.NotificationTimeLocal = "08:00"
+	settings.NotificationReminderDays = 5
+	settings.EnabledChannels = []string{}
+	createNotificationCronRouteTestSettings(t, app, user, settings)
+	record := newSubscriptionRecord(t, app, user.Id, []string{}, "Inherited SaaS")
+	record.Set("nextBillingDate", "2026-05-22")
+	record.Set("reminderDays", inheritReminderDays)
+	if err := app.Save(record); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := runNotificationCron(app, notificationCronOptions{
+		Now:           time.Date(2026, 5, 17, 8, 0, 0, 0, time.UTC),
+		Force:         true,
+		WindowMinutes: 2,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Skipped != 1 {
+		t.Fatalf("expected one skipped notification job, got %#v", result)
+	}
+
+	body := requestNotificationHistory(t, app, token)
+	if len(body.History.Jobs) != 1 {
+		t.Fatalf("expected one history job, got %#v", body.History.Jobs)
+	}
+	cronResult := assertNormalizedCronResult(t, body.History.Jobs[0])
+	if len(cronResult.Message.Items) != 1 {
+		t.Fatalf("expected one notification item, got %#v", cronResult.Message.Items)
+	}
+	if cronResult.Message.Items[0].ReminderDays != 5 {
+		t.Fatalf("expected effective reminder days in history, got %d", cronResult.Message.Items[0].ReminderDays)
+	}
+}
+
 func requestNotificationHistory(t *testing.T, app core.App, token string) notificationHistoryResponse {
 	t.Helper()
 	res := serveTestRequest(t, app, http.MethodGet, "/api/app/notifications/history?status=all&limit=20&offset=0", "", token)

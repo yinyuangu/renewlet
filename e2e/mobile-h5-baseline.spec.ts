@@ -6,6 +6,7 @@ import {
   uniqueE2EName,
 } from "./support/subscriptions";
 import {
+  captureLogoSheetScrollMetrics,
   expectActionNearContainerBottom,
   expectNoHorizontalOverflow,
   expectOverlayLeavesTopScrim,
@@ -13,6 +14,7 @@ import {
   expectTouchTarget,
   getRequiredLocatorBoundingBox,
 } from "./support/layout";
+import { installLogoCandidateRoute } from "./support/media-candidates";
 import {
   fillChangedTestPhone,
   getSettingsDiscardButton,
@@ -76,6 +78,59 @@ async function captureSearchableSheetListMetrics(sheet: Locator, optionLabel: st
   }, optionLabel);
 }
 
+async function captureMobileSelectSheetMetrics(sheet: Locator, locatorLabel: string) {
+  return sheet.evaluate((element, label) => {
+    const viewport = element.querySelector<HTMLElement>(".h5-mobile-select-viewport");
+    if (!viewport) {
+      throw new Error(`Missing mobile select viewport: ${label}`);
+    }
+
+    const scrollButtons = Array.from(element.querySelectorAll<HTMLElement>(".h5-mobile-select-scroll-button"));
+    const sheetRect = element.getBoundingClientRect();
+    const viewportRect = viewport.getBoundingClientRect();
+
+    return {
+      sheetHeight: Math.round(sheetRect.height),
+      viewportHeight: Math.round(viewportRect.height),
+      scrollTop: Math.round(viewport.scrollTop),
+      scrollHeight: Math.round(viewport.scrollHeight),
+      clientHeight: Math.round(viewport.clientHeight),
+      scrollButtonDisplays: scrollButtons.map((button) => window.getComputedStyle(button).display),
+    };
+  }, locatorLabel);
+}
+
+async function expectMobileSelectSheetStableWhileScrolling(sheet: Locator, locatorLabel: string) {
+  const scrollButtons = sheet.locator(".h5-mobile-select-scroll-button");
+  const scrollButtonCount = await scrollButtons.count();
+  expect(scrollButtonCount, `${locatorLabel}: Radix mounted at least one scroll affordance`).toBeGreaterThan(0);
+  for (let index = 0; index < scrollButtonCount; index += 1) {
+    await expect(scrollButtons.nth(index), `${locatorLabel}: mobile scroll button ${index} display`).toHaveCSS(
+      "display",
+      "none",
+    );
+  }
+
+  const before = await captureMobileSelectSheetMetrics(sheet, locatorLabel);
+  expect(before.scrollHeight, `${locatorLabel}: viewport must be internally scrollable`).toBeGreaterThan(before.clientHeight);
+
+  await sheet.locator(".h5-mobile-select-viewport").evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+    element.dispatchEvent(new Event("scroll", { bubbles: true }));
+  });
+
+  await expect
+    .poll(async () => (await captureMobileSelectSheetMetrics(sheet, locatorLabel)).scrollTop)
+    .toBeGreaterThan(0);
+  const after = await captureMobileSelectSheetMetrics(sheet, locatorLabel);
+
+  expect(Math.abs(after.sheetHeight - before.sheetHeight), `${locatorLabel}: sheet height after scroll`).toBeLessThanOrEqual(1);
+  expect(Math.abs(after.viewportHeight - before.viewportHeight), `${locatorLabel}: viewport height after scroll`).toBeLessThanOrEqual(1);
+  expect(after.scrollButtonDisplays, `${locatorLabel}: mobile scroll buttons must not affect layout`).toEqual(
+    Array.from({ length: after.scrollButtonDisplays.length }, () => "none"),
+  );
+}
+
 type UploadedLogoRouteRecord = {
   id: string;
   kind: "logo";
@@ -136,11 +191,17 @@ async function installUploadedLogoAssetsRoute(page: Page) {
   };
 }
 
-async function tapMobileSheetBackdrop(page: Page) {
+async function tapMobileSheetBackdrop(page: Page, absolutePosition?: { x: number; y: number }) {
   const backdrop = page.locator("[data-mobile-overlay-backdrop]").last();
   await expect(backdrop).toBeVisible();
   await expect(page.locator("body")).toHaveAttribute("data-mobile-overlay-open", "");
-  await backdrop.click({ position: { x: 12, y: 12 } });
+  if (absolutePosition) {
+    await page.touchscreen.tap(absolutePosition.x, absolutePosition.y);
+    return;
+  }
+
+  const backdropBox = await getRequiredLocatorBoundingBox(backdrop, "mobile sheet backdrop");
+  await page.touchscreen.tap(backdropBox.x + 12, backdropBox.y + 12);
 }
 
 test.describe("public H5 chrome", () => {
@@ -219,6 +280,7 @@ test("short H5 viewport keeps dialogs and bottom actions operable", async ({ pag
 test("mobile sheets keep Logo and currency search stable while typing", async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 390, height: 640 });
   const uploadedLogoAssetsRoute = await installUploadedLogoAssetsRoute(page);
+  await installLogoCandidateRoute(page);
 
   await page.goto("/subscriptions");
   const addDialog = await openAddSubscriptionDialog(page);
@@ -275,7 +337,7 @@ test("mobile sheets keep Logo and currency search stable while typing", async ({
   const emptyLogoSearchInput = emptyLogoSheet.getByPlaceholder("输入服务名称或品牌...");
   await emptyLogoSearchInput.focus();
   const focusState = await emptyLogoSheet.evaluate((element) => {
-    const panel = element.querySelector<HTMLElement>(".h5-logo-sheet-panel");
+    const panel = element.querySelector<HTMLElement>(".media-candidate-search-panel");
     const input = element.querySelector<HTMLInputElement>('input[placeholder="输入服务名称或品牌..."]');
     if (!panel || !input) {
       throw new Error("Missing Logo search panel or input");
@@ -290,7 +352,7 @@ test("mobile sheets keep Logo and currency search stable while typing", async ({
   expect(focusState.inputLeftInset, "Logo search input should keep visible left focus inset").toBeGreaterThan(12);
   await emptyLogoSearchInput.fill("Linear");
   await emptyLogoSearchInput.press("Enter");
-  await expect(emptyLogoSheet.getByTitle("Linear").first()).toBeVisible({ timeout: 10_000 });
+  await expect(emptyLogoSheet.getByTitle("Linear 1").first()).toBeVisible({ timeout: 10_000 });
   const logoSheetAfterSearch = await captureLogoSheetViewportMetrics(emptyLogoSheet, "logo-search-results");
   expect(
     Math.abs(logoSheetAfterSearch.sheetHeight - logoSheetBeforeSearch.sheetHeight),
@@ -301,7 +363,15 @@ test("mobile sheets keep Logo and currency search stable while typing", async ({
     "Logo search results viewport should stay fixed between prompt and results",
   ).toBeLessThanOrEqual(1);
   await expectLocatorInsideViewport(page, emptyLogoSheet, "mobile logo search sheet after results");
-  await emptyLogoSheet.getByTitle("Linear").first().click();
+  const addLogoScroll = await captureLogoSheetScrollMetrics(emptyLogoSheet, "logo-search-results");
+  expect(addLogoScroll.scrollHeight, "add Logo search results should overflow with many candidates").toBeGreaterThan(
+    addLogoScroll.clientHeight,
+  );
+  expect(addLogoScroll.scrollTop, JSON.stringify(addLogoScroll, null, 2)).toBeGreaterThanOrEqual(
+    addLogoScroll.scrollHeight - addLogoScroll.clientHeight - 1,
+  );
+  expect(addLogoScroll.lastBottomGap, JSON.stringify(addLogoScroll, null, 2)).toBeGreaterThanOrEqual(8);
+  await page.keyboard.press("Escape");
   await expect(emptyLogoSheet).toBeHidden();
   await addDialog.getByRole("button", { name: "取消" }).click();
   await expect(addDialog).toBeHidden();
@@ -327,10 +397,18 @@ test("mobile sheets keep Logo and currency search stable while typing", async ({
   await logoSearchInput.fill("Linear");
   await logoSearchInput.press("Enter");
   await expect(logoSearchInput).toHaveValue("Linear");
-  await expect(logoSheet.getByTitle("Linear").first()).toBeVisible({ timeout: 10_000 });
+  await expect(logoSheet.getByTitle("Linear 1").first()).toBeVisible({ timeout: 10_000 });
   await expectLocatorInsideViewport(page, logoSheet, "mobile logo search sheet after input");
+  const editLogoScroll = await captureLogoSheetScrollMetrics(logoSheet, "logo-search-results");
+  expect(editLogoScroll.scrollHeight, "edit Logo search results should overflow with many candidates").toBeGreaterThan(
+    editLogoScroll.clientHeight,
+  );
+  expect(editLogoScroll.scrollTop, JSON.stringify(editLogoScroll, null, 2)).toBeGreaterThanOrEqual(
+    editLogoScroll.scrollHeight - editLogoScroll.clientHeight - 1,
+  );
+  expect(editLogoScroll.lastBottomGap, JSON.stringify(editLogoScroll, null, 2)).toBeGreaterThanOrEqual(8);
 
-  await logoSheet.getByTitle("Linear").first().click();
+  await page.keyboard.press("Escape");
   await expect(logoSheet).toBeHidden();
 
   const rootScrollBefore = await page.evaluate(() => document.getElementById("root")?.scrollTop ?? 0);
@@ -371,6 +449,49 @@ test("mobile sheets keep Logo and currency search stable while typing", async ({
   await expect(editDialog).toBeHidden();
 });
 
+test("mobile import Logo editor keeps search candidates scrollable", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 640 });
+  await installLogoCandidateRoute(page);
+
+  await page.goto("/subscriptions");
+  await page.getByRole("button", { name: "导入数据" }).click();
+  const importDialog = page.getByRole("dialog", { name: "导入数据" });
+  await expect(importDialog).toBeVisible();
+
+  await importDialog.getByRole("tab", { name: "粘贴 JSON" }).click();
+  await importDialog.getByPlaceholder("粘贴 Renewlet 或 Wallos JSON...").fill(JSON.stringify([{
+    Name: "Linear",
+    "Payment Cycle": "Monthly",
+    "Next Payment": "2026-06-01",
+    Price: "$10",
+    Category: "Software",
+    "Payment Method": "Visa",
+  }]));
+  await Promise.all([
+    page.waitForResponse((response) =>
+      response.url().includes("/api/app/import/preview") && response.request().method() === "POST",
+    ),
+    importDialog.getByRole("button", { name: "生成预览" }).click(),
+  ]);
+
+  await importDialog.getByRole("button", { name: "修改 Logo" }).first().click();
+  const importLogoSheet = page.locator(".h5-import-logo-sheet");
+  await expect(importLogoSheet).toBeVisible();
+  await expect(importLogoSheet).toHaveClass(/h5-logo-sheet/);
+  await expect(importLogoSheet).toHaveClass(/h5-mobile-sheet-large/);
+  await waitForSheetAnimation(importLogoSheet);
+  await expect(importLogoSheet.getByTitle("Linear 1").first()).toBeVisible({ timeout: 10_000 });
+
+  const importLogoScroll = await captureLogoSheetScrollMetrics(importLogoSheet, null);
+  expect(importLogoScroll.scrollHeight, "import Logo search results should overflow with many candidates").toBeGreaterThan(
+    importLogoScroll.clientHeight,
+  );
+  expect(importLogoScroll.scrollTop, JSON.stringify(importLogoScroll, null, 2)).toBeGreaterThanOrEqual(
+    importLogoScroll.scrollHeight - importLogoScroll.clientHeight - 1,
+  );
+  expect(importLogoScroll.lastBottomGap, JSON.stringify(importLogoScroll, null, 2)).toBeGreaterThanOrEqual(8);
+});
+
 test("mobile option sheets use consistent detents and do not leak backdrop events", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 640 });
 
@@ -394,19 +515,34 @@ test("mobile option sheets use consistent detents and do not leak backdrop event
   await expectOverlayLeavesTopScrim(page, categorySheet, "category large sheet");
   await expectLocatorInsideViewport(page, categorySheet, "category large sheet");
   await expectNoHorizontalOverflow(page, "category large sheet");
+  await expectMobileSelectSheetStableWhileScrolling(categorySheet, "category large sheet");
   await page.keyboard.press("Escape");
   await expect(categorySheet).toBeHidden();
 
+  await page.setViewportSize({ width: 390, height: 740 });
   const dialog = await openAddSubscriptionDialog(page);
+  const currencyTrigger = dialog.getByRole("combobox", { name: "选择货币" });
+  await currencyTrigger.scrollIntoViewIfNeeded();
   const statusTrigger = dialog.getByRole("combobox").filter({ hasText: "活跃" });
   await statusTrigger.scrollIntoViewIfNeeded();
+  const currencyBox = await getRequiredLocatorBoundingBox(currencyTrigger, "currency trigger under status backdrop");
+  const currencyTapPoint = {
+    x: currencyBox.x + currencyBox.width / 2,
+    y: currencyBox.y + currencyBox.height / 2,
+  };
   await statusTrigger.click();
   const statusSheet = page.locator(".h5-mobile-sheet-content").filter({ hasText: "活跃" }).last();
   await expect(statusSheet).toBeVisible();
-  await tapMobileSheetBackdrop(page);
+  const statusSheetBox = await getRequiredLocatorBoundingBox(statusSheet, "status sheet");
+  expect(
+    currencyTapPoint.y,
+    "currency trigger coordinate must hit the backdrop, not the visible status sheet",
+  ).toBeLessThan(statusSheetBox.y);
+  await tapMobileSheetBackdrop(page, currencyTapPoint);
   await expect(statusSheet).toBeHidden();
   await expect(dialog).toBeVisible();
   await expect(page.locator(".h5-mobile-sheet-content")).toHaveCount(0);
+  await expect(page.getByTestId("searchable-select-sheet")).toHaveCount(0);
 
   const paymentTrigger = dialog.getByRole("combobox").filter({ hasText: "选择支付方式" });
   await paymentTrigger.scrollIntoViewIfNeeded();

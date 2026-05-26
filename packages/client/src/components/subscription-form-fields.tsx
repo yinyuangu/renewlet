@@ -1,13 +1,3 @@
-/**
- * 订阅表单字段渲染层。
- *
- * 架构位置：
- * - SubscriptionDialog 管理表单状态、提交和错误。
- * - 本组件只渲染字段，并把用户输入回传给外层。
- *
- * 注意： 不在这里调用 API 或做最终保存校验，避免新增/编辑流程出现两个真相来源。
- * 注意： 字段值保持 UI 输入态（多数是 string），不要在本组件提前转换成 domain 类型。
- */
 import { memo, useCallback, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import { Button } from "@/components/ui/button";
 import { FieldError } from "@/components/ui/field-error";
@@ -18,27 +8,27 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Switch } from "@/components/ui/switch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar as CalendarIcon, CreditCard } from "lucide-react";
+import { Calendar as CalendarIcon } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { compareDateOnly, dateOnlyToLocalDate, dateToDateOnly } from "@/lib/time/date-only";
 import { LogoPicker, type UploadStatus as LogoUploadStatus } from "@/components/logo-picker";
-import { AuthorizedImage } from "@/components/authorized-image";
+import { SubscriptionPaymentMethodSelect } from "@/components/subscription-payment-method-select";
 import { SubscriptionTagInput } from "@/components/subscription-tag-input";
 import type { CustomConfig } from "@/types/config";
 import type {
   BillingCycle,
-  Category,
-  PaymentMethod,
   RepeatReminderInterval,
   RepeatReminderWindow,
   SubscriptionStatus,
 } from "@/types/subscription";
 import {
+  INHERIT_REMINDER_DAYS,
   CURRENCY_OPTIONS,
   CYCLE_LABELS,
   REMINDER_DAYS_OPTIONS,
   REPEAT_REMINDER_INTERVAL_OPTIONS,
+  REPEAT_REMINDER_SENTENCE_INTERVAL_LABELS,
   REPEAT_REMINDER_WINDOW_OPTIONS,
 } from "@/types/subscription";
 import type { SubscriptionFormReminderType, SubscriptionFormState } from "@/types/subscription-form";
@@ -47,9 +37,7 @@ import { toReminderDays } from "@/lib/subscription-form";
 import { useI18n } from "@/i18n/I18nProvider";
 import { localizedLabel } from "@/i18n/locales";
 
-/** 透出提醒类型，方便外层弹窗复用表单状态契约。 */
 export type { SubscriptionFormReminderType };
-/** 透出订阅表单状态类型，字段值以 UI 输入态为准。 */
 export type { SubscriptionFormState };
 
 export interface SubscriptionFormFieldsProps {
@@ -62,6 +50,7 @@ export interface SubscriptionFormFieldsProps {
   onFieldChange?: <K extends keyof SubscriptionFormState>(key: K, value: SubscriptionFormState[K]) => void;
   errors?: SubscriptionFormErrors | undefined;
   onClearFieldError?: ((field: keyof SubscriptionFormErrors) => void) | undefined;
+  notificationReminderDays: number;
 }
 
 export type SubscriptionFormErrors = Partial<Record<
@@ -83,7 +72,6 @@ const errorFieldByFormKey: Partial<Record<keyof SubscriptionFormState, keyof Sub
   tags: "tags",
 } satisfies Partial<Record<keyof SubscriptionFormState, keyof SubscriptionFormErrors>>;
 
-/** 渲染新增/编辑订阅共用字段。 */
 export const SubscriptionFormFields = memo(function SubscriptionFormFields({
   idPrefix,
   config,
@@ -94,6 +82,7 @@ export const SubscriptionFormFields = memo(function SubscriptionFormFields({
   onFieldChange,
   errors = {},
   onClearFieldError,
+  notificationReminderDays,
 }: SubscriptionFormFieldsProps) {
   const { t, locale, label, formatDateOnly } = useI18n();
   const [startDatePickerOpen, setStartDatePickerOpen] = useState(false);
@@ -101,6 +90,16 @@ export const SubscriptionFormFields = memo(function SubscriptionFormFields({
 
   const update = useCallback(<K extends keyof SubscriptionFormState>(key: K, value: SubscriptionFormState[K]) => {
     setFormData((prev) => {
+      if (key === "billingCycle") {
+        const nextBillingCycle = value as BillingCycle;
+        return {
+          ...prev,
+          billingCycle: nextBillingCycle,
+          customDays: nextBillingCycle === "custom" ? prev.customDays : "",
+          // 一次性购买不是续费周期，表单层先关闭自动推算，保存边界会再次清空该字段。
+          autoCalculate: nextBillingCycle === "one-time" ? false : prev.autoCalculate,
+        };
+      }
       if (key === "startDate") {
         const nextStartDate = value as SubscriptionFormState["startDate"];
         return {
@@ -155,17 +154,14 @@ export const SubscriptionFormFields = memo(function SubscriptionFormFields({
   const selectedNextBillingDate = formData.nextBillingDate ? dateOnlyToLocalDate(formData.nextBillingDate) : undefined;
   // 当非法到期日被清空后，打开到期日历应落在开始日所在月份，让下一个合法选择直接可见。
   const nextBillingDateCalendarMonth = selectedNextBillingDate ?? selectedStartDate;
-  const repeatReminderIntervalLabel =
-    REPEAT_REMINDER_INTERVAL_OPTIONS.find((option) => option.value === formData.repeatReminderInterval)?.labels;
-  const repeatReminderIntervalText = repeatReminderIntervalLabel
-    ? label(repeatReminderIntervalLabel)
-    : formData.repeatReminderInterval;
-  const repeatReminderSentenceInterval =
-    locale === "en-US" ? repeatReminderIntervalText.replace(/^Every/, "every") : repeatReminderIntervalText;
+  const repeatReminderSentenceInterval = label(REPEAT_REMINDER_SENTENCE_INTERVAL_LABELS[formData.repeatReminderInterval]);
   const repeatReminderWindowHours =
     formData.repeatReminderWindow === "full" ? null : Number.parseInt(formData.repeatReminderWindow, 10);
+  const reminderDaysForPreview = formData.reminderType === "inherit"
+    ? notificationReminderDays
+    : toReminderDays(formData);
   const repeatReminderPreview =
-    repeatReminderWindowHours === null || toReminderDays(formData) * 24 <= repeatReminderWindowHours
+    repeatReminderWindowHours === null || reminderDaysForPreview * 24 <= repeatReminderWindowHours
       ? t("subscription.repeatReminderPreview.afterFirst", { interval: repeatReminderSentenceInterval })
       : t("subscription.repeatReminderPreview.finalWindow", { hours: repeatReminderWindowHours });
 
@@ -305,28 +301,14 @@ export const SubscriptionFormFields = memo(function SubscriptionFormFields({
         ) : (
           <div className="grid gap-2">
             <Label htmlFor={id("paymentMethod")}>{t("subscription.field.paymentMethod")}</Label>
-            <Select
+            <SubscriptionPaymentMethodSelect
               value={formData.paymentMethod}
+              methods={config.paymentMethods}
+              labelFor={label}
+              placeholder={t("subscription.placeholder.paymentMethod")}
+              tooltipContent={paymentMethodLabel ? label(paymentMethodLabel) : undefined}
               onValueChange={(value) => update("paymentMethod", value)}
-            >
-              <SelectTrigger className="border-border bg-secondary" tooltipContent={paymentMethodLabel ? label(paymentMethodLabel) : undefined}>
-                <SelectValue placeholder={t("subscription.placeholder.paymentMethod")} />
-              </SelectTrigger>
-              <SelectContent>
-                {config.paymentMethods.map((method) => (
-                  <SelectItem key={method.value} value={method.value}>
-                    <div className="flex items-center gap-2">
-                      {method.icon ? (
-                        <AuthorizedImage src={method.icon} alt="" className="w-4 h-4 object-contain" />
-                      ) : (
-                        <CreditCard className="w-4 h-4 text-muted-foreground" />
-                      )}
-                      <span>{label(method.labels)}</span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            />
           </div>
         )}
       </div>
@@ -334,28 +316,14 @@ export const SubscriptionFormFields = memo(function SubscriptionFormFields({
       {formData.billingCycle === "custom" && (
         <div className="grid gap-2">
           <Label htmlFor={id("paymentMethod")}>{t("subscription.field.paymentMethod")}</Label>
-          <Select
+          <SubscriptionPaymentMethodSelect
             value={formData.paymentMethod}
+            methods={config.paymentMethods}
+            labelFor={label}
+            placeholder={t("subscription.placeholder.paymentMethod")}
+            tooltipContent={paymentMethodLabel ? label(paymentMethodLabel) : undefined}
             onValueChange={(value) => update("paymentMethod", value)}
-          >
-            <SelectTrigger className="border-border bg-secondary" tooltipContent={paymentMethodLabel ? label(paymentMethodLabel) : undefined}>
-              <SelectValue placeholder={t("subscription.placeholder.paymentMethod")} />
-            </SelectTrigger>
-            <SelectContent>
-              {config.paymentMethods.map((method) => (
-                <SelectItem key={method.value} value={method.value}>
-                  <div className="flex items-center gap-2">
-                    {method.icon ? (
-                      <AuthorizedImage src={method.icon} alt="" className="w-4 h-4 object-contain" />
-                    ) : (
-                      <CreditCard className="w-4 h-4 text-muted-foreground" />
-                    )}
-                    <span>{label(method.labels)}</span>
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          />
         </div>
       )}
 
@@ -369,6 +337,7 @@ export const SubscriptionFormFields = memo(function SubscriptionFormFields({
             <Switch
               id={id("autoCalculate")}
               checked={formData.autoCalculate}
+              disabled={formData.billingCycle === "one-time"}
               onCheckedChange={(checked) => update("autoCalculate", checked)}
             />
           </div>
@@ -471,6 +440,9 @@ export const SubscriptionFormFields = memo(function SubscriptionFormFields({
             {formData.autoCalculate && (
               <p className="text-xs text-muted-foreground">{t("subscription.autoCalculateHelp")}</p>
             )}
+            {formData.billingCycle === "one-time" && (
+              <p className="text-xs text-muted-foreground">{t("subscription.oneTimeDateHelp")}</p>
+            )}
           </div>
         </div>
         <FieldError id={id("dates-error")} message={errors.dates} />
@@ -492,10 +464,13 @@ export const SubscriptionFormFields = memo(function SubscriptionFormFields({
         </div>
         <div className="flex flex-col gap-3 sm:flex-row">
           <Select
-            value={formData.reminderType === "custom" ? "custom" : formData.reminderDays}
+            value={formData.reminderType === "custom" ? "custom" : formData.reminderType === "inherit" ? String(INHERIT_REMINDER_DAYS) : formData.reminderDays}
             onValueChange={(value) => {
               if (value === "custom") {
                 update("reminderType", "custom");
+              } else if (value === String(INHERIT_REMINDER_DAYS)) {
+                update("reminderType", "inherit");
+                update("reminderDays", String(INHERIT_REMINDER_DAYS));
               } else {
                 update("reminderType", "preset");
                 update("reminderDays", value);
@@ -509,10 +484,14 @@ export const SubscriptionFormFields = memo(function SubscriptionFormFields({
               )}
               aria-invalid={Boolean(errors.reminderDays)}
               aria-describedby={errors.reminderDays ? id("reminder-error") : undefined}
+              aria-label={t("subscription.field.reminder")}
             >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value={String(INHERIT_REMINDER_DAYS)}>
+                {t("subscription.reminderInherit", { days: notificationReminderDays })}
+              </SelectItem>
               {REMINDER_DAYS_OPTIONS.map((option) => (
                 <SelectItem key={option.value} value={option.value.toString()}>
                   {label(option.labels)}
