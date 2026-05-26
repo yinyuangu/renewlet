@@ -48,21 +48,52 @@ jobs:
       - name: Sync workspace package versions
         run: node scripts/release.mjs sync-version "${{ inputs.version }}"
 
-      - name: Create release branch pull request
-        uses: peter-evans/create-pull-request@v8.1.0
-        with:
-          branch: release/v${{ inputs.version }}
-          base: main
-          title: "release: v${{ inputs.version }}"
-          commit-message: "chore: prepare release v${{ inputs.version }}"
-          labels: release
-          body: |
-            ## Release v${{ inputs.version }}
+      - name: Create or update release pull request
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_BOT_TOKEN || secrets.GITHUB_TOKEN }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
 
-            This PR promotes the release branch to `main` after RC validation.
+          RELEASE_BRANCH="release/v${VERSION}"
+          PR_TITLE="release: v${VERSION}"
+          BODY_FILE="$(mktemp)"
 
-            Checklist:
-            - [ ] CI is green on `release/v${{ inputs.version }}`
-            - [ ] `v${{ inputs.version }}-rc.1` has been tested
-            - [ ] Docker deployment package has been checked
-            - [ ] Cloudflare release build has passed
+          cat > "$BODY_FILE" <<EOF
+          ## Release v${VERSION}
+
+          This PR promotes the release branch to \`main\` after RC validation.
+
+          Checklist:
+          - [ ] CI is green on \`${RELEASE_BRANCH}\`
+          - [ ] \`v${VERSION}-rc.1\` has been tested
+          - [ ] Docker deployment package has been checked
+          - [ ] Cloudflare release build has passed
+          EOF
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+
+          if ! git diff --quiet; then
+            git add package.json packages/*/package.json
+            git commit -m "chore: prepare release v${VERSION}"
+          fi
+
+          # release PR 的核心差异是 dev 到 main 的提交历史；即使版本文件没有变化，也必须切分支并建 PR。
+          git fetch origin "+refs/heads/${RELEASE_BRANCH}:refs/remotes/origin/${RELEASE_BRANCH}" || true
+          git push --force-with-lease origin "HEAD:${RELEASE_BRANCH}"
+
+          PR_URL="$(gh pr list --base main --head "${RELEASE_BRANCH}" --state open --json url --jq '.[0].url // ""')"
+          if [[ -n "$PR_URL" ]]; then
+            gh pr edit "$PR_URL" --title "$PR_TITLE" --body-file "$BODY_FILE"
+          else
+            PR_URL="$(gh pr create --base main --head "${RELEASE_BRANCH}" --title "$PR_TITLE" --body-file "$BODY_FILE")"
+          fi
+
+          if [[ -z "$PR_URL" ]]; then
+            echo "Release pull request was not created or found." >&2
+            exit 1
+          fi
+
+          echo "Release pull request: ${PR_URL}"
