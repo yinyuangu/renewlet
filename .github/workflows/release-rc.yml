@@ -13,19 +13,44 @@ on:
         required: true
         type: string
 
-permissions:
-  contents: write
+permissions: {}
 
 jobs:
   tag:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      - name: Validate release bot configuration
+        env:
+          RELEASE_APP_CLIENT_ID: ${{ vars.RENEWLET_RELEASE_APP_CLIENT_ID }}
+          RELEASE_APP_PRIVATE_KEY: ${{ secrets.RENEWLET_RELEASE_APP_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "$RELEASE_APP_CLIENT_ID" || -z "$RELEASE_APP_PRIVATE_KEY" ]]; then
+            echo "Release Candidate requires the release bot GitHub App token." >&2
+            echo "Set repository variable RENEWLET_RELEASE_APP_CLIENT_ID and repository secret RENEWLET_RELEASE_APP_PRIVATE_KEY." >&2
+            echo "The release bot app needs Contents: write, Pull requests: write, and Workflows: write on this repository." >&2
+            exit 1
+          fi
+
+      - name: Create release bot token
+        id: release-bot
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.RENEWLET_RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RENEWLET_RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-workflows: write
+
       - name: Checkout release branch
         uses: actions/checkout@v6.0.2
         with:
           ref: release/v${{ inputs.version }}
           fetch-depth: 0
+          token: ${{ steps.release-bot.outputs.token }}
+          persist-credentials: false
 
       - name: Set up Node.js
         uses: actions/setup-node@v6.0.0
@@ -39,10 +64,20 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Create RC tag
-        # RC tag 会触发 release-publish，但不会更新 latest，也不会进入 Cloudflare 生产部署。
+        # RC tag 必须由 release bot 推送；GITHUB_TOKEN 推出的 tag 会被 GitHub 忽略，无法触发 release-publish。
+        env:
+          RELEASE_BOT_TOKEN: ${{ steps.release-bot.outputs.token }}
         run: |
           VERSION="$(node scripts/release.mjs validate-version "${{ inputs.version }}-rc.${{ inputs.rc }}")"
+          TAG="v${VERSION}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -a "v${VERSION}" -m "Renewlet v${VERSION}"
-          git push origin "v${VERSION}"
+          git remote set-url origin "https://x-access-token:${RELEASE_BOT_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+
+          if git ls-remote --exit-code --tags origin "refs/tags/${TAG}" > /dev/null 2>&1; then
+            echo "Tag ${TAG} already exists. Delete the existing tag or use the next RC number." >&2
+            exit 1
+          fi
+
+          git tag -a "${TAG}" -m "Renewlet ${TAG}"
+          git push origin "${TAG}"

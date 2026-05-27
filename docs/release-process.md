@@ -11,27 +11,54 @@ Renewlet uses a tag-driven release process. `dev` is the integration branch, `ma
 
 Use Conventional Commits for PR titles and commits. Examples: `feat: add notification channel`, `fix: prevent duplicate reminder jobs`, `docs: clarify Docker upgrade`.
 
+## Release Bot GitHub App
+
+Release workflows use a dedicated GitHub App token instead of the default `GITHUB_TOKEN`. This matches mature release workflows such as n8n and Immich, and avoids repository-level `GITHUB_TOKEN` limits around creating pull requests and triggering follow-up CI.
+
+Create a GitHub App named `renewlet-release-bot`, disable webhooks, and install it only on `zhiyingzzhou/renewlet`. Grant the app these repository permissions:
+
+- Contents: read and write
+- Pull requests: read and write
+- Workflows: read and write
+
+Add these repository settings before running release workflows:
+
+- Variable `RENEWLET_RELEASE_APP_CLIENT_ID`: the GitHub App Client ID.
+- Secret `RENEWLET_RELEASE_APP_PRIVATE_KEY`: the full private key PEM generated for the app.
+
+The release workflows fail early if either value is missing. Existing `release/vX.Y.Z` branches can stay in place; the release bot updates the branch and, after RC validation, creates or updates the matching PR.
+
 ## Prepare A Release
 
 1. Make sure `dev` is green in CI.
 2. Run the `Release Prepare` workflow.
 3. Enter a stable SemVer version such as `0.1.0`.
-4. The workflow syncs package versions and opens a `release/v0.1.0` PR against `main`.
+4. The workflow syncs package versions and pushes `release/v0.1.0`.
 5. Edit `CHANGELOG.md` for that version. Keep the notes short and user-facing; the GitHub Release links to the full commit history separately.
 6. Keep release-only fixes on `release/v0.1.0`.
+7. Do not open the `main` PR yet; publish and validate at least one RC first.
 
 ## Publish A Release Candidate
 
 1. Run the `Release Candidate` workflow.
 2. Enter the stable version, for example `0.1.0`.
 3. Enter the RC number, for example `1`.
-4. The workflow creates tag `v0.1.0-rc.1`.
-5. `Release Publish` builds and pushes:
+4. The workflow creates tag `v0.1.0-rc.1` with the release bot token.
+5. GitHub only starts the tag-driven `Release Publish` workflow when the tag is pushed by the release bot token. Tags created by the default `GITHUB_TOKEN` do not trigger follow-up workflows.
+6. `Release Publish` builds and pushes:
    - `zhiyingzzhou/renewlet:0.1.0-rc.1`
    - `zhiyingzzhou/renewlet:rc`
    - `ghcr.io/zhiyingzzhou/renewlet:0.1.0-rc.1`
    - `ghcr.io/zhiyingzzhou/renewlet:rc`
-6. RC releases are GitHub prereleases. They never update `latest` and never deploy production Cloudflare.
+7. RC releases are GitHub prereleases. They never update `latest` and never deploy production Cloudflare.
+
+## Validate And Promote
+
+1. Test the RC Docker image, GitHub prerelease assets, and Cloudflare release build output.
+2. If the RC fails validation, fix `release/v0.1.0` and publish the next RC, for example `v0.1.0-rc.2`.
+3. After an RC passes validation, run the `Release Promote` workflow.
+4. Enter the stable version, for example `0.1.0`, and the validated RC number, for example `1`.
+5. The workflow checks that `v0.1.0-rc.1` exists, then creates or updates the `release/v0.1.0` PR against `main`.
 
 ## Cloudflare Test Deploy
 
@@ -39,9 +66,8 @@ Use `.github/workflows/cloudflare-worker.yml` for Cloudflare test deployments. I
 
 ## Publish Stable
 
-1. Validate the RC with Docker and Cloudflare build checks.
-2. Merge the release PR into `main`.
-3. Create and push an annotated stable tag from `main`:
+1. Merge the promoted release PR into `main`.
+2. Create and push an annotated stable tag from `main`:
 
 ```bash
 git checkout main
@@ -50,16 +76,24 @@ git tag -a v0.1.0 -m "Renewlet v0.1.0"
 git push origin v0.1.0
 ```
 
-4. `Release Publish` builds Docker images, creates a draft GitHub Release, and attaches `renewlet-docker-v0.1.0.zip`.
-5. Stable releases push:
+3. `Release Publish` builds Docker images, creates a draft GitHub Release, and attaches `renewlet-docker-v0.1.0.zip`, `renewlet_0.1.0_linux_amd64.tar.gz`, `renewlet_0.1.0_linux_arm64.tar.gz`, and `checksums.txt`.
+4. Stable releases push:
    - `zhiyingzzhou/renewlet:0.1.0`
    - `zhiyingzzhou/renewlet:0.1`
    - `zhiyingzzhou/renewlet:latest`
    - `ghcr.io/zhiyingzzhou/renewlet:0.1.0`
    - `ghcr.io/zhiyingzzhou/renewlet:0.1`
    - `ghcr.io/zhiyingzzhou/renewlet:latest`
-6. Review the draft Release, verify the Docker image list and short changelog, then publish it manually.
-7. Approve the `production-cloudflare` environment if this release should deploy the production Worker. Stable releases use `.github/workflows/cloudflare-production.yml`, not the test deploy workflow.
+5. Review the draft Release, verify the Docker image list and short changelog, then publish it manually.
+6. Approve the `production-cloudflare` environment if this release should deploy the production Worker. Stable releases use `.github/workflows/cloudflare-production.yml`, not the test deploy workflow.
+
+## Docker In-App Updates
+
+- `/renewlet` is the stable Docker entrypoint and healthcheck path; do not remove it in later releases.
+- The real self-update target is `/opt/renewlet/current/renewlet`; the updater never replaces `/renewlet`.
+- Users on images older than this layout must still run `docker compose pull && docker compose up -d` once. Later stable releases can be installed from the admin version dialog.
+- Release binary archives must be Linux `amd64` and `arm64` tarballs named `renewlet_<version>_linux_<arch>.tar.gz`, with matching SHA-256 entries in `checksums.txt`.
+- Cloudflare builds only expose version/release information and must not expose an executable update path.
 
 ## Hotfix
 

@@ -1,6 +1,6 @@
 name: Release Prepare
 
-# 从 dev 拉出 release/vX.Y.Z 并同步版本号；这一步只准备 PR，不打 tag、不发布产物。
+# 从 dev 拉出 release/vX.Y.Z 并同步版本号；这一步只准备候选分支，不开 main PR、不打 tag、不发布产物。
 on:
   workflow_dispatch:
     inputs:
@@ -14,20 +14,44 @@ on:
         default: dev
         type: string
 
-permissions:
-  contents: write
-  pull-requests: write
+permissions: {}
 
 jobs:
   prepare:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
+      - name: Validate release bot configuration
+        env:
+          RELEASE_APP_CLIENT_ID: ${{ vars.RENEWLET_RELEASE_APP_CLIENT_ID }}
+          RELEASE_APP_PRIVATE_KEY: ${{ secrets.RENEWLET_RELEASE_APP_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "$RELEASE_APP_CLIENT_ID" || -z "$RELEASE_APP_PRIVATE_KEY" ]]; then
+            echo "Release Prepare requires a dedicated GitHub App token." >&2
+            echo "Set repository variable RENEWLET_RELEASE_APP_CLIENT_ID and repository secret RENEWLET_RELEASE_APP_PRIVATE_KEY." >&2
+            echo "The release bot app needs Contents: write, Pull requests: write, and Workflows: write on this repository." >&2
+            exit 1
+          fi
+
+      - name: Create release bot token
+        id: release-bot
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.RENEWLET_RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RENEWLET_RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-workflows: write
+
       - name: Checkout
         uses: actions/checkout@v6.0.2
         with:
           ref: ${{ inputs.base_branch }}
           fetch-depth: 0
+          token: ${{ steps.release-bot.outputs.token }}
+          persist-credentials: false
 
       - name: Set up Node.js
         uses: actions/setup-node@v6.0.0
@@ -41,32 +65,32 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Validate stable version
-        # package.json 只记录稳定 SemVer，RC 后缀只存在于 git tag 和镜像标签里。
+        # 同时校验 SemVer 和连续发布序列，避免 0.1.0 后误填 0.5.0 这类跳号版本。
         run: |
-          VERSION="$(node scripts/release.mjs validate-version "${{ inputs.version }}")"
-          if [[ "$VERSION" == *"-rc."* ]]; then
-            echo "Release prepare only accepts stable versions. Use release-rc for candidates." >&2
-            exit 1
-          fi
+          node scripts/release.mjs validate-next-version "${{ inputs.version }}"
 
       - name: Sync workspace package versions
         run: node scripts/release.mjs sync-version "${{ inputs.version }}"
 
-      - name: Create release branch pull request
-        uses: peter-evans/create-pull-request@v8.1.0
-        with:
-          branch: release/v${{ inputs.version }}
-          base: main
-          title: "release: v${{ inputs.version }}"
-          commit-message: "chore: prepare release v${{ inputs.version }}"
-          labels: release
-          body: |
-            ## Release v${{ inputs.version }}
+      - name: Create or update release branch
+        env:
+          RELEASE_BOT_TOKEN: ${{ steps.release-bot.outputs.token }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
 
-            This PR promotes the release branch to `main` after RC validation.
+          RELEASE_BRANCH="release/v${VERSION}"
 
-            Checklist:
-            - [ ] CI is green on `release/v${{ inputs.version }}`
-            - [ ] `v${{ inputs.version }}-rc.1` has been tested
-            - [ ] Docker deployment package has been checked
-            - [ ] Cloudflare release build has passed
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin "https://x-access-token:${RELEASE_BOT_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+
+          if ! git diff --quiet; then
+            git add package.json packages/*/package.json
+            git commit -m "chore: prepare release v${VERSION}"
+          fi
+
+          # RC 验证前只推进 release 分支；main PR 由 Release Promote 在候选版通过后创建。
+          git fetch origin "+refs/heads/${RELEASE_BRANCH}:refs/remotes/origin/${RELEASE_BRANCH}" || true
+          git push --force-with-lease origin "HEAD:${RELEASE_BRANCH}"
+          echo "Release branch ready: ${RELEASE_BRANCH}"

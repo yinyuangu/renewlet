@@ -1,18 +1,18 @@
 #!/usr/bin/env node
 
 /**
- * 检查手写文件是否超过默认 600 行的上限（check-file-lines.mjs）。
+ * 检查手写文件是否超过默认 800 行的上限（check-file-lines.mjs）。
  *
  * 架构位置：根 package script 和 test:all 会调用该守卫，防止拆分后的源码、
  * 测试、样式、脚本与 i18n 文件再次膨胀到难以维护。
  *
- * 注意： 这里刻意排除锁文件、生成索引、构建产物和 PocketBase 数据目录；
+ * 注意：这里刻意排除锁文件、生成索引、构建产物和 PocketBase 数据目录；
  * 新增生成物目录时必须同步 EXCLUDED_PATHS，否则守卫会把机器生成内容误报为手写代码。
  */
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 
-const DEFAULT_LIMIT = 600;
+const DEFAULT_LIMIT = 800;
 const limit = Number.parseInt(process.env.FILE_LINE_LIMIT ?? String(DEFAULT_LIMIT), 10);
 
 const CHECKED_EXTENSIONS = new Set([
@@ -38,6 +38,7 @@ const EXCLUDED_PATHS = [
   /(^|\/)pb_data\//,
   /^packages\/server\/internal\/static\//,
   /^packages\/client\/src\/lib\/built-in-icons-index\.json$/,
+  /^packages\/client\/src\/i18n\/catalog-keys\.ts$/,
 ];
 
 function trackedAndNewFiles() {

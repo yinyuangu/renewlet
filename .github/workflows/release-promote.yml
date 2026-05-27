@@ -1,0 +1,114 @@
+name: Release Promote
+
+# RC 验证通过后才创建 main PR；这一步不打 tag、不发布产物，只把稳定版合入请求显式化。
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Stable SemVer version without the leading v, for example 0.1.0."
+        required: true
+        type: string
+      rc:
+        description: "Validated RC number, for example 1."
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Validate release bot configuration
+        env:
+          RELEASE_APP_CLIENT_ID: ${{ vars.RENEWLET_RELEASE_APP_CLIENT_ID }}
+          RELEASE_APP_PRIVATE_KEY: ${{ secrets.RENEWLET_RELEASE_APP_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "$RELEASE_APP_CLIENT_ID" || -z "$RELEASE_APP_PRIVATE_KEY" ]]; then
+            echo "Release Promote requires the release bot GitHub App token." >&2
+            echo "Set repository variable RENEWLET_RELEASE_APP_CLIENT_ID and repository secret RENEWLET_RELEASE_APP_PRIVATE_KEY." >&2
+            echo "The release bot app needs Contents: write, Pull requests: write, and Workflows: write on this repository." >&2
+            exit 1
+          fi
+
+      - name: Create release bot token
+        id: release-bot
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.RENEWLET_RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RENEWLET_RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-workflows: write
+
+      - name: Checkout release branch
+        uses: actions/checkout@v6.0.2
+        with:
+          ref: release/v${{ inputs.version }}
+          fetch-depth: 0
+          token: ${{ steps.release-bot.outputs.token }}
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6.0.0
+        with:
+          node-version: 24
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Create or update release pull request
+        env:
+          GH_TOKEN: ${{ steps.release-bot.outputs.token }}
+          VERSION: ${{ inputs.version }}
+          RC: ${{ inputs.rc }}
+        run: |
+          set -euo pipefail
+
+          RELEASE_BRANCH="release/v${VERSION}"
+          RC_VERSION="$(node scripts/release.mjs validate-version "${VERSION}-rc.${RC}")"
+          RC_TAG="v${RC_VERSION}"
+          PR_TITLE="release: v${VERSION}"
+          BODY_FILE="$(mktemp)"
+
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          if ! git ls-remote --exit-code --tags origin "refs/tags/${RC_TAG}" > /dev/null 2>&1; then
+            echo "Validated RC tag ${RC_TAG} does not exist. Publish and test the RC before promoting this release." >&2
+            exit 1
+          fi
+
+          cat > "$BODY_FILE" <<EOF
+          ## Release v${VERSION}
+
+          This PR promotes \`${RELEASE_BRANCH}\` to \`main\` after RC validation.
+
+          Validated RC:
+          - \`${RC_TAG}\`
+
+          Checklist:
+          - [ ] CI is green on \`${RELEASE_BRANCH}\`
+          - [ ] \`${RC_TAG}\` Docker and GHCR images have been tested
+          - [ ] Docker deployment package has been checked
+          - [ ] Cloudflare release build has passed
+          EOF
+
+          # main PR 只在已验证 RC 存在后创建，避免未测试候选版提前进入稳定合并队列。
+          PR_URL="$(gh pr list --base main --head "${RELEASE_BRANCH}" --state open --json url --jq '.[0].url // ""')"
+          if [[ -n "$PR_URL" ]]; then
+            gh pr edit "$PR_URL" --title "$PR_TITLE" --body-file "$BODY_FILE"
+          else
+            PR_URL="$(gh pr create --base main --head "${RELEASE_BRANCH}" --title "$PR_TITLE" --body-file "$BODY_FILE")"
+          fi
+
+          if [[ -z "$PR_URL" ]]; then
+            echo "Release pull request was not created or found." >&2
+            exit 1
+          fi
+
+          echo "Release pull request: ${PR_URL}"
