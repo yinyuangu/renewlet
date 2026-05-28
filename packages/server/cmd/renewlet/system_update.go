@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -38,16 +39,17 @@ func (service *systemUpdateService) CheckVersion(ctx context.Context, locale app
 	if err != nil {
 		if cached := service.cachedVersion(); cached != nil {
 			// 版本检查是管理页体验能力，不应因 GitHub 短暂失败阻断管理员查看上次可信结果。
-			cached.Warning = serverFormat(locale, "system.versionCheckCacheWarning", map[string]interface{}{"error": err.Error()})
+			cached.Warning = service.versionCheckWarning(locale, err)
 			return cached, nil
 		}
-		response.Warning = err.Error()
+		response.Warning = service.versionCheckWarning(locale, err)
 		return response, nil
 	}
 
 	response.ReleaseInfo = release.dto
 	response.LatestVersion = release.dto.Version
 	response.HasUpdate = isNewerSystemVersion(Version, release.dto.Version)
+	response.CheckSucceeded = true
 	service.storeVersion(response)
 	return cloneSystemVersionResponse(response, false), nil
 }
@@ -144,6 +146,7 @@ func (service *systemUpdateService) baseVersionResponse(locale appLocale) *syste
 		UnsupportedReason: capability.unsupportedReason,
 		ReleaseInfo:       nil,
 		Cached:            false,
+		CheckSucceeded:    false,
 		Build: systemBuildInfo{
 			Version:   Version,
 			Commit:    Commit,
@@ -160,7 +163,7 @@ func (service *systemUpdateService) fetchLatestRelease(ctx context.Context) (*fe
 	}
 	version, parsed, ok := parseSystemVersion(release.TagName)
 	if !ok || parsed.prerelease != "" || release.Prerelease || release.Draft {
-		return nil, fmt.Errorf("latest GitHub release is not a stable Renewlet release")
+		return nil, errSystemNoStableRelease
 	}
 	assets := make([]systemReleaseAssetDTO, 0, len(release.Assets))
 	for _, asset := range release.Assets {
@@ -201,6 +204,36 @@ func (service *systemUpdateService) clearCache() {
 	defer service.cacheMu.Unlock()
 	service.cacheValue = nil
 	service.cacheExpiry = time.Time{}
+}
+
+func (service *systemUpdateService) versionCheckWarning(locale appLocale, err error) string {
+	var githubErr *githubAPIError
+	if errors.As(err, &githubErr) {
+		if githubErr.rateLimited {
+			return service.versionCheckRateLimitWarning(locale, githubErr.retryAt)
+		}
+		switch githubErr.statusCode {
+		case http.StatusNotFound:
+			return serverText(locale, "system.versionCheckNotFoundWarning")
+		case http.StatusForbidden, http.StatusUnauthorized:
+			return serverText(locale, "system.versionCheckAccessWarning")
+		case 0:
+			return serverText(locale, "system.versionCheckNetworkWarning")
+		default:
+			return serverText(locale, "system.versionCheckUnavailableWarning")
+		}
+	}
+	if errors.Is(err, errSystemNoStableRelease) {
+		return serverText(locale, "system.versionCheckNoStableReleaseWarning")
+	}
+	return serverText(locale, "system.versionCheckUnavailableWarning")
+}
+
+func (service *systemUpdateService) versionCheckRateLimitWarning(locale appLocale, retryAt time.Time) string {
+	if !retryAt.IsZero() && retryAt.After(service.now()) {
+		return serverFormat(locale, "system.versionCheckRateLimitRetryWarning", map[string]interface{}{"time": retryAt.UTC().Format(time.RFC3339)})
+	}
+	return serverText(locale, "system.versionCheckRateLimitWarning")
 }
 
 func (service *systemUpdateService) beginUpdate() bool {

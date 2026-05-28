@@ -1,20 +1,23 @@
 # Cloudflare Workers Deploy
 
-## One-Click Deploy
+## Recommended: One-Click Deploy
 
 <a href="https://deploy.workers.cloudflare.com/?url=https://github.com/zhiyingzzhou/renewlet"><img src="https://deploy.workers.cloudflare.com/button" alt="Deploy to Cloudflare"></a>
 
 1. Click the button.
-2. Finish the Cloudflare wizard.
-3. Open:
+2. Sign in to Cloudflare or authorize access.
+3. Finish the Cloudflare wizard.
+4. Open:
 
 ```text
 https://<worker-name>.<workers-dev-subdomain>.workers.dev/setup
 ```
 
-## GitHub Actions Deploy
+If you prefer to create D1/R2, the Cloudflare API Token, and GitHub Secrets yourself, use the manual deploy flow below.
 
-Manual Cloudflare resources and GitHub Secrets. Push to `dev` or run the workflow manually.
+## Manual Deploy (GitHub Actions)
+
+Manual deploy is for users who want to manage Cloudflare resources and GitHub Actions themselves. After preparing the 5 values below, run `Cloudflare Worker` manually in your fork.
 
 Workflow:
 
@@ -155,7 +158,7 @@ In your fork repository, open `Settings` -> `Secrets and variables` -> `Actions`
 
 The workflow file is `.github/workflows/cloudflare-worker.yml`.
 
-It runs automatically when you push to `dev`, and you can also run it manually from GitHub Actions:
+For the first deployment, run it manually from GitHub Actions. Later, when you sync upstream changes into your fork, Actions can redeploy automatically if enabled. You can also run it manually at any time:
 
 The workflow needs all 5 repository secrets to deploy to Cloudflare. Without them, it only verifies the Cloudflare build path and does not change any remote D1 database or Worker.
 
@@ -186,20 +189,23 @@ Custom domain: after deployment, bind a Worker route or custom domain for the Wo
 
 ## Update Version
 
-Workers deploy does not support Renewlet's Docker in-app updater. The admin version dialog only shows version information and the GitHub Release link.
-
-Workers deploy supports two update modes:
+Cloudflare Workers deployments can update with automatic sync or manual sync.
 
 ### Automatic Update
 
-Enable Upstream Sync Action. Upstream updates sync and deploy automatically.
+If your fork has automatic upstream sync enabled, upstream updates sync and redeploy automatically.
 
 ### Manual Update
 
-1. Sync upstream updates in the fork.
-2. After sync, deployment runs automatically. You can also run `Cloudflare Worker` from Actions.
+1. Open your fork repository.
+2. Click `Sync fork`.
+3. If GitHub asks for confirmation, click `Update branch`.
+4. Wait for Cloudflare to redeploy.
+5. If deployment does not start automatically, open `Actions` and run `Cloudflare Worker` manually.
 
-## Wrangler CLI
+## Optional: Wrangler CLI
+
+Most deployments do not need Wrangler CLI. Use these commands only if you want to manage Cloudflare resources from your own machine.
 
 Create resources:
 
@@ -224,101 +230,6 @@ pnpm check:cloudflare
 pnpm build:cloudflare
 pnpm exec wrangler d1 migrations apply DB --remote --config wrangler.generated.jsonc
 pnpm exec wrangler deploy --config wrangler.generated.jsonc
-```
-
-## Local Development
-
-Copy the local variables example:
-
-```bash
-cp .dev.vars.example .dev.vars
-```
-
-Start the local Worker:
-
-```bash
-pnpm check:cloudflare
-pnpm build:cloudflare
-pnpm exec wrangler d1 migrations apply DB --local
-pnpm exec wrangler dev --test-scheduled --ip 0.0.0.0
-```
-
-Open:
-
-```text
-http://localhost:8787/setup
-http://<local LAN IP>:8787/setup
-```
-
-Production Cron uses `triggers.crons` in `wrangler.jsonc`.
-
-Simulate a Cron Trigger locally:
-
-```bash
-curl "http://localhost:8787/__scheduled?cron=*+*+*+*+*"
-curl "http://<local LAN IP>:8787/__scheduled?cron=*+*+*+*+*"
-```
-
-`/__scheduled` requires `wrangler dev --test-scheduled`.
-
-## Post-Deployment Check
-
-First copy the check variable template, then fill in the deployed Worker domain and an independent test administrator account:
-
-```bash
-cp cloudflare-check.env.example cloudflare-check.env.local
-```
-
-Then run:
-
-```bash
-pnpm test:e2e:cloudflare
-```
-
-`cloudflare-check.env.local` is ignored by git. The script first runs `pnpm typecheck:e2e`, then checks public routes, login guards, private pages, the settings page, temporary subscription create/delete, mobile layout, and duplicate requests from core APIs.
-
-Read-only check only:
-
-```bash
-pnpm test:e2e:cloudflare -- --readonly
-```
-
-## Local Data
-
-Wrangler's local D1 files are in the project directory:
-
-```text
-.wrangler/state/v3/d1/
-```
-
-Renewlet's local R2 state is in:
-
-```text
-.wrangler/state/v3/r2/
-```
-
-List tables:
-
-```bash
-pnpm exec wrangler d1 execute DB --local --command "SELECT name FROM sqlite_schema WHERE type='table' ORDER BY name;"
-```
-
-View users:
-
-```bash
-pnpm exec wrangler d1 execute DB --local --command "SELECT id, email, role, created_at FROM users;"
-```
-
-View subscription count:
-
-```bash
-pnpm exec wrangler d1 execute DB --local --command "SELECT COUNT(*) AS count FROM subscriptions;"
-```
-
-Open directly with `sqlite3`:
-
-```bash
-sqlite3 "$(find .wrangler/state/v3/d1 -name '*.sqlite' ! -name 'metadata.sqlite' | head -n 1)"
 ```
 
 ## Other Configuration

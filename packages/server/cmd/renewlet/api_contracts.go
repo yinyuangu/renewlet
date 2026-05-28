@@ -195,6 +195,7 @@ type systemVersionResponse struct {
 	CurrentVersion    string                `json:"currentVersion"`
 	LatestVersion     string                `json:"latestVersion"`
 	HasUpdate         bool                  `json:"hasUpdate"`
+	CheckSucceeded    bool                  `json:"checkSucceeded"`
 	Runtime           string                `json:"runtime"`
 	UpdateSupported   bool                  `json:"updateSupported"`
 	UnsupportedReason string                `json:"unsupportedReason,omitempty"`

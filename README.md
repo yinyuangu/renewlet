@@ -46,7 +46,9 @@ Idle memory usage is around 20-30MiB in local testing, making it comfortable for
 
 <a href="https://deploy.workers.cloudflare.com/?url=https://github.com/zhiyingzzhou/renewlet"><img src="https://deploy.workers.cloudflare.com/button" alt="Deploy to Cloudflare"></a>
 
-[Cloudflare Workers Deploy](docs/cloudflare-workers-deploy.md)
+Click the button and follow the Cloudflare wizard for the easiest deployment path.
+
+If you want to create Cloudflare resources yourself or deploy with GitHub Actions, see [Cloudflare Workers manual deploy](docs/cloudflare-workers-deploy.md).
 
 ## Quick Deploy
 
@@ -80,7 +82,7 @@ docker compose pull
 docker compose up -d
 ```
 
-`latest` only moves on stable GitHub Releases. For production, prefer a concrete version tag such as `0.1.0`; release candidates use tags like `0.1.0-rc.1` and never update `latest`.
+For production, prefer a concrete stable version tag such as `0.1.0`.
 
 ### Upgrade
 
@@ -90,7 +92,7 @@ Back up data and config before upgrading:
 tar -czf renewlet-backup-$(date +%F).tgz .env docker-compose.yml data
 ```
 
-If your current container predates the in-app updater, upgrade once with Docker:
+Upgrade to a specific version with Docker Compose:
 
 ```bash
 sed -i.bak 's#RENEWLET_IMAGE=.*#RENEWLET_IMAGE="zhiyingzzhou/renewlet:0.1.0"#' .env
@@ -99,9 +101,9 @@ docker compose up -d
 docker compose logs -f
 ```
 
-After that bridge upgrade, admins can open the version badge in the header and click **Update now** for later stable releases. Docker keeps `/renewlet` as the stable entrypoint and healthcheck path; the updater only replaces `/opt/renewlet/current/renewlet` inside the container.
+Admins can also open the version menu in Renewlet and click **Update now**.
 
-Cloudflare deployments show the version and release link only. Upgrade them through the Cloudflare deployment workflow or by syncing your fork.
+Cloudflare deployments update from your fork: click `Sync fork` / `Update branch`, wait for redeploy, and run `Cloudflare Worker` manually only if it does not start automatically.
 
 ### Common commands
 

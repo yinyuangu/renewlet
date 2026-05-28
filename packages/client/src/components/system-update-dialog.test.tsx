@@ -32,6 +32,8 @@ vi.mock("@/i18n/I18nProvider", () => ({
         "system.badgeVersion": "v{version}",
         "system.buildType": "构建类型",
         "system.checking": "正在检查版本...",
+        "system.checkDeferredDescription": "当前显示的是本机版本；请稍后重新检查。",
+        "system.checkDeferredTitle": "暂时无法检查更新",
         "system.currentVersion": "当前版本",
         "system.latestVersion": "最新版本",
         "system.noUpdateDescription": "当前部署不需要更新。",
@@ -49,7 +51,6 @@ vi.mock("@/i18n/I18nProvider", () => ({
         "system.unsupportedTitle": "当前部署不支持一键更新",
         "system.updateAvailableDescription": "可以更新到 v{version}。",
         "system.updateAvailableTitle": "发现新版本",
-        "system.updateDescription": "检查 GitHub Release，并在支持的 Docker 部署中一键替换运行二进制。",
         "system.updateFailedDescription": "更新失败，请稍后重试。",
         "system.updateFailedTitle": "更新失败",
         "system.updateNow": "立即更新",
@@ -73,6 +74,7 @@ function versionFixture(overrides: Record<string, unknown> = {}) {
     currentVersion: "1.0.0",
     latestVersion: "1.1.0",
     hasUpdate: true,
+    checkSucceeded: true,
     runtime: "docker",
     updateSupported: true,
     releaseInfo: {
@@ -149,6 +151,23 @@ describe("SystemUpdateDialog", () => {
 
     expect(await screen.findByText("当前部署不支持一键更新")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "立即更新" })).toBeDisabled();
+  });
+
+  it("shows a deferred check state without claiming the deployment is current", async () => {
+    mocks.apiFetch.mockResolvedValueOnce(versionFixture({
+      latestVersion: "1.0.0",
+      hasUpdate: false,
+      checkSucceeded: false,
+      releaseInfo: null,
+      warning: "GitHub API 临时限流，请稍后重新检查。",
+    }));
+
+    renderWithQuery(<SystemUpdateDialog open onOpenChange={vi.fn()} />);
+
+    expect(await screen.findByText("暂时无法检查更新")).toBeInTheDocument();
+    expect(screen.getByText("GitHub API 临时限流，请稍后重新检查。")).toBeInTheDocument();
+    expect(screen.queryByText("已是最新版本")).not.toBeInTheDocument();
+    expect(screen.queryByText("检查 GitHub Release，并在支持的 Docker 部署中一键替换运行二进制。")).not.toBeInTheDocument();
   });
 });
 

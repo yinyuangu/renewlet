@@ -8,9 +8,12 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -84,6 +87,69 @@ func TestSelectSystemUpdateAssets(t *testing.T) {
 	}
 	if archive.Name != archiveName || checksum.Name != "checksums.txt" {
 		t.Fatalf("unexpected assets: %#v %#v", archive, checksum)
+	}
+}
+
+func TestGitHubReleaseRequestUsesVersionedAPIHeadersAndOptionalToken(t *testing.T) {
+	t.Setenv(systemUpdateGitHubTokenEnv, "ghp_test")
+	var captured *http.Request
+	client := &httpSystemReleaseClient{
+		apiClient: &http.Client{
+			Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
+				captured = request
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Status:     "200 OK",
+					Header:     make(http.Header),
+					Body: io.NopCloser(strings.NewReader(`{
+						"tag_name":"v1.2.3",
+						"name":"Renewlet 1.2.3",
+						"body":"",
+						"published_at":"2026-05-27T00:00:00Z",
+						"html_url":"https://github.com/zhiyingzzhou/renewlet/releases/tag/v1.2.3",
+						"prerelease":false,
+						"draft":false,
+						"assets":[]
+					}`)),
+				}, nil
+			}),
+		},
+	}
+	if _, err := client.FetchLatestRelease(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if captured == nil {
+		t.Fatal("expected request to be captured")
+	}
+	if got := captured.Header.Get("Accept"); got != "application/vnd.github+json" {
+		t.Fatalf("Accept = %q", got)
+	}
+	if got := captured.Header.Get("X-GitHub-Api-Version"); got != systemUpdateGitHubAPIVersion {
+		t.Fatalf("X-GitHub-Api-Version = %q", got)
+	}
+	if got := captured.Header.Get("User-Agent"); got == "" || !strings.HasPrefix(got, "Renewlet/") {
+		t.Fatalf("User-Agent = %q", got)
+	}
+	if got := captured.Header.Get("Authorization"); got != "Bearer ghp_test" {
+		t.Fatalf("Authorization = %q", got)
+	}
+}
+
+func TestSystemVersionWarningDoesNotExposeGitHubStatus(t *testing.T) {
+	service := newSystemUpdateService(&fakeSystemReleaseClient{})
+	service.now = func() time.Time { return time.Unix(1_779_820_800, 0) }
+	warning := service.versionCheckWarning(localeZhCN, &githubAPIError{
+		statusCode:  http.StatusForbidden,
+		status:      "403 Forbidden",
+		rateLimited: true,
+		retryAt:     service.now().Add(time.Hour),
+	})
+
+	if strings.Contains(warning, "403") || strings.Contains(warning, "Forbidden") {
+		t.Fatalf("warning leaked HTTP status: %q", warning)
+	}
+	if !strings.Contains(warning, systemUpdateGitHubTokenEnv) {
+		t.Fatalf("warning should mention token fallback, got %q", warning)
 	}
 }
 
@@ -216,4 +282,10 @@ func writeTarGz(path string, files map[string]string) error {
 		return err
 	}
 	return os.WriteFile(path, buffer.Bytes(), 0o644)
+}
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (fn roundTripFunc) RoundTrip(request *http.Request) (*http.Response, error) {
+	return fn(request)
 }

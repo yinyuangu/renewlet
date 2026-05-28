@@ -1,5 +1,4 @@
-import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { assertDateOnly } from "@/lib/time/date-only";
@@ -83,8 +82,7 @@ vi.mock("@/components/subscription-form-fields", () => ({
 }));
 
 describe("SubscriptionDialog submit", () => {
-  it("submits an empty tags array when the create form tags input is blank", async () => {
-    const user = userEvent.setup();
+  it("submits an empty tags array when the create form tags input is blank", () => {
     const onSubmit = vi.fn();
 
     render(
@@ -98,8 +96,8 @@ describe("SubscriptionDialog submit", () => {
       </TooltipProvider>,
     );
 
-    await user.click(screen.getByRole("button", { name: "填充有效订阅" }));
-    await user.click(screen.getByRole("button", { name: "添加订阅" }));
+    fireEvent.click(screen.getByRole("button", { name: "填充有效订阅" }));
+    fireEvent.click(screen.getByRole("button", { name: "添加订阅" }));
 
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
       name: "Aws",
@@ -107,8 +105,7 @@ describe("SubscriptionDialog submit", () => {
     }));
   });
 
-  it("shows a field error for invalid website URLs", async () => {
-    const user = userEvent.setup();
+  it("shows a field error for invalid website URLs", () => {
     const onSubmit = vi.fn();
 
     render(
@@ -122,15 +119,14 @@ describe("SubscriptionDialog submit", () => {
       </TooltipProvider>,
     );
 
-    await user.click(screen.getByRole("button", { name: "填充非法网站订阅" }));
-    await user.click(screen.getByRole("button", { name: "添加订阅" }));
+    fireEvent.click(screen.getByRole("button", { name: "填充非法网站订阅" }));
+    fireEvent.click(screen.getByRole("button", { name: "添加订阅" }));
 
     expect(screen.getByRole("alert")).toHaveTextContent("网站地址必须使用 http:// 或 https://");
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
-  it("submits zero-price subscriptions", async () => {
-    const user = userEvent.setup();
+  it("submits zero-price subscriptions", () => {
     const onSubmit = vi.fn();
 
     render(
@@ -144,8 +140,8 @@ describe("SubscriptionDialog submit", () => {
       </TooltipProvider>,
     );
 
-    await user.click(screen.getByRole("button", { name: "填充零元订阅" }));
-    await user.click(screen.getByRole("button", { name: "添加订阅" }));
+    fireEvent.click(screen.getByRole("button", { name: "填充零元订阅" }));
+    fireEvent.click(screen.getByRole("button", { name: "添加订阅" }));
 
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
       name: "Free uptime check",

@@ -29,27 +29,27 @@ msgid "common.optionDisabled"
 msgstr "{label}（已禁用）"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:60
+#: src/i18n/descriptors/common.ts:59
 msgid "system.runtime.cloudflare"
 msgstr "Cloudflare"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:59
+#: src/i18n/descriptors/common.ts:58
 msgid "system.runtime.docker"
 msgstr "Docker"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:77
+#: src/i18n/descriptors/common.ts:78
 msgid "system.restartDescription"
 msgstr "Docker restart 策略会拉起新版本；如果页面短暂断开，请稍后刷新。"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:81
+#: src/i18n/descriptors/common.ts:82
 msgid "locale.enUS"
 msgstr "English"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:97
+#: src/i18n/descriptors/common.ts:98
 msgid "theme.hexColor"
 msgstr "Hex 颜色"
 
@@ -69,22 +69,22 @@ msgid "common.uploadFailed"
 msgstr "上传失败"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:86
+#: src/i18n/descriptors/common.ts:87
 msgid "time.noon"
 msgstr "中午"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:80
+#: src/i18n/descriptors/common.ts:81
 msgid "locale.zhCN"
 msgstr "中文"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:94
+#: src/i18n/descriptors/common.ts:95
 msgid "theme.variant"
 msgstr "主题风格"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:100
+#: src/i18n/descriptors/common.ts:101
 msgid "theme.lightness"
 msgstr "亮度 (L)"
 
@@ -99,7 +99,7 @@ msgid "nav.dashboard"
 msgstr "仪表盘"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:117
+#: src/i18n/descriptors/common.ts:118
 msgid "theme.lavender.description"
 msgstr "优雅浪漫的紫色调"
 
@@ -114,7 +114,7 @@ msgid "common.saving"
 msgstr "保存中..."
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:87
+#: src/i18n/descriptors/common.ts:88
 msgid "time.evening"
 msgstr "傍晚"
 
@@ -134,12 +134,12 @@ msgid "common.builtIn"
 msgstr "内置"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:56
+#: src/i18n/descriptors/common.ts:55
 msgid "system.latestVersion"
 msgstr "最新版本"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:84
+#: src/i18n/descriptors/common.ts:85
 msgid "time.minute"
 msgstr "分"
 
@@ -164,12 +164,12 @@ msgid "common.loading"
 msgstr "加载中..."
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:69
+#: src/i18n/descriptors/common.ts:70
 msgid "system.releaseLink"
 msgstr "发布页"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:65
+#: src/i18n/descriptors/common.ts:66
 msgid "system.updateAvailableTitle"
 msgstr "发现新版本"
 
@@ -179,7 +179,7 @@ msgid "common.cancel"
 msgstr "取消"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:66
+#: src/i18n/descriptors/common.ts:67
 msgid "system.updateAvailableDescription"
 msgstr "可以更新到 v{version}。更新会替换 Docker 运行二进制并自动重启。"
 
@@ -204,7 +204,7 @@ msgid "common.enabled"
 msgstr "已启用"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:67
+#: src/i18n/descriptors/common.ts:68
 msgid "system.noUpdateTitle"
 msgstr "已是最新版本"
 
@@ -214,22 +214,27 @@ msgid "header.logoutSuccessTitle"
 msgstr "已退出登录"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:55
+#: src/i18n/descriptors/common.ts:63
+msgid "system.checkDeferredDescription"
+msgstr "当前显示的是本机版本；请稍后重新检查。"
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/common.ts:54
 msgid "system.currentVersion"
 msgstr "当前版本"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:63
+#: src/i18n/descriptors/common.ts:64
 msgid "system.unsupportedTitle"
 msgstr "当前部署不支持一键更新"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:68
+#: src/i18n/descriptors/common.ts:69
 msgid "system.noUpdateDescription"
 msgstr "当前部署不需要更新。"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:101
+#: src/i18n/descriptors/common.ts:102
 msgid "theme.quickPick"
 msgstr "快速选择"
 
@@ -239,7 +244,7 @@ msgid "system.openUpdateDialog"
 msgstr "打开系统更新"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:82
+#: src/i18n/descriptors/common.ts:83
 msgid "reminder.days"
 msgstr "提前 {days} 天"
 
@@ -259,27 +264,27 @@ msgid "nav.calendar"
 msgstr "日历"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:114
+#: src/i18n/descriptors/common.ts:115
 msgid "theme.sunset.name"
 msgstr "日落橙"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:85
+#: src/i18n/descriptors/common.ts:86
 msgid "time.morning"
 msgstr "早晨"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:83
+#: src/i18n/descriptors/common.ts:84
 msgid "time.hour"
 msgstr "时"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:90
+#: src/i18n/descriptors/common.ts:91
 msgid "theme.mode"
 msgstr "明暗模式"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:88
+#: src/i18n/descriptors/common.ts:89
 msgid "time.night"
 msgstr "晚上"
 
@@ -289,22 +294,27 @@ msgid "common.noData"
 msgstr "暂无数据"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:72
+#: src/i18n/descriptors/common.ts:62
+msgid "system.checkDeferredTitle"
+msgstr "暂时无法检查更新"
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/common.ts:73
 msgid "system.updating"
 msgstr "更新中..."
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:74
+#: src/i18n/descriptors/common.ts:75
 msgid "system.updateFailedTitle"
 msgstr "更新失败"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:75
+#: src/i18n/descriptors/common.ts:76
 msgid "system.updateFailedDescription"
 msgstr "更新失败，请稍后重试。"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:73
+#: src/i18n/descriptors/common.ts:74
 msgid "system.updateStartedTitle"
 msgstr "更新已开始"
 
@@ -324,22 +334,17 @@ msgid "common.unknown"
 msgstr "未知"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:58
+#: src/i18n/descriptors/common.ts:57
 msgid "system.buildType"
 msgstr "构建类型"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:51
-msgid "system.updateDescription"
-msgstr "检查 GitHub Release，并在支持的 Docker 部署中一键替换运行二进制。"
-
-#. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:62
+#: src/i18n/descriptors/common.ts:61
 msgid "system.warningTitle"
 msgstr "检查提示"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:103
+#: src/i18n/descriptors/common.ts:104
 msgid "theme.color.orange"
 msgstr "橙"
 
@@ -349,12 +354,12 @@ msgid "common.searching"
 msgstr "正在搜索..."
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:52
+#: src/i18n/descriptors/common.ts:51
 msgid "system.checking"
 msgstr "正在检查版本..."
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:113
+#: src/i18n/descriptors/common.ts:114
 msgid "theme.ocean.description"
 msgstr "沉稳优雅的海洋蓝"
 
@@ -364,42 +369,42 @@ msgid "common.noMatches"
 msgstr "没有匹配结果"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:91
+#: src/i18n/descriptors/common.ts:92
 msgid "theme.light"
 msgstr "浅色"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:112
+#: src/i18n/descriptors/common.ts:113
 msgid "theme.ocean.name"
 msgstr "深海蓝"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:92
+#: src/i18n/descriptors/common.ts:93
 msgid "theme.dark"
 msgstr "深色"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:111
+#: src/i18n/descriptors/common.ts:112
 msgid "theme.emerald.description"
 msgstr "清新自然的翡翠色调"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:115
+#: src/i18n/descriptors/common.ts:116
 msgid "theme.sunset.description"
 msgstr "温暖活力的日落色"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:61
+#: src/i18n/descriptors/common.ts:60
 msgid "system.runtime.source"
 msgstr "源码/手动部署"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:53
+#: src/i18n/descriptors/common.ts:52
 msgid "system.checkFailedTitle"
 msgstr "版本检查失败"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:118
+#: src/i18n/descriptors/common.ts:119
 msgid "theme.rose.name"
 msgstr "玫瑰粉"
 
@@ -409,22 +414,22 @@ msgid "common.disable"
 msgstr "禁用"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:71
+#: src/i18n/descriptors/common.ts:72
 msgid "system.updateNow"
 msgstr "立即更新"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:76
+#: src/i18n/descriptors/common.ts:77
 msgid "system.restartTitle"
 msgstr "等待自动重启"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:109
+#: src/i18n/descriptors/common.ts:110
 msgid "theme.color.pink"
 msgstr "粉"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:119
+#: src/i18n/descriptors/common.ts:120
 msgid "theme.rose.description"
 msgstr "精致柔和的玫瑰色"
 
@@ -434,12 +439,12 @@ msgid "system.updateTitle"
 msgstr "系统更新"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:102
+#: src/i18n/descriptors/common.ts:103
 msgid "theme.color.red"
 msgstr "红"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:108
+#: src/i18n/descriptors/common.ts:109
 msgid "theme.color.purple"
 msgstr "紫"
 
@@ -449,7 +454,7 @@ msgid "nav.statistics"
 msgstr "统计"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:105
+#: src/i18n/descriptors/common.ts:106
 msgid "theme.color.green"
 msgstr "绿"
 
@@ -459,27 +464,27 @@ msgid "common.edit"
 msgstr "编辑"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:110
+#: src/i18n/descriptors/common.ts:111
 msgid "theme.emerald.name"
 msgstr "翡翠绿"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:95
+#: src/i18n/descriptors/common.ts:96
 msgid "theme.custom"
 msgstr "自定义"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:98
+#: src/i18n/descriptors/common.ts:99
 msgid "theme.hue"
 msgstr "色相 (H)"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:107
+#: src/i18n/descriptors/common.ts:108
 msgid "theme.color.blue"
 msgstr "蓝"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:116
+#: src/i18n/descriptors/common.ts:117
 msgid "theme.lavender.name"
 msgstr "薰衣草紫"
 
@@ -499,12 +504,12 @@ msgid "nav.settings"
 msgstr "设置"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:64
+#: src/i18n/descriptors/common.ts:65
 msgid "system.unsupportedDescription"
 msgstr "请使用原部署方式升级。"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:54
+#: src/i18n/descriptors/common.ts:53
 msgid "system.checkFailedDescription"
 msgstr "请稍后重试，或打开 GitHub Release 手动查看。"
 
@@ -514,12 +519,12 @@ msgid "common.selectPlaceholder"
 msgstr "请选择"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:93
+#: src/i18n/descriptors/common.ts:94
 msgid "theme.system"
 msgstr "跟随系统"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:57
+#: src/i18n/descriptors/common.ts:56
 msgid "system.runtime"
 msgstr "运行面"
 
@@ -534,7 +539,7 @@ msgid "common.backHome"
 msgstr "返回首页"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:79
+#: src/i18n/descriptors/common.ts:80
 msgid "notFound.home"
 msgstr "返回首页"
 
@@ -549,7 +554,7 @@ msgid "header.logout"
 msgstr "退出登录"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:96
+#: src/i18n/descriptors/common.ts:97
 msgid "theme.customDescription"
 msgstr "选择你喜欢的颜色"
 
@@ -559,7 +564,7 @@ msgid "common.notifications"
 msgstr "通知"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:89
+#: src/i18n/descriptors/common.ts:90
 msgid "time.notificationAria"
 msgstr "通知时间，当前 {time}"
 
@@ -569,26 +574,26 @@ msgid "common.configure"
 msgstr "配置"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:70
+#: src/i18n/descriptors/common.ts:71
 msgid "system.recheck"
 msgstr "重新检查"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:106
+#: src/i18n/descriptors/common.ts:107
 msgid "theme.color.cyan"
 msgstr "青"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:78
+#: src/i18n/descriptors/common.ts:79
 msgid "notFound.title"
 msgstr "页面未找到"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:99
+#: src/i18n/descriptors/common.ts:100
 msgid "theme.saturation"
 msgstr "饱和度 (S)"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:104
+#: src/i18n/descriptors/common.ts:105
 msgid "theme.color.yellow"
 msgstr "黄"

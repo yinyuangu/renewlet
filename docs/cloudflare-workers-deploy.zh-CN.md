@@ -1,20 +1,23 @@
 # Cloudflare Workers 部署
 
-## 一键部署
+## 推荐：一键部署
 
 <a href="https://deploy.workers.cloudflare.com/?url=https://github.com/zhiyingzzhou/renewlet"><img src="https://deploy.workers.cloudflare.com/button" alt="Deploy to Cloudflare"></a>
 
 1. 点击按钮。
-2. 按 Cloudflare 向导完成部署。
-3. 打开：
+2. 登录或授权 Cloudflare。
+3. 按 Cloudflare 向导完成部署。
+4. 打开：
 
 ```text
 https://<worker-name>.<workers-dev-subdomain>.workers.dev/setup
 ```
 
-## GitHub Actions 部署
+如果你想自己创建 D1/R2、Cloudflare API Token 和 GitHub Secrets，可以继续使用下面的手动部署流程。
 
-手动创建 Cloudflare 资源和 GitHub Secrets。push 到 `dev` 或手动运行 workflow。
+## 手动部署（GitHub Actions）
+
+手动部署适合想自己管理 Cloudflare 资源和 GitHub Actions 的用户。准备好下面 5 个值后，在你的 fork 仓库里手动运行 `Cloudflare Worker`。
 
 流程：
 
@@ -155,7 +158,7 @@ Renewlet 的 Worker binding 名固定如下：
 
 工作流文件在 `.github/workflows/cloudflare-worker.yml`。
 
-它会在 push 到 `dev` 时自动运行，也可以从 GitHub Actions 手动运行：
+首次部署建议从 GitHub Actions 手动运行。之后同步 fork 更新后，仓库启用 Actions 时会自动重新部署；也可以随时从 GitHub Actions 手动运行：
 
 workflow 需要下面 5 个 repository secrets 才会部署到 Cloudflare。没有配齐时，它只验证 Cloudflare 构建路径，不会修改任何远端 D1 数据库或 Worker。
 
@@ -186,20 +189,23 @@ https://<WORKER_NAME>.<workers-dev-subdomain>.workers.dev/setup
 
 ## 更新版本
 
-Workers 部署不支持 Renewlet 的 Docker 页面内更新器。管理员版本弹窗只显示版本信息和 GitHub Release 链接。
-
-Workers 部署支持两种更新方式：
+Cloudflare Workers 部署可以用自动同步或手动同步更新。
 
 ### 自动更新
 
-启用 Upstream Sync Action 后，上游仓库有更新时会自动同步并触发部署。
+如果你的 fork 已启用自动同步，上游仓库有更新时会自动同步并触发部署。
 
 ### 手动更新
 
-1. 在 Fork 仓库中同步上游更新。
-2. 同步完成后会自动触发部署；也可以手动进入 Actions 页面运行 `Cloudflare Worker`。
+1. 打开你的 fork 仓库。
+2. 点击 `Sync fork`。
+3. 如果页面提示需要更新，点击 `Update branch`。
+4. 等待 Cloudflare 重新部署。
+5. 如果没有自动部署，进入 `Actions` 手动运行 `Cloudflare Worker`。
 
-## Wrangler CLI
+## 可选：Wrangler CLI
+
+普通部署不需要使用 Wrangler CLI。只有你想在本机直接管理 Cloudflare 资源时，再使用下面的命令。
 
 创建资源：
 
@@ -224,101 +230,6 @@ pnpm check:cloudflare
 pnpm build:cloudflare
 pnpm exec wrangler d1 migrations apply DB --remote --config wrangler.generated.jsonc
 pnpm exec wrangler deploy --config wrangler.generated.jsonc
-```
-
-## 本地开发
-
-复制本地变量示例：
-
-```bash
-cp .dev.vars.example .dev.vars
-```
-
-启动本地 Worker：
-
-```bash
-pnpm check:cloudflare
-pnpm build:cloudflare
-pnpm exec wrangler d1 migrations apply DB --local
-pnpm exec wrangler dev --test-scheduled --ip 0.0.0.0
-```
-
-打开：
-
-```text
-http://localhost:8787/setup
-http://<本机局域网 IP>:8787/setup
-```
-
-生产 Cron 使用 `wrangler.jsonc` 里的 `triggers.crons`。
-
-本地模拟 Cron Trigger：
-
-```bash
-curl "http://localhost:8787/__scheduled?cron=*+*+*+*+*"
-curl "http://<本机局域网 IP>:8787/__scheduled?cron=*+*+*+*+*"
-```
-
-`/__scheduled` 需要配合 `wrangler dev --test-scheduled` 使用。
-
-## 部署后巡检
-
-首次复制巡检变量模板，填入已部署 Worker 域名和独立测试管理员账号：
-
-```bash
-cp cloudflare-check.env.example cloudflare-check.env.local
-```
-
-之后直接运行：
-
-```bash
-pnpm test:e2e:cloudflare
-```
-
-`cloudflare-check.env.local` 会被 git 忽略；脚本会先运行 `pnpm typecheck:e2e`，再检查公开路由、登录守卫、私有页面、设置页、临时订阅写删、移动端布局和核心 API 重复请求。
-
-只做只读巡检：
-
-```bash
-pnpm test:e2e:cloudflare -- --readonly
-```
-
-## 本地数据
-
-Wrangler 的本地 D1 文件在项目目录：
-
-```text
-.wrangler/state/v3/d1/
-```
-
-Renewlet 的本地 R2 状态在：
-
-```text
-.wrangler/state/v3/r2/
-```
-
-查表：
-
-```bash
-pnpm exec wrangler d1 execute DB --local --command "SELECT name FROM sqlite_schema WHERE type='table' ORDER BY name;"
-```
-
-查看用户：
-
-```bash
-pnpm exec wrangler d1 execute DB --local --command "SELECT id, email, role, created_at FROM users;"
-```
-
-查看订阅数量：
-
-```bash
-pnpm exec wrangler d1 execute DB --local --command "SELECT COUNT(*) AS count FROM subscriptions;"
-```
-
-用 `sqlite3` 直接打开：
-
-```bash
-sqlite3 "$(find .wrangler/state/v3/d1 -name '*.sqlite' ! -name 'metadata.sqlite' | head -n 1)"
 ```
 
 ## 其他配置

@@ -2,7 +2,7 @@ import { AlertCircle, CheckCircle2, ExternalLink, RefreshCw, Rocket, Server, Spa
 import { useMemo, type ReactNode } from "react";
 import { badgeVariants } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useSystemUpdate, useSystemVersion } from "@/hooks/use-system-version";
 import { useI18n } from "@/i18n/I18nProvider";
@@ -54,13 +54,12 @@ export function SystemUpdateDialog({ open, onOpenChange }: SystemUpdateDialogPro
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="border-border bg-card sm:max-w-xl">
+      <DialogContent aria-describedby={undefined} className="border-border bg-card sm:max-w-xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" />
             {t("system.updateTitle")}
           </DialogTitle>
-          <DialogDescription>{t("system.updateDescription")}</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -84,7 +83,9 @@ export function SystemUpdateDialog({ open, onOpenChange }: SystemUpdateDialogPro
                 <StatePanel icon={<AlertCircle className="h-4 w-4" />} tone="warning" title={t("system.warningTitle")} description={version.warning} />
               ) : null}
 
-              {!version.updateSupported ? (
+              {!version.checkSucceeded ? (
+                <StatePanel icon={<AlertCircle className="h-4 w-4" />} tone="warning" title={t("system.checkDeferredTitle")} description={t("system.checkDeferredDescription")} />
+              ) : !version.updateSupported ? (
                 <StatePanel icon={<Server className="h-4 w-4" />} tone="neutral" title={t("system.unsupportedTitle")} description={version.unsupportedReason ?? t("system.unsupportedDescription")} />
               ) : version.hasUpdate ? (
                 <StatePanel icon={<Rocket className="h-4 w-4" />} tone="success" title={t("system.updateAvailableTitle")} description={t("system.updateAvailableDescription", { version: version.latestVersion })} />

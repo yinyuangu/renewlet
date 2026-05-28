@@ -45,6 +45,7 @@ export const systemVersionResponseSchema = z.object({
   currentVersion: z.string().min(1),
   latestVersion: z.string().min(1),
   hasUpdate: z.boolean(),
+  checkSucceeded: z.boolean(),
   runtime: systemRuntimeSchema,
   updateSupported: z.boolean(),
   unsupportedReason: z.string().optional(),

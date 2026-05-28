@@ -6,10 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
+	"time"
 )
 
 func defaultSystemReleaseClient() systemReleaseClient {
@@ -33,15 +36,14 @@ func (client *httpSystemReleaseClient) FetchLatestRelease(ctx context.Context) (
 	if err != nil {
 		return nil, err
 	}
-	request.Header.Set("Accept", "application/vnd.github+json")
-	request.Header.Set("User-Agent", "Renewlet/"+Version)
+	applyGitHubAPIHeaders(request)
 	response, err := client.apiClient.Do(request)
 	if err != nil {
-		return nil, err
+		return nil, classifyGitHubNetworkError(err)
 	}
 	defer response.Body.Close()
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
-		return nil, fmt.Errorf("GitHub release API returned %s", response.Status)
+		return nil, newGitHubAPIError(response)
 	}
 	var release githubRelease
 	// Release API 是外部输入，限制 body 避免版本检查被异常响应拖垮常驻进程。
@@ -120,4 +122,82 @@ func validateTrustedDownloadURL(rawURL string) error {
 		return nil
 	}
 	return fmt.Errorf("download host %q is not trusted", host)
+}
+
+func applyGitHubAPIHeaders(request *http.Request) {
+	request.Header.Set("Accept", "application/vnd.github+json")
+	request.Header.Set("X-GitHub-Api-Version", systemUpdateGitHubAPIVersion)
+	request.Header.Set("User-Agent", "Renewlet/"+Version)
+	if token := strings.TrimSpace(os.Getenv(systemUpdateGitHubTokenEnv)); token != "" {
+		// GitHub 匿名 REST API 每 IP 共享低额度；管理员可配置只读 token 把版本检查从共享出口限流中解耦。
+		request.Header.Set("Authorization", "Bearer "+token)
+	}
+}
+
+func newGitHubAPIError(response *http.Response) error {
+	body, _ := io.ReadAll(io.LimitReader(response.Body, 64<<10))
+	message := githubErrorMessage(body)
+	apiError := &githubAPIError{
+		statusCode:  response.StatusCode,
+		status:      response.Status,
+		message:     message,
+		rateLimited: isGitHubRateLimited(response, message),
+		retryAt:     githubRetryAt(response.Header, time.Now()),
+	}
+	return apiError
+}
+
+func githubErrorMessage(body []byte) string {
+	var payload struct {
+		Message string `json:"message"`
+	}
+	if err := json.Unmarshal(body, &payload); err == nil {
+		return strings.TrimSpace(payload.Message)
+	}
+	return strings.TrimSpace(string(body))
+}
+
+func isGitHubRateLimited(response *http.Response, message string) bool {
+	if response.StatusCode == http.StatusTooManyRequests {
+		return true
+	}
+	if response.StatusCode != http.StatusForbidden {
+		return false
+	}
+	if strings.EqualFold(response.Header.Get("X-RateLimit-Remaining"), "0") {
+		return true
+	}
+	if strings.TrimSpace(response.Header.Get("Retry-After")) != "" {
+		return true
+	}
+	normalizedMessage := strings.ToLower(message)
+	return strings.Contains(normalizedMessage, "rate limit") || strings.Contains(normalizedMessage, "abuse")
+}
+
+func githubRetryAt(header http.Header, now time.Time) time.Time {
+	if retryAfter := strings.TrimSpace(header.Get("Retry-After")); retryAfter != "" {
+		if seconds, err := strconv.Atoi(retryAfter); err == nil && seconds > 0 {
+			return now.Add(time.Duration(seconds) * time.Second)
+		}
+		if at, err := http.ParseTime(retryAfter); err == nil {
+			return at
+		}
+	}
+	if reset := strings.TrimSpace(header.Get("X-RateLimit-Reset")); reset != "" {
+		if seconds, err := strconv.ParseInt(reset, 10, 64); err == nil && seconds > 0 {
+			return time.Unix(seconds, 0)
+		}
+	}
+	return time.Time{}
+}
+
+func classifyGitHubNetworkError(err error) error {
+	if err == nil {
+		return nil
+	}
+	var netError net.Error
+	if errors.Is(err, io.EOF) || errors.As(err, &netError) {
+		return &githubAPIError{message: err.Error()}
+	}
+	return err
 }

@@ -4,12 +4,15 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 )
 
 const (
 	systemUpdateRepository       = "zhiyingzzhou/renewlet"
+	systemUpdateGitHubAPIVersion = "2026-03-10"
+	systemUpdateGitHubTokenEnv   = "RENEWLET_GITHUB_TOKEN"
 	systemUpdateCacheTTL         = 20 * time.Minute
 	systemUpdateAPITimeout       = 15 * time.Second
 	systemUpdateDownloadTimeout  = 2 * time.Minute
@@ -23,6 +26,7 @@ var (
 	errSystemUpdateUnsupported = errors.New("system update unsupported")
 	errSystemUpdateNoUpdate    = errors.New("system update no update")
 	errSystemUpdateInProgress  = errors.New("system update in progress")
+	errSystemNoStableRelease   = errors.New("system update no stable release")
 
 	defaultSystemUpdateService = newSystemUpdateService(defaultSystemReleaseClient())
 )
@@ -75,6 +79,21 @@ type githubAsset struct {
 	Name               string `json:"name"`
 	BrowserDownloadURL string `json:"browser_download_url"`
 	Size               int64  `json:"size"`
+}
+
+type githubAPIError struct {
+	statusCode  int
+	status      string
+	message     string
+	rateLimited bool
+	retryAt     time.Time
+}
+
+func (e *githubAPIError) Error() string {
+	if strings.TrimSpace(e.message) == "" {
+		return "GitHub release API returned " + e.status
+	}
+	return "GitHub release API returned " + e.status + ": " + e.message
 }
 
 type fetchedSystemRelease struct {
