@@ -1,0 +1,441 @@
+import zhCatalog from "../data/server-i18n/active.zh-CN.json";
+import enCatalog from "../data/server-i18n/active.en-US.json";
+import type { Locale, RepeatReminderInterval, RepeatReminderWindow } from "./runtime";
+import { renderEmailTemplate } from "./email-template-render";
+
+export const EMAIL_MAX_HTML_BYTES = 100 * 1024;
+const EMAIL_COMPACT_TEXT_RUNES = 12_000;
+
+type ServerCatalog = Record<string, string>;
+
+const SERVER_CATALOGS: Record<Locale, ServerCatalog> = {
+  "zh-CN": zhCatalog,
+  "en-US": enCatalog,
+};
+
+export interface NotificationEmailSettings {
+  locale: string;
+  themeVariant: string;
+  themeCustomColor: {
+    h: number;
+    s: number;
+    l: number;
+  };
+}
+
+export interface NotificationEmailItem {
+  type: "renewal" | "trial" | "expired" | string;
+  subscriptionId?: string;
+  name: string;
+  logoUrl?: string;
+  price: number;
+  currency: string;
+  status: string;
+  targetDate: string;
+  reminderDays: number;
+  daysUntil?: number;
+  repeatReminder?: {
+    interval: RepeatReminderInterval | string;
+    window: RepeatReminderWindow | string;
+  };
+}
+
+export interface NotificationEmailMessage {
+  title: string;
+  content: string;
+  timestamp: string;
+  hasPayload: boolean;
+  items: NotificationEmailItem[];
+}
+
+export interface BuildNotificationEmailOptions {
+  appUrl?: string;
+}
+
+export interface NotificationEmail {
+  subject: string;
+  text: string;
+  html: string;
+}
+
+export interface EmailTheme {
+  primary: string;
+  primaryText: string;
+  primarySoft: string;
+  background: string;
+  surface: string;
+  surfaceMuted: string;
+  border: string;
+  text: string;
+  muted: string;
+  warning: string;
+  danger: string;
+  success: string;
+}
+
+export interface EmailCopy {
+  brandTagline: string;
+  generated: string;
+  noReminders: string;
+  testNotification: string;
+  reminderItems: string;
+  message: string;
+  emptyDetails: string;
+  generatedAt: string;
+  footer: string;
+  truncated: string;
+  upcomingRenewals: string;
+  trialEnding: string;
+  expired: string;
+  billingDate: string;
+  trialEnds: string;
+  expiredSince: string;
+  updateNextBillingDate: string;
+  dayBefore: string;
+  daysBefore: string;
+  repeatEvery: string;
+  preheaderItems: string;
+  ctaViewSubscriptions: string;
+  ctaOpenSettings: string;
+}
+
+export interface EmailTemplateData {
+  lang: Locale;
+  title: string;
+  preheader: string;
+  statusLabel: string;
+  contentLines: string[];
+  groups: EmailTemplateGroup[];
+  summaryRows: EmailSummaryRow[];
+  cta: EmailCta | null;
+  timestamp: string;
+  copy: EmailCopy;
+  theme: EmailTheme;
+}
+
+export interface EmailSummaryRow {
+  label: string;
+  value: string;
+}
+
+export interface EmailTemplateGroup {
+  label: string;
+  count: number;
+  items: EmailTemplateItem[];
+}
+
+export interface EmailTemplateItem {
+  name: string;
+  dateLabel: string;
+  targetDate: string;
+  amount: string;
+  currency: string;
+  detail: string;
+  accentText: string;
+}
+
+export interface EmailCta {
+  url: string;
+  label: string;
+}
+
+export function buildNotificationEmail(
+  settings: NotificationEmailSettings,
+  message: NotificationEmailMessage,
+  options: BuildNotificationEmailOptions = {},
+): NotificationEmail {
+  const data = buildEmailTemplateData(settings, message, options, false);
+  let html = renderEmailTemplate(data);
+  if (utf8ByteLength(html) > EMAIL_MAX_HTML_BYTES) {
+    html = renderEmailTemplate(buildEmailTemplateData(settings, message, options, true));
+  }
+  return {
+    subject: message.title,
+    text: `${message.content}\n\n${message.timestamp}`,
+    html,
+  };
+}
+
+function buildEmailTemplateData(
+  settings: NotificationEmailSettings,
+  input: NotificationEmailMessage,
+  options: BuildNotificationEmailOptions,
+  compact: boolean,
+): EmailTemplateData {
+  const locale = normalizeEmailLocale(settings.locale);
+  const copy = loadEmailCopy(locale);
+  const itemCount = input.items.length;
+  const hasReminderItems = itemCount > 0;
+  const message = compact
+    ? { ...input, items: [], content: compactEmailContent(input.content, copy) }
+    : input;
+  const theme = emailThemeFromSettings(settings);
+  const groups = message.items.length > 0 ? buildEmailTemplateGroups(message.items, copy, theme) : [];
+  let statusLabel = copy.generated;
+  if (itemCount === 0 && !input.hasPayload) {
+    statusLabel = copy.noReminders;
+  } else if (itemCount === 0) {
+    statusLabel = copy.testNotification;
+  }
+  return {
+    lang: locale,
+    title: input.title,
+    preheader: emailPreheader(input, copy),
+    statusLabel,
+    contentLines: groups.length === 0 ? splitEmailContentLines(message.content, copy) : [],
+    groups,
+    summaryRows: emailSummaryRows(itemCount, groups, copy),
+    cta: emailCtaFromAppUrl(options.appUrl ?? "", hasReminderItems, copy),
+    timestamp: input.timestamp,
+    copy,
+    theme,
+  };
+}
+
+function loadEmailCopy(locale: Locale): EmailCopy {
+  const text = (key: string) => serverText(locale, key);
+  return {
+    brandTagline: text("email.brandTagline"),
+    generated: text("email.generated"),
+    noReminders: text("email.noReminders"),
+    testNotification: text("email.testNotification"),
+    reminderItems: text("email.reminderItems"),
+    message: text("email.message"),
+    emptyDetails: text("email.emptyDetails"),
+    generatedAt: text("email.generatedAt"),
+    footer: text("email.footer"),
+    truncated: text("email.truncated"),
+    upcomingRenewals: text("email.upcomingRenewals"),
+    trialEnding: text("email.trialEnding"),
+    expired: text("email.expired"),
+    billingDate: text("email.billingDate"),
+    trialEnds: text("email.trialEnds"),
+    expiredSince: text("email.expiredSince"),
+    updateNextBillingDate: text("email.updateNextBillingDate"),
+    dayBefore: text("email.dayBefore"),
+    daysBefore: text("email.daysBefore"),
+    repeatEvery: text("email.repeatEvery"),
+    preheaderItems: text("email.preheaderItems"),
+    ctaViewSubscriptions: text("email.ctaViewSubscriptions"),
+    ctaOpenSettings: text("email.ctaOpenSettings"),
+  };
+}
+
+function buildEmailTemplateGroups(items: NotificationEmailItem[], copy: EmailCopy, theme: EmailTheme): EmailTemplateGroup[] {
+  const grouped: Record<string, NotificationEmailItem[]> = { renewal: [], trial: [], expired: [] };
+  for (const item of items) {
+    // 邮件不会渲染 logo URL；外链图片会让邮件客户端暴露私有资产或第三方请求痕迹。
+    const itemType = grouped[item.type] ? item.type : "renewal";
+    grouped[itemType]?.push(item);
+  }
+  return (["renewal", "trial", "expired"] as const)
+    .map((itemType) => {
+      const rawItems = grouped[itemType] ?? [];
+      return {
+        label: emailGroupLabel(itemType, copy),
+        count: rawItems.length,
+        items: rawItems.map((item) => ({
+          name: item.name,
+          dateLabel: emailItemDateLabel(item.type, copy),
+          targetDate: item.targetDate,
+          amount: formatAmount(item.price),
+          currency: item.currency,
+          detail: emailItemDetail(item, copy),
+          accentText: emailItemAccent(item.type, theme),
+        })),
+      };
+    })
+    .filter((group) => group.count > 0);
+}
+
+function emailSummaryRows(itemCount: number, groups: EmailTemplateGroup[], copy: EmailCopy): EmailSummaryRow[] {
+  if (groups.length === 0) return [{ label: copy.reminderItems, value: String(itemCount) }];
+  return groups.map((group) => ({ label: group.label, value: String(group.count) }));
+}
+
+function emailCtaFromAppUrl(rawAppUrl: string, hasReminderItems: boolean, copy: EmailCopy): EmailCta | null {
+  const appUrl = rawAppUrl.trim();
+  if (!appUrl) return null;
+  try {
+    const parsed = new URL(appUrl);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
+    const targetPath = hasReminderItems ? "/subscriptions" : "/settings";
+    const basePath = parsed.pathname.replace(/\/+$/, "");
+    parsed.pathname = basePath ? `${basePath}${targetPath}` : targetPath;
+    parsed.search = "";
+    parsed.hash = "";
+    return { url: parsed.toString(), label: hasReminderItems ? copy.ctaViewSubscriptions : copy.ctaOpenSettings };
+  } catch {
+    return null;
+  }
+}
+
+function emailThemeFromSettings(settings: NotificationEmailSettings): EmailTheme {
+  const [h, s, l] = emailThemeHsl(settings);
+  const primary = hslToHex(h, s, l);
+  return {
+    primary,
+    primaryText: contrastTextForHsl(h, s, l),
+    primarySoft: hslToHex(h, Math.min(s, 70), 94),
+    background: "#F4F7F6",
+    surface: "#FFFFFF",
+    surfaceMuted: "#F8FAF9",
+    border: "#DDE6E2",
+    text: "#17211F",
+    muted: "#64748B",
+    warning: "#D97706",
+    danger: "#DC2626",
+    success: primary,
+  };
+}
+
+function emailThemeHsl(settings: NotificationEmailSettings): [number, number, number] {
+  switch (settings.themeVariant.trim()) {
+    case "ocean":
+      return [210, 90, 45];
+    case "sunset":
+      return [25, 95, 48];
+    case "lavender":
+      return [270, 70, 55];
+    case "rose":
+      return [340, 75, 50];
+    case "custom":
+      if (validEmailCustomColor(settings.themeCustomColor)) {
+        return [settings.themeCustomColor.h, settings.themeCustomColor.s, settings.themeCustomColor.l];
+      }
+      break;
+  }
+  return [160, 84, 39];
+}
+
+function validEmailCustomColor(color: NotificationEmailSettings["themeCustomColor"]): boolean {
+  return [color.h, color.s, color.l].every(Number.isFinite)
+    && color.h >= 0 && color.h <= 360
+    && color.s >= 0 && color.s <= 100
+    && color.l >= 0 && color.l <= 100;
+}
+
+function emailItemAccent(itemType: string, theme: EmailTheme): string {
+  if (itemType === "trial") return theme.warning;
+  if (itemType === "expired") return theme.danger;
+  return theme.success;
+}
+
+function emailPreheader(message: NotificationEmailMessage, copy: EmailCopy): string {
+  if (message.items.length > 0) return formatCatalogCopy(copy.preheaderItems, { count: message.items.length });
+  return firstNonEmptyLine(message.content) || message.title;
+}
+
+function firstNonEmptyLine(input: string): string {
+  for (const line of input.replaceAll("\r\n", "\n").split("\n")) {
+    const trimmed = line.trim();
+    if (trimmed) return trimmed;
+  }
+  return "";
+}
+
+function emailGroupLabel(itemType: string, copy: EmailCopy): string {
+  if (itemType === "trial") return copy.trialEnding;
+  if (itemType === "expired") return copy.expired;
+  return copy.upcomingRenewals;
+}
+
+function emailItemDateLabel(itemType: string, copy: EmailCopy): string {
+  if (itemType === "trial") return copy.trialEnds;
+  if (itemType === "expired") return copy.expiredSince;
+  return copy.billingDate;
+}
+
+function emailItemDetail(item: NotificationEmailItem, copy: EmailCopy): string {
+  if (item.type === "expired") return copy.updateNextBillingDate;
+  if (item.repeatReminder && copy.repeatEvery) {
+    return formatCatalogCopy(copy.repeatEvery, { hours: repeatReminderIntervalHours(item.repeatReminder.interval) });
+  }
+  if (item.reminderDays === 1 && copy.dayBefore) {
+    return formatCatalogCopy(copy.dayBefore, { days: item.reminderDays });
+  }
+  return formatCatalogCopy(copy.daysBefore, { days: item.reminderDays });
+}
+
+function splitEmailContentLines(input: string, copy: EmailCopy): string[] {
+  const lines = input.replaceAll("\r\n", "\n").replaceAll("\r", "\n").trim().split("\n");
+  return lines.length === 0 || (lines.length === 1 && lines[0] === "") ? [copy.emptyDetails] : lines;
+}
+
+function compactEmailContent(input: string, copy: EmailCopy): string {
+  const chars = [...input];
+  if (chars.length <= EMAIL_COMPACT_TEXT_RUNES) return input;
+  return `${chars.slice(0, EMAIL_COMPACT_TEXT_RUNES).join("").trim()}\n\n${copy.truncated}`;
+}
+
+function repeatReminderIntervalHours(interval: string): number {
+  const match = /^(\d+)h$/.exec(interval);
+  return match?.[1] ? Number.parseInt(match[1], 10) : 1;
+}
+
+function formatCatalogCopy(message: string, params: Record<string, string | number>): string {
+  return message.replace(/\{([A-Za-z_][A-Za-z0-9_]*)\}/g, (match, name: string) => {
+    const value = params[name];
+    return value === undefined ? match : String(value);
+  });
+}
+
+function formatAmount(amount: number): string {
+  if (!Number.isFinite(amount)) return String(amount);
+  return amount.toFixed(2).replace(/\.00$/, "").replace(/(\.\d)0$/, "$1");
+}
+
+function normalizeEmailLocale(value: string): Locale {
+  const normalized = value.trim().replaceAll("_", "-").toLowerCase();
+  if (normalized === "en" || normalized === "en-us") return "en-US";
+  return "zh-CN";
+}
+
+function serverText(locale: Locale, key: string): string {
+  return SERVER_CATALOGS[locale]?.[key] ?? SERVER_CATALOGS["zh-CN"][key] ?? key;
+}
+
+function utf8ByteLength(value: string): number {
+  return new TextEncoder().encode(value).length;
+}
+
+function hslToHex(h: number, s: number, l: number): string {
+  const [r, g, b] = hslToRgb(h, s, l);
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
+function hslToRgb(h: number, s: number, l: number): [number, number, number] {
+  let hue = h % 360;
+  if (hue < 0) hue += 360;
+  const saturation = clamp01(s / 100);
+  const lightness = clamp01(l / 100);
+  const c = (1 - Math.abs(2 * lightness - 1)) * saturation;
+  const x = c * (1 - Math.abs((hue / 60) % 2 - 1));
+  const m = lightness - c / 2;
+  let rgb: [number, number, number] = [0, 0, 0];
+  if (hue < 60) rgb = [c, x, 0];
+  else if (hue < 120) rgb = [x, c, 0];
+  else if (hue < 180) rgb = [0, c, x];
+  else if (hue < 240) rgb = [0, x, c];
+  else if (hue < 300) rgb = [x, 0, c];
+  else rgb = [c, 0, x];
+  return rgb.map((value) => Math.round((value + m) * 255)) as [number, number, number];
+}
+
+function contrastTextForHsl(h: number, s: number, l: number): string {
+  const [r, g, b] = hslToRgb(h, s, l).map((value) => value / 255) as [number, number, number];
+  const luminance = 0.2126 * linearizedRgb(r) + 0.7152 * linearizedRgb(g) + 0.0722 * linearizedRgb(b);
+  return luminance > 0.52 ? "#111827" : "#FFFFFF";
+}
+
+function linearizedRgb(value: number): number {
+  return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+}
+
+function clamp01(value: number): number {
+  return Math.min(1, Math.max(0, value));
+}
+
+function toHex(value: number): string {
+  return value.toString(16).toUpperCase().padStart(2, "0");
+}

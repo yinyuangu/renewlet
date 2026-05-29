@@ -3,6 +3,7 @@ import { z } from "zod";
 import { type AppLocale } from "./http";
 import { serverFormat, serverText } from "./server-i18n";
 import type { ApiAppSettings } from "@renewlet/shared/schemas/settings";
+import { base64Utf8, composeEmail, dotStuff, type Mailbox, type SmtpEmail } from "./smtp-mime";
 
 const DEFAULT_EHLO_DOMAIN = "renewlet.local";
 const SUPPORTED_AUTH_METHOD = "PLAIN";
@@ -18,12 +19,6 @@ export interface SmtpConfig {
   from: string;
   replyTo: string;
   authMethod: typeof SUPPORTED_AUTH_METHOD;
-}
-
-export interface SmtpEmail {
-  to: string[];
-  subject: string;
-  text: string;
 }
 
 interface SmtpResponse {
@@ -221,11 +216,6 @@ function buildSmtpConfig(
   return { host, port, secure, username, password, from, replyTo, authMethod: SUPPORTED_AUTH_METHOD };
 }
 
-interface Mailbox {
-  raw: string;
-  address: string;
-}
-
 function parseMailbox(raw: string, locale: AppLocale): Mailbox {
   const trimmed = raw.trim();
   const match = /<([^<>]+)>$/.exec(trimmed);
@@ -236,68 +226,12 @@ function parseMailbox(raw: string, locale: AppLocale): Mailbox {
   return { raw: trimmed, address };
 }
 
-function composeEmail(email: SmtpEmail, from: Mailbox, to: Mailbox[], replyTo: Mailbox | null): string {
-  const headers = [
-    `From: ${formatMailboxHeader(from)}`,
-    `To: ${to.map(formatMailboxHeader).join(", ")}`,
-    `Subject: ${encodeHeader(email.subject)}`,
-    `Date: ${new Date().toUTCString()}`,
-    "MIME-Version: 1.0",
-    "Content-Type: text/plain; charset=UTF-8",
-    "Content-Transfer-Encoding: 8bit",
-  ];
-  if (replyTo) headers.splice(2, 0, `Reply-To: ${formatMailboxHeader(replyTo)}`);
-  // 这里只发送纯文本通知，避免用户订阅内容进入 HTML 邮件上下文后产生额外转义面。
-  return `${headers.join("\r\n")}\r\n\r\n${normalizeCrlf(email.text)}`;
-}
-
-function formatMailboxHeader(mailbox: Mailbox): string {
-  const display = mailbox.raw.endsWith(">") ? mailbox.raw.slice(0, mailbox.raw.lastIndexOf("<")).trim().replace(/^"|"$/g, "") : "";
-  if (!display) return mailbox.address;
-  return `${encodeHeader(display)} <${mailbox.address}>`;
-}
-
 function supportsCapability(response: SmtpResponse, capability: string): boolean {
   return response.lines.some((line) => line.toUpperCase().startsWith(capability));
 }
 
 function supportsAuthPlain(response: SmtpResponse): boolean {
   return response.lines.some((line) => /^AUTH\b/i.test(line) && /\bPLAIN\b/i.test(line));
-}
-
-function parseBool(value: string | undefined, fallback: boolean): boolean {
-  const normalized = value?.trim().toLowerCase();
-  if (!normalized) return fallback;
-  if (["1", "true", "yes", "on"].includes(normalized)) return true;
-  if (["0", "false", "no", "off"].includes(normalized)) return false;
-  return fallback;
-}
-
-function normalizeCrlf(value: string): string {
-  return value.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\n/g, "\r\n");
-}
-
-function dotStuff(value: string): string {
-  return normalizeCrlf(value)
-    .split("\r\n")
-    .map((line) => (line.startsWith(".") ? `.${line}` : line))
-    .join("\r\n");
-}
-
-function encodeHeader(value: string): string {
-  const safe = sanitizeHeader(value);
-  return /^[\x20-\x7E]*$/.test(safe) ? safe : `=?UTF-8?B?${base64Utf8(safe)}?=`;
-}
-
-function sanitizeHeader(value: string): string {
-  return value.replace(/[\r\n]+/g, " ").trim();
-}
-
-function base64Utf8(value: string): string {
-  const bytes = new TextEncoder().encode(value);
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary);
 }
 
 function sanitizeProviderText(value: string): string {

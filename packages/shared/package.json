@@ -23,16 +23,19 @@
     "./media-resolver": "./src/media-resolver.ts",
     "./media-resolver-config": "./src/media-resolver-config.ts",
     "./media-resolver-fixtures": "./src/media-resolver-fixtures.ts",
+    "./email-template": "./src/email-template.ts",
     "./settings-defaults": "./src/settings-defaults.ts",
     "./runtime": "./src/runtime.ts"
   },
   "scripts": {
+    "test:run": "vitest run",
     "typecheck": "tsc --noEmit --project tsconfig.json"
   },
   "dependencies": {
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.6"
   }
 }

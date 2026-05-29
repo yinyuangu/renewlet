@@ -5,6 +5,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "test:run": "vitest run",
     "typecheck": "tsc --noEmit --project tsconfig.json"
   },
   "dependencies": {
@@ -14,6 +15,7 @@
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260520.1",
     "typescript": "^6.0.3",
+    "vitest": "^4.1.6",
     "wrangler": "^4.93.0"
   }
 }

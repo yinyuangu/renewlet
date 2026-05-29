@@ -1,5 +1,10 @@
 import { z } from "zod";
 import {
+  buildNotificationEmail,
+  type NotificationEmailItem,
+  type NotificationEmailMessage,
+} from "@renewlet/shared/email-template";
+import {
   notificationHistoryResponseSchema,
   notificationsRunBodySchema,
   notificationsTestBodySchema,
@@ -21,13 +26,8 @@ const CRON_USER_CONCURRENCY = 5;
 
 type Channel = ApiAppSettings["enabledChannels"][number];
 
-interface NotificationMessage {
-  title: string;
-  content: string;
-  timestamp: string;
-  hasPayload: boolean;
-  items: Array<Record<string, unknown>>;
-}
+type NotificationMessage = NotificationEmailMessage;
+type ScheduleOccurrence = ReturnType<typeof scheduleOccurrence>;
 
 export async function notificationTest(request: Request, env: Env): Promise<Response> {
   const locale = requestLocale(request);
@@ -35,7 +35,7 @@ export async function notificationTest(request: Request, env: Env): Promise<Resp
   const body = await readJson(request, notificationsTestBodySchema, locale);
   const settings = await effectiveSettings(env, auth.user.id, body.settings);
   const message = buildTestMessage(new Date(), settings);
-  await sendChannel(env, body.channel, settings, message, locale);
+  await sendChannel(env, body.channel, settings, message, locale, requestAppUrl(request));
   return ok();
 }
 
@@ -43,7 +43,7 @@ export async function notificationRun(request: Request, env: Env): Promise<Respo
   const locale = requestLocale(request);
   const auth = await requireAuth(request, env);
   const body = await readOptionalJson(request, notificationsRunBodySchema, locale);
-  const result = await runForUser(env, auth.user.id, body.force === true, body.settings, "manual", locale);
+  const result = await runForUser(env, auth.user.id, body.force === true, body.settings, "manual", locale, { appUrl: requestAppUrl(request) });
   if (!result.sent) return json({ ok: true, sent: false, reason: "no_due_items" });
   return json({ ok: true, sent: true, summary: result.summary });
 }
@@ -123,7 +123,8 @@ async function runScheduledForUser(env: Env, userId: string): Promise<void> {
     ) VALUES (?, ?, ?, ?, ?, ?, 'pending', 0, NULL, '{}', ?, ?)
   `).bind(newId("job"), userId, occurrence.scheduledLocalDate, occurrence.scheduledLocalTime, occurrence.timeZone, occurrence.scheduledInstantUtc, timestamp, timestamp).run();
   if ((insert.meta.changes ?? 0) === 0) return;
-  await runForUser(env, userId, false, undefined, "cron", DEFAULT_SERVER_I18N_LOCALE, occurrence);
+  // Cron 没有 request origin；邮件 CTA 只在手动请求能确定公开域名时生成。
+  await runForUser(env, userId, false, undefined, "cron", DEFAULT_SERVER_I18N_LOCALE, { occurrence });
 }
 
 async function runForUser(
@@ -133,12 +134,12 @@ async function runForUser(
   settingsPatch: SettingsPatch | undefined,
   source: "cron" | "manual",
   locale: AppLocale,
-  occurrence?: ReturnType<typeof scheduleOccurrence>,
+  options: { occurrence?: ScheduleOccurrence; appUrl?: string } = {},
 ): Promise<{ sent: boolean; summary: SendSummary }> {
   const settings = await effectiveSettings(env, userId, settingsPatch);
   const subscriptions = (await listSubscriptions(env, userId)).map(toApiSubscription);
   const now = new Date();
-  const schedule = occurrence ?? scheduleOccurrence(dateOnlyInZone(now, settings.timezone), settings.notificationTimeLocal, settings.timezone);
+  const schedule = options.occurrence ?? scheduleOccurrence(dateOnlyInZone(now, settings.timezone), settings.notificationTimeLocal, settings.timezone);
   const message = buildDueMessage(now, settings, subscriptions, true);
   if (!message.hasPayload && !force) {
     // cron 空跑也要写 skipped，历史页才能解释“调度正常但没有到期内容”。
@@ -148,7 +149,7 @@ async function runForUser(
   if (settings.enabledChannels.length === 0) {
     throw new HttpError(400, serverText(locale, "notification.noEnabledChannels"));
   }
-  const summary = await sendChannels(env, settings.enabledChannels, settings, message, locale);
+  const summary = await sendChannels(env, settings.enabledChannels, settings, message, locale, options.appUrl);
   const status = summary.failed.length > 0 && summary.succeeded.length === 0 ? "failed" : "sent";
   await finalizeJob(env, userId, schedule, status, summary.attempted.length, summary.failed[0]?.error ?? null, {
     // 历史详情保存的是产品可解释结果，不保存 provider token 或完整外部响应。
@@ -193,12 +194,12 @@ interface SendSummary {
   failed: Array<{ channel: Channel; error: string }>;
 }
 
-async function sendChannels(env: Env, channels: Channel[], settings: ApiAppSettings, message: NotificationMessage, locale: AppLocale): Promise<SendSummary> {
+async function sendChannels(env: Env, channels: Channel[], settings: ApiAppSettings, message: NotificationMessage, locale: AppLocale, appUrl?: string): Promise<SendSummary> {
   const summary: SendSummary = { attempted: channels, succeeded: [], failed: [] };
   for (const channel of channels) {
     try {
       // 多渠道是“尽力发送”：一个渠道失败要进入 summary，不能吞掉其它渠道的成功。
-      await sendChannel(env, channel, settings, message, locale);
+      await sendChannel(env, channel, settings, message, locale, appUrl);
       summary.succeeded.push(channel);
     } catch (error) {
       summary.failed.push({ channel, error: error instanceof Error ? error.message : String(error) });
@@ -207,7 +208,7 @@ async function sendChannels(env: Env, channels: Channel[], settings: ApiAppSetti
   return summary;
 }
 
-async function sendChannel(env: Env, channel: Channel, settings: ApiAppSettings, message: NotificationMessage, locale: AppLocale): Promise<void> {
+async function sendChannel(env: Env, channel: Channel, settings: ApiAppSettings, message: NotificationMessage, locale: AppLocale, appUrl?: string): Promise<void> {
   switch (channel) {
     case "telegram":
       await postJson(`https://api.telegram.org/bot${required(settings.telegramBotToken, serverText(locale, "service.telegramBotToken"), locale)}/sendMessage`, {
@@ -236,7 +237,7 @@ async function sendChannel(env: Env, channel: Channel, settings: ApiAppSettings,
       await fetchOk(barkUrl(settings, message, locale), { method: "GET" }, "Bark", locale);
       return;
     case "email":
-      await sendEmail(env, settings, message, locale);
+      await sendEmail(env, settings, message, locale, appUrl);
       return;
   }
 }
@@ -260,11 +261,12 @@ async function sendWebhook(settings: ApiAppSettings, message: NotificationMessag
   await fetchOk(endpoint, { method: "POST", headers, body }, "Webhook", locale);
 }
 
-async function sendEmail(env: Env, settings: ApiAppSettings, message: NotificationMessage, locale: AppLocale): Promise<void> {
+async function sendEmail(env: Env, settings: ApiAppSettings, message: NotificationMessage, locale: AppLocale, appUrl?: string): Promise<void> {
   let to = splitList(settings.recipientEmail);
   if (!settings.notifyMultipleAddresses && to.length > 1) to = to.slice(0, 1);
   if (to.length === 0) throw new Error(serverText(locale, "smtp.recipientEmpty"));
-  await sendSmtpEmail(notificationSmtpConfig(settings, locale), { to, subject: message.title, text: textMessage(message) }, locale);
+  const email = buildNotificationEmail(settings, message, appUrl ? { appUrl } : {});
+  await sendSmtpEmail(notificationSmtpConfig(settings, locale), { to, subject: email.subject, text: email.text, html: email.html }, locale);
 }
 
 function buildOverview(now: Date, settings: ApiAppSettings, subscriptions: ApiSubscription[]) {
@@ -300,7 +302,7 @@ function buildDueMessage(now: Date, settings: ApiAppSettings, subscriptions: Api
   return { title: serverText(locale, "notification.content.title"), content, timestamp: displayTime(now, settings), hasPayload: items.length > 0, items };
 }
 
-function groupedNotificationContent(items: Array<Record<string, unknown>>, locale: AppLocale): string {
+function groupedNotificationContent(items: NotificationEmailItem[], locale: AppLocale): string {
   const groups = [
     ["renewal", "notification.content.renewalBlock"],
     ["trial", "notification.content.trialBlock"],
@@ -309,7 +311,7 @@ function groupedNotificationContent(items: Array<Record<string, unknown>>, local
   return groups
     .map(([type, titleKey]) => {
       const lines = items
-        .filter((item) => item["type"] === type)
+        .filter((item) => item.type === type)
         .map((item) => notificationItemLine(item, locale));
       return lines.length > 0 ? `${serverText(locale, titleKey)}\n${lines.join("\n")}` : "";
     })
@@ -317,22 +319,21 @@ function groupedNotificationContent(items: Array<Record<string, unknown>>, local
     .join("\n\n");
 }
 
-function notificationItemLine(item: Record<string, unknown>, locale: AppLocale): string {
-  let extra = serverFormat(locale, "notification.content.reminderDays", { days: Number(item["reminderDays"]) });
-  if (item["type"] === "trial") {
-    extra = serverFormat(locale, "notification.content.trialReminderDays", { days: Number(item["reminderDays"]) });
-  } else if (item["type"] === "expired") {
+function notificationItemLine(item: NotificationEmailItem, locale: AppLocale): string {
+  let extra = serverFormat(locale, "notification.content.reminderDays", { days: item.reminderDays });
+  if (item.type === "trial") {
+    extra = serverFormat(locale, "notification.content.trialReminderDays", { days: item.reminderDays });
+  } else if (item.type === "expired") {
     extra = serverText(locale, "notification.content.expiredStatus");
   }
-  if (item["repeatReminder"]) {
-    const repeatReminder = item["repeatReminder"] as { interval?: unknown };
-    extra += serverText(locale, "notification.content.repeatSeparator") + serverFormat(locale, "notification.content.repeatEvery", { hours: repeatReminderHours(String(repeatReminder.interval ?? "")) });
+  if (item.repeatReminder) {
+    extra += serverText(locale, "notification.content.repeatSeparator") + serverFormat(locale, "notification.content.repeatEvery", { hours: repeatReminderHours(item.repeatReminder.interval) });
   }
   return serverFormat(locale, "notification.content.itemLine", {
-    name: String(item["name"] ?? ""),
-    targetDate: String(item["targetDate"] ?? ""),
-    amount: formatAmount(Number(item["price"] ?? 0)),
-    currency: String(item["currency"] ?? ""),
+    name: item.name,
+    targetDate: item.targetDate,
+    amount: formatAmount(item.price),
+    currency: item.currency,
     extra,
   });
 }
@@ -348,8 +349,8 @@ function formatAmount(amount: number): string {
   return fixed.replace(/\.00$/, "").replace(/(\.\d)0$/, "$1");
 }
 
-function collectItems(localDate: string, settings: ApiAppSettings, subscriptions: ApiSubscription[], options: { includeExpired: boolean }) {
-  const items: Array<Record<string, unknown>> = [];
+function collectItems(localDate: string, settings: ApiAppSettings, subscriptions: ApiSubscription[], options: { includeExpired: boolean }): NotificationEmailItem[] {
+  const items: NotificationEmailItem[] = [];
   for (const sub of subscriptions) {
     // one-time 是买断记录；Worker 通知不能把购买日当成续费/过期日生成提醒。
     if (sub.billingCycle === "one-time") continue;
@@ -365,7 +366,7 @@ function collectItems(localDate: string, settings: ApiAppSettings, subscriptions
   return items;
 }
 
-function item(type: "renewal" | "trial" | "expired", sub: ApiSubscription, targetDate: string, daysUntil: number, reminderDays: number) {
+function item(type: "renewal" | "trial" | "expired", sub: ApiSubscription, targetDate: string, daysUntil: number, reminderDays: number): NotificationEmailItem {
   return {
     type,
     subscriptionId: sub.id,
@@ -487,6 +488,10 @@ function textMessage(message: NotificationMessage): string {
 
 function applyTemplate(template: string, message: NotificationMessage): string {
   return template.replaceAll("{title}", message.title).replaceAll("{content}", message.content).replaceAll("{timestamp}", message.timestamp);
+}
+
+function requestAppUrl(request: Request): string {
+  return new URL(request.url).origin;
 }
 
 function splitList(input: string): string[] {
