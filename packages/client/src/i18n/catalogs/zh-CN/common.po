@@ -165,6 +165,11 @@ msgstr "发布页"
 
 #. js-lingui-explicit-id
 #: src/i18n/descriptors/common.ts:71
+msgid "system.cloudflareDeployGuide"
+msgstr "Cloudflare 部署说明"
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/common.ts:72
 msgid "system.viewChangelog"
 msgstr "查看更新日志"
 
@@ -437,16 +442,6 @@ msgstr "正在重启..."
 #: src/i18n/descriptors/common.ts:77
 msgid "system.retry"
 msgstr "重试"
-
-#. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:78
-msgid "system.sourceMode"
-msgstr "源码构建"
-
-#. js-lingui-explicit-id
-#: src/i18n/descriptors/common.ts:79
-msgid "system.sourceModeHint"
-msgstr "源码或非 Release 构建请使用原部署方式更新。"
 
 #. js-lingui-explicit-id
 #: src/i18n/descriptors/common.ts:110

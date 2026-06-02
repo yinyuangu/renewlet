@@ -196,13 +196,14 @@ type systemReleaseInfoDTO struct {
 	Assets      []systemReleaseAssetDTO `json:"assets"`
 }
 
-// systemVersionResponse 描述当前运行面是否能页面内自更新。
+// systemVersionResponse 描述当前部署形态、版本检查结果，以及是否能页面内执行二进制更新。
 type systemVersionResponse struct {
 	CurrentVersion    string                `json:"currentVersion"`
 	LatestVersion     string                `json:"latestVersion"`
 	HasUpdate         bool                  `json:"hasUpdate"`
 	CheckSucceeded    bool                  `json:"checkSucceeded"`
-	Runtime           string                `json:"runtime"`
+	Deployment        string                `json:"deployment"`
+	UpdateMode        string                `json:"updateMode"`
 	UpdateSupported   bool                  `json:"updateSupported"`
 	UnsupportedReason string                `json:"unsupportedReason,omitempty"`
 	ReleaseInfo       *systemReleaseInfoDTO `json:"releaseInfo"`

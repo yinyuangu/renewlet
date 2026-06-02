@@ -102,7 +102,7 @@ docker compose up -d
 docker compose logs -f
 ```
 
-也可以在页面顶部的版本菜单里点击 **立即更新**。
+使用当前二进制布局的官方 Docker release 镜像，也可以在 Renewlet 页面顶部版本菜单中更新。页面内更新会下载 GitHub Release 二进制、校验 `checksums.txt`、替换运行二进制，然后由管理员点击 **立即重启** 应用更新。旧布局镜像需要先执行一次 `docker compose pull && docker compose up -d`，之后才会开放页面内更新。
 
 Cloudflare 部署升级：打开你的 fork，点击 `Sync fork` / `Update branch`，等待重新部署；没有自动运行时再手动运行 `Cloudflare Worker`。部署路径必须保持先执行 D1 migrations，再发布 Worker。
 

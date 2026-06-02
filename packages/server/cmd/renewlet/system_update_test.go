@@ -155,6 +155,98 @@ func TestSystemVersionWarningDoesNotExposeGitHubStatus(t *testing.T) {
 	}
 }
 
+func TestSelfUpdateCapabilityMatrix(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("self-update capability matrix depends on linux Docker binary semantics")
+	}
+
+	oldVersion, oldBuildType := Version, BuildType
+	t.Cleanup(func() {
+		Version, BuildType = oldVersion, oldBuildType
+	})
+
+	cases := []struct {
+		name           string
+		buildType      string
+		enabled        string
+		writeBinary    bool
+		wantDeployment string
+		wantMode       string
+		wantSupported  bool
+		wantReasonPart string
+	}{
+		{
+			name:           "docker release supports in-app binary update",
+			buildType:      "release",
+			enabled:        "true",
+			writeBinary:    true,
+			wantDeployment: "docker",
+			wantMode:       "in-app-binary",
+			wantSupported:  true,
+		},
+		{
+			name:           "docker release with self update disabled falls back to compose",
+			buildType:      "release",
+			enabled:        "false",
+			writeBinary:    true,
+			wantDeployment: "docker",
+			wantMode:       "docker-compose",
+			wantSupported:  false,
+			wantReasonPart: "RENEWLET_SELF_UPDATE_ENABLED=false",
+		},
+		{
+			name:           "old docker bridge cannot replace container binary",
+			buildType:      "release",
+			enabled:        "true",
+			writeBinary:    false,
+			wantDeployment: "docker",
+			wantMode:       "docker-compose",
+			wantSupported:  false,
+			wantReasonPart: "docker compose pull",
+		},
+		{
+			name:           "non release source build stays manual",
+			buildType:      "source",
+			enabled:        "true",
+			writeBinary:    true,
+			wantDeployment: "source",
+			wantMode:       "source-manual",
+			wantSupported:  false,
+			wantReasonPart: "Release",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			tempDir := t.TempDir()
+			binaryPath := filepath.Join(tempDir, "renewlet")
+			if tc.writeBinary {
+				if err := os.WriteFile(binaryPath, []byte("old"), 0o755); err != nil {
+					t.Fatal(err)
+				}
+			}
+			t.Setenv("RENEWLET_SELF_UPDATE_ENABLED", tc.enabled)
+			t.Setenv("RENEWLET_SELF_UPDATE_BINARY", binaryPath)
+			t.Setenv("RENEWLET_SELF_UPDATE_BACKUP_DIR", filepath.Join(tempDir, "backups"))
+			Version, BuildType = "1.0.0", tc.buildType
+
+			got := selfUpdateCapability(localeZhCN)
+			if got.deployment != tc.wantDeployment {
+				t.Fatalf("deployment = %q, want %q", got.deployment, tc.wantDeployment)
+			}
+			if got.updateMode != tc.wantMode {
+				t.Fatalf("updateMode = %q, want %q", got.updateMode, tc.wantMode)
+			}
+			if got.supported != tc.wantSupported {
+				t.Fatalf("supported = %v, want %v", got.supported, tc.wantSupported)
+			}
+			if tc.wantReasonPart != "" && !strings.Contains(got.unsupportedReason, tc.wantReasonPart) {
+				t.Fatalf("unsupportedReason = %q, want to contain %q", got.unsupportedReason, tc.wantReasonPart)
+			}
+		})
+	}
+}
+
 func TestChecksumForArchive(t *testing.T) {
 	hash := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 	got, err := checksumForArchive("renewlet_1.0.0_linux_amd64.tar.gz", []byte(hash+"  renewlet_1.0.0_linux_amd64.tar.gz\n"))

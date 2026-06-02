@@ -156,7 +156,8 @@ func (service *systemUpdateService) baseVersionResponse(locale appLocale) *syste
 		CurrentVersion:    Version,
 		LatestVersion:     Version,
 		HasUpdate:         false,
-		Runtime:           capability.runtime,
+		Deployment:        capability.deployment,
+		UpdateMode:        capability.updateMode,
 		UpdateSupported:   capability.supported,
 		UnsupportedReason: capability.unsupportedReason,
 		ReleaseInfo:       nil,
@@ -284,17 +285,33 @@ func selfUpdateCapability(locale appLocale) systemUpdateCapability {
 		backupDir = defaultSelfUpdateBackupDir
 	}
 	if !envBool("RENEWLET_SELF_UPDATE_ENABLED", false) {
+		reasonKey := "system.updateUnsupportedRuntime"
+		if BuildType == "release" {
+			reasonKey = "system.updateUnsupportedSelfUpdateDisabled"
+		}
 		return systemUpdateCapability{
-			runtime:           "source",
+			deployment:        deploymentForBuildType(),
+			updateMode:        updateModeForManualDeployment(),
 			supported:         false,
-			unsupportedReason: serverText(locale, "system.updateUnsupportedRuntime"),
+			unsupportedReason: serverText(locale, reasonKey),
+			binaryPath:        binaryPath,
+			backupDir:         backupDir,
+		}
+	}
+	if BuildType != "release" {
+		return systemUpdateCapability{
+			deployment:        deploymentForBuildType(),
+			updateMode:        updateModeForManualDeployment(),
+			supported:         false,
+			unsupportedReason: serverText(locale, "system.updateUnsupportedNotRelease"),
 			binaryPath:        binaryPath,
 			backupDir:         backupDir,
 		}
 	}
 	if runtime.GOOS != "linux" {
 		return systemUpdateCapability{
-			runtime:           "docker",
+			deployment:        "docker",
+			updateMode:        "docker-compose",
 			supported:         false,
 			unsupportedReason: serverText(locale, "system.updateUnsupportedLinuxDocker"),
 			binaryPath:        binaryPath,
@@ -304,28 +321,35 @@ func selfUpdateCapability(locale appLocale) systemUpdateCapability {
 	if fileInfo, err := os.Lstat(binaryPath); err != nil || !fileInfo.Mode().IsRegular() {
 		// 旧镜像的 /renewlet 可能仍是真实文件；自更新只支持新布局里的 current/renewlet 可替换目标。
 		return systemUpdateCapability{
-			runtime:           "docker",
+			deployment:        "docker",
+			updateMode:        "docker-compose",
 			supported:         false,
 			unsupportedReason: serverText(locale, "system.updateUnsupportedDockerBridge"),
 			binaryPath:        binaryPath,
 			backupDir:         backupDir,
 		}
 	}
-	if BuildType != "release" {
-		return systemUpdateCapability{
-			runtime:           "docker",
-			supported:         false,
-			unsupportedReason: serverText(locale, "system.updateUnsupportedNotRelease"),
-			binaryPath:        binaryPath,
-			backupDir:         backupDir,
-		}
-	}
 	return systemUpdateCapability{
-		runtime:    "docker",
+		deployment: "docker",
+		updateMode: "in-app-binary",
 		supported:  true,
 		binaryPath: binaryPath,
 		backupDir:  backupDir,
 	}
+}
+
+func deploymentForBuildType() string {
+	if BuildType == "release" {
+		return "docker"
+	}
+	return "source"
+}
+
+func updateModeForManualDeployment() string {
+	if BuildType == "release" {
+		return "docker-compose"
+	}
+	return "source-manual"
 }
 
 func selectSystemUpdateAssets(assets []githubAsset, version string) (githubAsset, githubAsset, error) {

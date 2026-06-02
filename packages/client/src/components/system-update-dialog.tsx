@@ -1,4 +1,4 @@
-import { AlertCircle, Check, Download, ExternalLink, Info, RefreshCw, RotateCw, Server, X } from "lucide-react";
+import { AlertCircle, Check, Download, ExternalLink, RefreshCw, RotateCw, Server, X } from "lucide-react";
 import { useCallback, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -6,7 +6,7 @@ import { useSystemRestart, useSystemUpdate, useSystemVersion } from "@/hooks/use
 import { useI18n } from "@/i18n/I18nProvider";
 import { ApiError } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
-import type { SystemRuntime } from "@/lib/api/schemas/app";
+import type { SystemDeployment } from "@/lib/api/schemas/app";
 import type { MessageKey } from "@/i18n/messages";
 
 interface SystemUpdateDialogProps {
@@ -14,7 +14,7 @@ interface SystemUpdateDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const runtimeLabelKeys: Record<SystemRuntime, MessageKey> = {
+const deploymentLabelKeys: Record<SystemDeployment, MessageKey> = {
   cloudflare: "system.runtime.cloudflare",
   docker: "system.runtime.docker",
   source: "system.runtime.source",
@@ -23,6 +23,7 @@ const runtimeLabelKeys: Record<SystemRuntime, MessageKey> = {
 const RESTART_COUNTDOWN_SECONDS = 8;
 const HEALTH_RETRY_COUNT = 5;
 const HEALTH_RETRY_DELAY_MS = 1_000;
+const CLOUDFLARE_DEPLOY_GUIDE_URL = "https://github.com/zhiyingzzhou/renewlet/blob/main/docs/cloudflare-workers-deploy.md";
 
 export const systemRestartBrowser = {
   reload() {
@@ -35,6 +36,7 @@ export const systemRestartBrowser = {
  *
  * 状态链：检查 Release -> 下载替换二进制 -> needsRestart -> 显式重启 -> 轮询 health -> 刷新页面。
  * Cloudflare/source 运行面只展示版本信息和不支持原因，不提供执行入口。
+ * 前端只消费 deployment/updateMode/updateSupported，不能再从 buildType 反推部署能力。
  */
 export function SystemUpdateDialog({ open, onOpenChange }: SystemUpdateDialogProps) {
   const { t } = useI18n();
@@ -196,9 +198,8 @@ export function SystemUpdateDialog({ open, onOpenChange }: SystemUpdateDialogPro
               ) : !version.updateSupported ? (
                 <div className="space-y-3">
                   <StatePanel icon={<Server className="h-4 w-4" />} tone="neutral" title={t("system.unsupportedTitle")} description={version.unsupportedReason ?? t("system.unsupportedDescription")} />
-                  {version.runtime === "source" || version.build.buildType !== "release" ? (
-                    <StatePanel icon={<Info className="h-4 w-4" />} tone="info" title={t("system.sourceMode")} description={t("system.sourceModeHint")} />
-                  ) : null}
+                  {version.updateMode === "cloudflare-deploy" ? <ReleaseLink href={CLOUDFLARE_DEPLOY_GUIDE_URL} label={t("system.cloudflareDeployGuide")} /> : null}
+                  {version.releaseInfo?.htmlUrl ? <ReleaseLink href={version.releaseInfo.htmlUrl} label={t("system.releaseLink")} /> : null}
                 </div>
               ) : version.hasUpdate ? (
                 <div className="space-y-3">
@@ -217,7 +218,7 @@ export function SystemUpdateDialog({ open, onOpenChange }: SystemUpdateDialogPro
               )}
 
               <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-                <InfoItem label={t("system.runtime")} value={t(runtimeLabelKeys[version.runtime])} />
+                <InfoItem label={t("system.runtime")} value={t(deploymentLabelKeys[version.deployment])} />
                 <InfoItem label={t("system.buildType")} value={version.build.buildType} />
               </div>
             </>

@@ -22,7 +22,8 @@ export async function systemVersion(request: Request, env: Env): Promise<Respons
     latestVersion: version,
     hasUpdate: false,
     checkSucceeded: true,
-    runtime: "cloudflare",
+    deployment: "cloudflare",
+    updateMode: "cloudflare-deploy",
     updateSupported: false,
     unsupportedReason: serverText(locale, "system.cloudflareVersionUnsupportedReason"),
     releaseInfo: {

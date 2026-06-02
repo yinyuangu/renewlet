@@ -111,7 +111,9 @@ git push origin v0.1.0
 - 真实自更新目标是 `/opt/renewlet/current/renewlet`；更新器永远不替换 `/renewlet`。
 - 使用旧布局镜像的用户仍需先执行一次 `docker compose pull && docker compose up -d`。完成桥接后，后续稳定版可在管理员版本弹窗里更新。
 - Release 二进制包必须提供 Linux `amd64` 和 `arm64` tarball，命名为 `renewlet_<version>_linux_<arch>.tar.gz`，并在 `checksums.txt` 写入对应 SHA-256。
-- Cloudflare 构建只暴露版本/发布页信息，不允许暴露可执行更新路径。
+- `/api/app/admin/system/version` 使用 `deployment` 表达 `docker`、`cloudflare` 或 `source` 部署形态，使用 `updateMode` 表达 `in-app-binary`、`docker-compose`、`cloudflare-deploy` 或 `source-manual` 升级路径。`updateSupported` 只表示管理员弹窗能否执行页面内二进制更新。
+- 新布局的 Docker release 镜像返回 `deployment=docker`、`updateMode=in-app-binary`、`updateSupported=true`。禁用自更新、旧 bridge 布局和非 release 构建必须返回对应手动模式，并只给出一条明确不支持原因。
+- Cloudflare 构建返回 `deployment=cloudflare`、`updateMode=cloudflare-deploy`、`updateSupported=false`；只暴露版本/发布页信息，不允许暴露可执行更新路径。
 
 ## 热修复
 

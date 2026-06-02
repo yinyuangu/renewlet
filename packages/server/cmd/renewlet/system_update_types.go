@@ -107,7 +107,8 @@ type fetchedSystemRelease struct {
 }
 
 type systemUpdateCapability struct {
-	runtime           string
+	deployment        string
+	updateMode        string
 	supported         bool
 	unsupportedReason string
 	binaryPath        string

@@ -24,11 +24,12 @@ export const passwordResetStatusResponseSchema = z.object({
 }).strict();
 
 /**
- * 系统更新运行面枚举。
+ * 系统部署形态与更新模式分开表达。
  *
- * Docker 支持页面内自更新，Cloudflare/source 只展示版本状态；前端按钮显隐依赖这个字段组合。
+ * deployment 是实际运行面；updateMode 是管理员版本弹窗该暴露的升级路径，前端不能再从 buildType 猜。
  */
-export const systemRuntimeSchema = z.enum(["docker", "cloudflare", "source"]);
+export const systemDeploymentSchema = z.enum(["docker", "cloudflare", "source"]);
+export const systemUpdateModeSchema = z.enum(["in-app-binary", "docker-compose", "cloudflare-deploy", "source-manual"]);
 
 /** 构建信息由 CI ldflags 或 Wrangler vars 注入；不能用于权限判断，只用于版本弹窗展示。 */
 export const systemBuildInfoSchema = z.object({
@@ -60,7 +61,8 @@ export const systemVersionResponseSchema = z.object({
   latestVersion: z.string().min(1),
   hasUpdate: z.boolean(),
   checkSucceeded: z.boolean(),
-  runtime: systemRuntimeSchema,
+  deployment: systemDeploymentSchema,
+  updateMode: systemUpdateModeSchema,
   updateSupported: z.boolean(),
   unsupportedReason: z.string().optional(),
   releaseInfo: systemReleaseInfoSchema.nullable(),
@@ -86,7 +88,8 @@ export const systemRestartResponseSchema = okResponseSchema;
 
 export type SetupStatusResponse = z.infer<typeof setupStatusResponseSchema>;
 export type PasswordResetStatusResponse = z.infer<typeof passwordResetStatusResponseSchema>;
-export type SystemRuntime = z.infer<typeof systemRuntimeSchema>;
+export type SystemDeployment = z.infer<typeof systemDeploymentSchema>;
+export type SystemUpdateMode = z.infer<typeof systemUpdateModeSchema>;
 export type SystemVersionResponse = z.infer<typeof systemVersionResponseSchema>;
 export type SystemUpdateResponse = z.infer<typeof systemUpdateResponseSchema>;
 export type SystemRestartResponse = z.infer<typeof systemRestartResponseSchema>;

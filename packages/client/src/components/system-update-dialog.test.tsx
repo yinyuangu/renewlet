@@ -38,6 +38,7 @@ vi.mock("@/i18n/I18nProvider", () => ({
         "system.noUpdateDescription": "当前部署不需要更新。",
         "system.noUpdateTitle": "已是最新版本",
         "system.openUpdateDialog": "打开系统更新",
+        "system.cloudflareDeployGuide": "Cloudflare 部署说明",
         "system.recheck": "重新检查",
         "system.releaseLink": "发布页",
         "system.restartNow": "立即重启",
@@ -48,8 +49,6 @@ vi.mock("@/i18n/I18nProvider", () => ({
         "system.runtime.docker": "Docker",
         "system.runtime.cloudflare": "Cloudflare",
         "system.runtime.source": "源码/手动部署",
-        "system.sourceMode": "源码构建",
-        "system.sourceModeHint": "源码或非 Release 构建请使用原部署方式更新。",
         "system.unsupportedDescription": "请使用原部署方式升级。",
         "system.unsupportedTitle": "当前部署不支持一键更新",
         "system.updateAvailableDescription": "可以更新到 v{version}。",
@@ -78,7 +77,8 @@ function versionFixture(overrides: Record<string, unknown> = {}) {
     latestVersion: "1.1.0",
     hasUpdate: true,
     checkSucceeded: true,
-    runtime: "docker",
+    deployment: "docker",
+    updateMode: "in-app-binary",
     updateSupported: true,
     releaseInfo: {
       tagName: "v1.1.0",
@@ -206,10 +206,11 @@ describe("SystemUpdateDialog", () => {
     expect(screen.getByRole("button", { name: "立即重启" })).toBeInTheDocument();
   });
 
-  it("shows unsupported source builds with source update hint", async () => {
+  it("shows unsupported source builds without update actions", async () => {
     mockVersionEndpoint({
       hasUpdate: false,
-      runtime: "source",
+      deployment: "source",
+      updateMode: "source-manual",
       updateSupported: false,
       unsupportedReason: "源码构建不支持",
       releaseInfo: null,
@@ -227,7 +228,45 @@ describe("SystemUpdateDialog", () => {
     await user.click(await screen.findByRole("button", { name: "打开系统更新" }));
 
     expect(await screen.findByText("当前部署不支持一键更新")).toBeInTheDocument();
-    expect(screen.getByText("源码或非 Release 构建请使用原部署方式更新。")).toBeInTheDocument();
+    expect(screen.getByText("源码构建不支持")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "立即更新" })).not.toBeInTheDocument();
+    expect(screen.queryByText("源码构建")).not.toBeInTheDocument();
+  });
+
+  it("shows Cloudflare deploy guidance without source wording or update actions", async () => {
+    mockVersionEndpoint({
+      hasUpdate: false,
+      deployment: "cloudflare",
+      updateMode: "cloudflare-deploy",
+      updateSupported: false,
+      unsupportedReason: "Cloudflare 需要通过部署流程升级",
+      releaseInfo: {
+        tagName: "v1.1.0",
+        version: "1.1.0",
+        name: "Renewlet 1.1.0",
+        body: "",
+        publishedAt: "2026-05-26T00:00:00Z",
+        htmlUrl: "https://github.com/zhiyingzzhou/renewlet/releases/tag/v1.1.0",
+        assets: [],
+      },
+      build: {
+        version: "1.0.0",
+        commit: "abc",
+        buildTime: "2026-05-26T00:00:00Z",
+        buildType: "cloudflare",
+      },
+    });
+
+    const user = userEvent.setup();
+    renderWithQuery(<SystemUpdateHarness />);
+
+    await user.click(await screen.findByRole("button", { name: "打开系统更新" }));
+
+    expect(await screen.findByText("Cloudflare 需要通过部署流程升级")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Cloudflare 部署说明" })).toHaveAttribute("href", expect.stringContaining("docs/cloudflare-workers-deploy.md"));
+    expect(screen.getByRole("link", { name: "发布页" })).toHaveAttribute("href", "https://github.com/zhiyingzzhou/renewlet/releases/tag/v1.1.0");
+    expect(screen.queryByText("源码构建")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "立即更新" })).not.toBeInTheDocument();
   });
 
   it("shows update error and retry button", async () => {
