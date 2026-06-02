@@ -33,7 +33,7 @@
     "allowJs": false,
     "noUnusedLocals": false,
     "strictNullChecks": true,
-    "types": ["vite/client", "vitest/globals", "node"],
+    "types": ["vite/client", "vitest/globals", "@testing-library/jest-dom", "node"],
     "strict": true
   },
   "include": [

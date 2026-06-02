@@ -10,6 +10,8 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages/client/package.json packages/client/package.json
 COPY packages/shared/package.json packages/shared/package.json
 COPY packages/server/package.json packages/server/package.json
+# workspace 已纳入独立官网；这里只复制 manifest 让 frozen lockfile 可解析，产品镜像仍只构建 client/server。
+COPY apps/website/package.json apps/website/package.json
 RUN pnpm install --frozen-lockfile
 
 FROM client-deps AS client-builder

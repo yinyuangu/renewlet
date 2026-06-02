@@ -10,18 +10,32 @@ import { RuntimeSection } from './components/RuntimeSection'
 import { DeployDialog } from './features/deploy/DeployDialog'
 import type { Locale } from './content/site'
 
+// /en/ 是真实静态 HTML 入口，初始语言必须跟路径一致，避免英文 canonical 页首屏闪成中文。
+function initialLocale(): Locale {
+  return window.location.pathname.replace(/\/+$/, '').endsWith('/en') ? 'en' : 'zh'
+}
+
 function App() {
   const [deployOpen, setDeployOpen] = useState(false)
-  const [locale, setLocale] = useState<Locale>('zh')
+  const [locale, setLocale] = useState<Locale>(initialLocale)
 
   function openDeployDialog() {
     setDeployOpen(true)
   }
 
+  function handleLocaleChange(nextLocale: Locale) {
+    setLocale(nextLocale)
+    document.documentElement.lang = nextLocale === 'en' ? 'en' : 'zh-CN'
+
+    const base = import.meta.env.BASE_URL.replace(/\/$/, '')
+    const nextPath = nextLocale === 'en' ? `${base}/en/` : `${base}/`
+    window.history.replaceState({}, '', nextPath)
+  }
+
   return (
     <>
       <div className="overflow-clip">
-        <Header locale={locale} onLocaleChange={setLocale} />
+        <Header locale={locale} onLocaleChange={handleLocaleChange} />
         <main>
           <Hero locale={locale} onDeployClick={openDeployDialog} />
           <Intro locale={locale} />
