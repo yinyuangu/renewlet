@@ -95,15 +95,16 @@ git push origin v0.1.0
 ```
 
 3. `Release Publish` builds Docker images, creates a draft GitHub Release, and attaches `renewlet-docker-v0.1.0.zip`, `renewlet_0.1.0_linux_amd64.tar.gz`, `renewlet_0.1.0_linux_arm64.tar.gz`, and `checksums.txt`.
-4. Stable releases push:
+4. The workflow rejects a tag when the workspace package versions do not match the tag version. RC tags validate against the stable package version without writing the `-rc.N` suffix into `package.json`.
+5. Stable releases push:
    - `zhiyingzzhou/renewlet:0.1.0`
    - `zhiyingzzhou/renewlet:0.1`
    - `zhiyingzzhou/renewlet:latest`
    - `ghcr.io/zhiyingzzhou/renewlet:0.1.0`
    - `ghcr.io/zhiyingzzhou/renewlet:0.1`
    - `ghcr.io/zhiyingzzhou/renewlet:latest`
-5. Review the draft Release, verify the Docker image list and short changelog, then publish it manually.
-6. Approve the `production-cloudflare` environment if this release should deploy the production Worker. Stable releases use the production deploy job inside `Release Publish`, not the `Cloudflare Worker` test deploy workflow.
+6. Review the draft Release, verify the Docker image list and short changelog, then publish it manually.
+7. Approve the `production-cloudflare` environment if this release should deploy the production Worker. Stable releases use the production deploy job inside `Release Publish`, not the `Cloudflare Worker` test deploy workflow.
 
 ## Docker In-App Updates
 
@@ -113,7 +114,7 @@ git push origin v0.1.0
 - Release binary archives must be Linux `amd64` and `arm64` tarballs named `renewlet_<version>_linux_<arch>.tar.gz`, with matching SHA-256 entries in `checksums.txt`.
 - `/api/app/admin/system/version` reports `deployment` as `docker`, `cloudflare`, or `source`, and `updateMode` as `in-app-binary`, `docker-compose`, `cloudflare-deploy`, or `source-manual`. `updateSupported` only means the admin dialog may execute the in-app binary update.
 - Docker release images with the new layout return `deployment=docker`, `updateMode=in-app-binary`, and `updateSupported=true`. Disabled self-update, old bridge layouts, and non-release builds must return the correct manual mode and a single unsupported reason.
-- Cloudflare builds return `deployment=cloudflare`, `updateMode=cloudflare-deploy`, and `updateSupported=false`; they only expose version/release information and must not expose an executable update path.
+- Cloudflare builds return `deployment=cloudflare`, `updateMode=cloudflare-deploy`, and `updateSupported=false`; they expose the injected build version and release link, but must not claim `checkSucceeded=true` unless a trusted GitHub latest-release check has actually succeeded.
 
 ## Hotfix
 

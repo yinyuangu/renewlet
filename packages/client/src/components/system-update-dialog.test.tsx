@@ -339,7 +339,9 @@ describe("SystemUpdateDialog", () => {
     await user.click(await screen.findByRole("button", { name: "打开系统更新" }));
 
     await screen.findByText("GitHub API 临时限流，请稍后重新检查。");
+    expect(screen.getAllByText("暂时无法检查更新").length).toBeGreaterThan(0);
     expect(screen.getByText("GitHub API 临时限流，请稍后重新检查。")).toBeInTheDocument();
+    expect(screen.queryByText("已是最新版本")).not.toBeInTheDocument();
   });
 });
 

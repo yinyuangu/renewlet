@@ -43,6 +43,7 @@ jobs:
         # 下游用 is-stable 决定 draft/prerelease 和 Cloudflare 生产部署；RC 永远不能碰 latest/生产。
         run: |
           VERSION="$(node scripts/release.mjs validate-version "${GITHUB_REF_NAME}")"
+          node scripts/release.mjs validate-package-versions "$VERSION"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           if [[ "$VERSION" == *"-rc."* ]]; then
             echo "is-stable=false" >> "$GITHUB_OUTPUT"

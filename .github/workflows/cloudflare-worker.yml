@@ -22,7 +22,7 @@ env:
   WORKER_NAME: ${{ secrets.WORKER_NAME }}
   D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
   R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
-  RENEWLET_VERSION: 0.1.0
+  RENEWLET_VERSION: 0.0.0-dev
   RENEWLET_COMMIT: ${{ github.sha }}
 
 jobs:

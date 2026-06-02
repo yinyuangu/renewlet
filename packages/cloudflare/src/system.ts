@@ -1,11 +1,10 @@
 import { systemVersionResponseSchema } from "@renewlet/shared/schemas/app";
-import packageJson from "../package.json";
 import { requireAdmin } from "./auth";
 import { HttpError, json, requestLocale } from "./http";
 import { serverText } from "./server-i18n";
 import type { Env } from "./types";
 
-const PACKAGE_VERSION = packageJson.version;
+const DEV_VERSION = "0.0.0-dev";
 
 /**
  * systemVersion 返回 Cloudflare 运行面的版本状态。
@@ -15,13 +14,13 @@ const PACKAGE_VERSION = packageJson.version;
 export async function systemVersion(request: Request, env: Env): Promise<Response> {
   await requireAdmin(request, env);
   const locale = requestLocale(request);
-  const version = cloudflareBuildValue(env.RENEWLET_VERSION, PACKAGE_VERSION);
-  // Cloudflare Worker 没有可替换的容器内二进制；这里只暴露发布信息，执行入口始终返回不支持。
+  const version = cloudflareBuildValue(env.RENEWLET_VERSION, DEV_VERSION);
+  // Cloudflare Worker 没有可替换的容器内二进制；未接入 GitHub latest 检查前不能声明“已是最新版本”。
   return json(systemVersionResponseSchema.parse({
     currentVersion: version,
     latestVersion: version,
     hasUpdate: false,
-    checkSucceeded: true,
+    checkSucceeded: false,
     deployment: "cloudflare",
     updateMode: "cloudflare-deploy",
     updateSupported: false,
@@ -59,7 +58,5 @@ export async function systemUpdate(request: Request, env: Env): Promise<Response
 function cloudflareBuildValue(value: string | undefined, fallback: string): string {
   const trimmed = value?.trim();
   if (!trimmed) return fallback;
-  // wrangler.jsonc 的本地占位版本不能泄漏到线上；CI 未注入时退回 package 版本比显示 0.1.0 更可诊断。
-  if (trimmed === "0.1.0" && PACKAGE_VERSION !== "0.1.0") return PACKAGE_VERSION;
   return trimmed;
 }

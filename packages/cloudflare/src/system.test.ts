@@ -24,7 +24,7 @@ describe("Cloudflare system update contract", () => {
       deployment: "cloudflare",
       updateMode: "cloudflare-deploy",
       updateSupported: false,
-      checkSucceeded: true,
+      checkSucceeded: false,
       hasUpdate: false,
       build: {
         version: "1.2.3",
@@ -33,6 +33,30 @@ describe("Cloudflare system update contract", () => {
       },
     });
     expect(body).not.toHaveProperty("runtime");
+  });
+
+  it("uses an explicit dev version when release metadata is not injected", async () => {
+    const env = envFixture();
+    delete env.RENEWLET_VERSION;
+
+    const response = await systemVersion(new Request("https://renewlet.example/api/app/admin/system/version", {
+      headers: { "accept-language": "en-US" },
+    }), env);
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as Record<string, unknown>;
+    expect(body).toMatchObject({
+      currentVersion: "0.0.0-dev",
+      latestVersion: "0.0.0-dev",
+      checkSucceeded: false,
+      hasUpdate: false,
+      deployment: "cloudflare",
+      build: {
+        version: "0.0.0-dev",
+        commit: "abc123",
+        buildType: "cloudflare",
+      },
+    });
   });
 
   it("rejects executable updates in the Worker runtime", async () => {

@@ -139,9 +139,9 @@ export function SystemUpdateDialog({ open, onOpenChange }: SystemUpdateDialogPro
         mobileTitle={t("system.currentVersion")}
         mobileCloseLabel={t("common.close")}
         mobilePresentation="anchored"
-        className="w-[min(calc(100vw-2rem),20rem)] rounded-xl border-border bg-card p-0 shadow-xl"
+        className="flex max-h-[min(calc(var(--app-viewport-height)-1rem),var(--radix-popover-content-available-height,38rem))] w-[min(calc(100vw-2rem),20rem)] flex-col rounded-xl border-border bg-card p-0 shadow-xl"
       >
-        <div className="flex items-center justify-between border-b border-border px-4 py-3">
+        <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
           <span className="text-sm font-semibold text-foreground">{t("system.currentVersion")}</span>
           <button
             type="button"
@@ -155,7 +155,7 @@ export function SystemUpdateDialog({ open, onOpenChange }: SystemUpdateDialogPro
           </button>
         </div>
 
-        <div className="space-y-4 p-4">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
           {versionQuery.isPending ? (
             <div className="flex flex-col items-center justify-center gap-2 py-7 text-primary">
               <RefreshCw className="h-6 w-6 animate-spin" />
@@ -168,6 +168,7 @@ export function SystemUpdateDialog({ open, onOpenChange }: SystemUpdateDialogPro
               <VersionHero
                 currentVersion={version.currentVersion}
                 hasUpdate={version.hasUpdate}
+                checkSucceeded={version.checkSucceeded}
                 statusText={!version.checkSucceeded ? t("system.checkDeferredTitle") : version.hasUpdate ? `${t("system.latestVersion")}: v${version.latestVersion}` : t("system.noUpdateTitle")}
               />
 
@@ -198,8 +199,10 @@ export function SystemUpdateDialog({ open, onOpenChange }: SystemUpdateDialogPro
               ) : !version.updateSupported ? (
                 <div className="space-y-3">
                   <StatePanel icon={<Server className="h-4 w-4" />} tone="neutral" title={t("system.unsupportedTitle")} description={version.unsupportedReason ?? t("system.unsupportedDescription")} />
-                  {version.updateMode === "cloudflare-deploy" ? <ReleaseLink href={CLOUDFLARE_DEPLOY_GUIDE_URL} label={t("system.cloudflareDeployGuide")} /> : null}
-                  {version.releaseInfo?.htmlUrl ? <ReleaseLink href={version.releaseInfo.htmlUrl} label={t("system.releaseLink")} /> : null}
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md border border-border bg-background/40 px-3 py-2">
+                    {version.updateMode === "cloudflare-deploy" ? <ReleaseLink href={CLOUDFLARE_DEPLOY_GUIDE_URL} label={t("system.cloudflareDeployGuide")} /> : null}
+                    {version.releaseInfo?.htmlUrl ? <ReleaseLink href={version.releaseInfo.htmlUrl} label={t("system.releaseLink")} /> : null}
+                  </div>
                 </div>
               ) : version.hasUpdate ? (
                 <div className="space-y-3">
@@ -217,10 +220,12 @@ export function SystemUpdateDialog({ open, onOpenChange }: SystemUpdateDialogPro
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-                <InfoItem label={t("system.runtime")} value={t(deploymentLabelKeys[version.deployment])} />
-                <InfoItem label={t("system.buildType")} value={version.build.buildType} />
-              </div>
+              <InfoList
+                items={[
+                  { label: t("system.runtime"), value: t(deploymentLabelKeys[version.deployment]) },
+                  { label: t("system.buildType"), value: version.build.buildType },
+                ]}
+              />
             </>
           ) : null}
         </div>
@@ -255,12 +260,12 @@ export function SystemVersionBadge() {
   );
 }
 
-function VersionHero({ currentVersion, hasUpdate, statusText }: { currentVersion: string; hasUpdate: boolean; statusText: string }) {
+function VersionHero({ currentVersion, hasUpdate, checkSucceeded, statusText }: { currentVersion: string; hasUpdate: boolean; checkSucceeded: boolean; statusText: string }) {
   return (
     <div className="text-center">
       <div className="inline-flex min-w-0 items-center justify-center gap-2">
         <span className="truncate text-3xl font-bold tracking-normal text-foreground">v{currentVersion}</span>
-        {!hasUpdate ? (
+        {checkSucceeded && !hasUpdate ? (
           <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
             <Check className="h-3.5 w-3.5" />
           </span>
@@ -271,20 +276,35 @@ function VersionHero({ currentVersion, hasUpdate, statusText }: { currentVersion
   );
 }
 
-function InfoItem({ label, value }: { label: string; value: string }) {
+function InfoList({ items }: { items: Array<{ label: string; value: string }> }) {
   return (
-    <div className="min-w-0 rounded-md bg-secondary/40 px-2.5 py-2">
-      <div className="truncate text-[11px] text-muted-foreground">{label}</div>
-      <div className="truncate font-medium text-foreground">{value || "-"}</div>
+    <dl className="divide-y divide-border rounded-md border border-border bg-background/40 text-xs">
+      {items.map((item) => (
+        <InfoRow key={item.label} label={item.label} value={item.value} />
+      ))}
+    </dl>
+  );
+}
+
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-2">
+      <dt className="truncate text-muted-foreground">{label}</dt>
+      <dd className="max-w-36 truncate text-right font-medium text-foreground">{value || "-"}</dd>
     </div>
   );
 }
 
 function ReleaseLink({ href, label }: { href: string; label: string }) {
   return (
-    <a className="flex items-center justify-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground" href={href} target="_blank" rel="noreferrer">
-      {label}
-      <ExternalLink className="h-3.5 w-3.5" />
+    <a
+      className="inline-flex min-w-0 items-center gap-1.5 rounded-sm text-xs font-medium text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+    >
+      <span className="min-w-0 truncate">{label}</span>
+      <ExternalLink className="h-3 w-3 shrink-0" />
     </a>
   );
 }

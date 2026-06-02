@@ -45,6 +45,18 @@ RUN mkdir -p /out /pb_data \
 
 FROM alpine:3.22 AS runner
 
+ARG VERSION=0.0.0-dev
+ARG COMMIT=dev
+ARG BUILD_TIME=dev
+
+LABEL org.opencontainers.image.title="Renewlet" \
+  org.opencontainers.image.description="Self-hosted subscription ledger and renewal reminders" \
+  org.opencontainers.image.source="https://github.com/zhiyingzzhou/renewlet" \
+  org.opencontainers.image.version="${VERSION}" \
+  org.opencontainers.image.revision="${COMMIT}" \
+  org.opencontainers.image.created="${BUILD_TIME}" \
+  org.opencontainers.image.licenses="MIT"
+
 # GOMEMLIMIT 给小内存 VPS 留余量；自更新变量固定真实二进制和备份目录，不能指向 /renewlet symlink。
 ENV GOMEMLIMIT=128MiB \
   RENEWLET_SELF_UPDATE_ENABLED=true \

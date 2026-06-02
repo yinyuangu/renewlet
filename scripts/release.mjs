@@ -27,6 +27,7 @@ const packagePaths = [
 function usage() {
   console.log(`Usage:
   node scripts/release.mjs validate-version <version>
+  node scripts/release.mjs validate-package-versions <version>
   node scripts/release.mjs validate-next-version <version>
   node scripts/release.mjs sync-version <version>
   node scripts/release.mjs notes --version <version> [--previous <tag>]
@@ -152,6 +153,27 @@ function syncVersion(rawVersion) {
   }
 
   console.log(`Synced workspace package versions to ${version}.`);
+}
+
+function validatePackageVersions(rawVersion) {
+  const version = normalizeVersion(rawVersion);
+  const packageVersion = version.replace(/-rc\.\d+$/, "");
+  const mismatches = [];
+
+  for (const relativePath of packagePaths) {
+    const path = join(repoRoot, relativePath);
+    const actual = readJson(path).version;
+    if (actual !== packageVersion) {
+      mismatches.push(`${relativePath}: expected ${packageVersion}, got ${actual}`);
+    }
+  }
+
+  if (mismatches.length > 0) {
+    fail(`Workspace package versions must match the release tag:\n${mismatches.join("\n")}`);
+  }
+
+  console.log(packageVersion);
+  return packageVersion;
 }
 
 function commitRange(previous) {
@@ -327,6 +349,9 @@ switch (command) {
     console.log(version);
     break;
   }
+  case "validate-package-versions":
+    validatePackageVersions(args._[1]);
+    break;
   case "validate-next-version":
     validateNextVersion(args._[1]);
     break;

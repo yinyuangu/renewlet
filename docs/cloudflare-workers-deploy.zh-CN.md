@@ -30,6 +30,8 @@ https://<worker-name>.<workers-dev-subdomain>.workers.dev/setup
 
 如果缺少任意必需 secret，workflow 仍会运行 Cloudflare 检查和构建，然后通过 GitHub Actions notice 明确跳过远端 D1 migration 和 Worker 部署。
 
+仓库里的 `wrangler.jsonc` 使用 `0.0.0-dev` 作为本地占位版本。官方稳定版会在 release workflow 中把 tag 版本、commit 和 build time 注入生产 Worker 部署配置。
+
 把下面 5 个值填进 GitHub Secrets 后才会启用远端部署。
 
 ### 1. Fork 仓库

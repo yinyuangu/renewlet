@@ -33,7 +33,7 @@
   ],
   "vars": {
     "SETUP_ENABLED": "true",
-    "RENEWLET_VERSION": "0.1.0",
+    "RENEWLET_VERSION": "0.0.0-dev",
     "RENEWLET_COMMIT": "dev",
     "RENEWLET_BUILD_TIME": ""
   }
