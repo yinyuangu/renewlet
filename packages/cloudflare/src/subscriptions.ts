@@ -35,10 +35,10 @@ export async function createSubscription(request: Request, env: Env): Promise<Re
   const row = toSubscriptionRow(newId("sub"), auth.user.id, body, timestamp, timestamp);
   await env.DB.prepare(`
     INSERT INTO subscriptions (
-      id, user_id, name, logo, price, currency, billing_cycle, custom_days, category, status, payment_method,
+      id, user_id, name, logo, price, currency, billing_cycle, custom_days, category, status, pinned, payment_method,
       start_date, next_billing_date, auto_calculate_next_billing_date, trial_end_date, website, notes, tags_json,
       reminder_days, repeat_reminder_enabled, repeat_reminder_interval, repeat_reminder_window, extra_json, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).bind(...subscriptionRowValues(row)).run();
   return json({ subscription: toApiSubscription(row) }, { status: 201 });
 }
@@ -57,7 +57,7 @@ export async function updateSubscription(request: Request, env: Env, id: string)
   await env.DB.prepare(`
     UPDATE subscriptions SET
       name = ?, logo = ?, price = ?, currency = ?, billing_cycle = ?, custom_days = ?, category = ?, status = ?,
-      payment_method = ?, start_date = ?, next_billing_date = ?, auto_calculate_next_billing_date = ?,
+      pinned = ?, payment_method = ?, start_date = ?, next_billing_date = ?, auto_calculate_next_billing_date = ?,
       trial_end_date = ?, website = ?, notes = ?, tags_json = ?, reminder_days = ?, repeat_reminder_enabled = ?,
       repeat_reminder_interval = ?, repeat_reminder_window = ?, extra_json = ?, updated_at = ?
     WHERE user_id = ? AND id = ?
@@ -70,6 +70,7 @@ export async function updateSubscription(request: Request, env: Env, id: string)
     merged.custom_days,
     merged.category,
     merged.status,
+    merged.pinned,
     merged.payment_method,
     merged.start_date,
     merged.next_billing_date,
@@ -111,6 +112,7 @@ function toBody(row: SubscriptionRow): SubscriptionBody {
     customDays: row.custom_days,
     category: row.category,
     status: row.status as SubscriptionBody["status"],
+    pinned: row.pinned === 1,
     paymentMethod: row.payment_method,
     startDate: row.start_date,
     nextBillingDate: row.next_billing_date,
@@ -147,6 +149,7 @@ export function toSubscriptionRow(
     custom_days: body.billingCycle === "custom" ? body.customDays ?? 1 : null,
     category: body.category,
     status: body.status,
+    pinned: boolToInt(body.pinned),
     payment_method: body.paymentMethod ?? null,
     start_date: body.startDate,
     next_billing_date: body.nextBillingDate,
@@ -170,7 +173,7 @@ export function toSubscriptionRow(
 export function subscriptionRowValues(row: SubscriptionRow): unknown[] {
   return [
     row.id, row.user_id, row.name, row.logo, row.price, row.currency, row.billing_cycle, row.custom_days,
-    row.category, row.status, row.payment_method, row.start_date, row.next_billing_date,
+    row.category, row.status, row.pinned, row.payment_method, row.start_date, row.next_billing_date,
     row.auto_calculate_next_billing_date, row.trial_end_date, row.website, row.notes, row.tags_json,
     row.reminder_days, row.repeat_reminder_enabled, row.repeat_reminder_interval, row.repeat_reminder_window,
     row.extra_json, row.created_at, row.updated_at,

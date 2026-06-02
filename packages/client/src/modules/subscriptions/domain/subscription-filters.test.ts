@@ -46,6 +46,7 @@ function subscription(overrides: SubscriptionOverrides = {}): Subscription {
     repeatReminderEnabled: false,
     repeatReminderInterval: "1h",
     repeatReminderWindow: "72h",
+    pinned: false,
   };
 
   if (overrides.billingCycle === "custom") {
@@ -82,6 +83,28 @@ describe("subscription sorting", () => {
     ];
 
     expect(sortIds(subscriptions, "default")).toEqual(["second", "first"]);
+  });
+
+  it("keeps pinned subscriptions ahead for default and field sorting", () => {
+    const subscriptions = [
+      subscription({ id: "regular-expensive", price: 100 }),
+      subscription({ id: "pinned-cheap", price: 10, pinned: true }),
+      subscription({ id: "regular-cheap", price: 1 }),
+      subscription({ id: "pinned-expensive", price: 80, pinned: true }),
+    ];
+
+    expect(sortIds(subscriptions, "default")).toEqual([
+      "pinned-cheap",
+      "pinned-expensive",
+      "regular-expensive",
+      "regular-cheap",
+    ]);
+    expect(sortIds(subscriptions, "price_desc")).toEqual([
+      "pinned-expensive",
+      "pinned-cheap",
+      "regular-expensive",
+      "regular-cheap",
+    ]);
   });
 
   it("sorts by renewal date while preserving tie order", () => {

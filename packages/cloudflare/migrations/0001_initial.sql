@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS subscriptions (
   custom_days INTEGER,
   category TEXT NOT NULL,
   status TEXT NOT NULL,
+  pinned INTEGER NOT NULL DEFAULT 0,
   payment_method TEXT,
   start_date TEXT NOT NULL,
   next_billing_date TEXT NOT NULL,

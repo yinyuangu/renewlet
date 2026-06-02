@@ -148,6 +148,8 @@ interface SubscriptionBase {
   category: Category;
   /** 状态。 */
   status: SubscriptionStatus;
+  /** 是否置顶显示；列表排序会先按置顶分组，再应用用户选择的排序条件。 */
+  pinned: boolean;
   /** 支付方式（可选）。 */
   paymentMethod: PaymentMethod | undefined;
   /** 下次扣费日期（用于提醒与日历）。 */

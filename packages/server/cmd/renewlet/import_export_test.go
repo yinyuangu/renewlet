@@ -340,6 +340,7 @@ func importSubscriptionBody(source string, sourceID string, confidence string, p
 		"customDays":                   nil,
 		"category":                     "developer_tools",
 		"status":                       "active",
+		"pinned":                       false,
 		"paymentMethod":                nil,
 		"startDate":                    "2026-01-01",
 		"nextBillingDate":              "2026-02-01",

@@ -98,6 +98,7 @@ function buildLegacySubscription(
     customDays: billingCycle === "custom" ? normalizeCustomDays(row["customDays"], localWarnings) : null,
     category: normalizeCategory(row["category"]),
     status: normalizeStatus(row["status"], localWarnings),
+    pinned: false,
     paymentMethod: normalizeOptionalText(row["paymentMethod"]),
     startDate,
     nextBillingDate,

@@ -193,6 +193,7 @@ export function toSubscriptionDraft(formData: SubscriptionFormState): Subscripti
     currency: formData.currency,
     category: formData.category,
     status: formData.status,
+    pinned: false,
     paymentMethod: formData.paymentMethod || undefined,
     startDate,
     nextBillingDate,

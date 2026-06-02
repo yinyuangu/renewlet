@@ -54,6 +54,7 @@ function makeSubscription(overrides: Partial<Subscription> = {}): Subscription {
     customDays: undefined,
     category: "productivity",
     status: "active",
+    pinned: false,
     paymentMethod: undefined,
     startDate: assertDateOnly("2026-01-01"),
     nextBillingDate: assertDateOnly("2026-02-01"),

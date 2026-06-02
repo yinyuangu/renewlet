@@ -23,7 +23,7 @@ import { useCustomConfig } from '@/contexts/CustomConfigContext';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { colorWithAlpha } from '@/lib/color';
-import { Calendar, MoreHorizontal, CalendarClock, Bell, CreditCard, CalendarPlus, Pencil, Trash2 } from 'lucide-react';
+import { Calendar, MoreHorizontal, CalendarClock, Bell, CreditCard, CalendarPlus, Pencil, Pin, PinOff, Trash2 } from 'lucide-react';
 import {
   daysBetweenDateOnly,
   todayDateOnlyInTimeZone,
@@ -64,6 +64,8 @@ interface SubscriptionCardProps {
   onEdit?: (id: string) => void;
   /** 删除动作只上抛 id，真正 mutation 和缓存失效统一留在页面应用层。 */
   onDelete?: (id: string) => void;
+  /** 置顶切换动作由页面持有 mutation，卡片只负责菜单入口。 */
+  onTogglePinned?: (id: string) => void;
   /** 用户 IANA 时区，用于续费/试用提示窗口。 */
   timeZone: string;
 }
@@ -80,7 +82,7 @@ const statusStyles: Record<SubscriptionStatus, string> = {
 const DEFAULT_BADGE_COLOR = "hsl(var(--primary))";
 
 /** 订阅卡片。 */
-export function SubscriptionCard({ subscription, viewMode = 'grid', onEdit, onDelete, timeZone }: SubscriptionCardProps) {
+export function SubscriptionCard({ subscription, viewMode = 'grid', onEdit, onDelete, onTogglePinned, timeZone }: SubscriptionCardProps) {
   const { config } = useCustomConfig();
   const { data: settings } = useSettings();
   const { t, locale, label, formatCurrency, formatDateOnly } = useI18n();
@@ -125,16 +127,24 @@ export function SubscriptionCard({ subscription, viewMode = 'grid', onEdit, onDe
         isTrialEndingSoon && "animate-pulse-glow"
       )}
     >
-      <div className="flex items-start gap-4">
+      <div className="relative z-10 flex items-start gap-4">
         <SubscriptionLogo name={subscription.name} logo={subscription.logo} fallbackColor={categoryColor} size="md" />
 
         <div className="min-w-0 flex-1 grid gap-3">
           <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-start gap-x-3 gap-y-2">
-            <TruncatedTooltipText
-              as="h3"
-              text={subscription.name}
-              className="min-w-0 font-semibold text-foreground"
-            />
+            <div className="flex min-w-0 items-center gap-1.5">
+              {subscription.pinned ? (
+                <>
+                  <Pin className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" data-testid="subscription-pinned-title-icon" />
+                  <span className="sr-only">{t("subscription.pin")}</span>
+                </>
+              ) : null}
+              <TruncatedTooltipText
+                as="h3"
+                text={subscription.name}
+                className="min-w-0 font-semibold text-foreground"
+              />
+            </div>
 
             <div className="shrink-0 text-right">
               <p className="whitespace-nowrap text-xl font-bold text-foreground">
@@ -165,6 +175,16 @@ export function SubscriptionCard({ subscription, viewMode = 'grid', onEdit, onDe
                   <CalendarPlus className="h-4 w-4 shrink-0 text-muted-foreground" />
                   {t("subscription.addToCalendar")}
                 </DropdownMenuItem>
+                {onTogglePinned ? (
+                  <DropdownMenuItem className="gap-2.5 px-2.5 py-2 text-sm" onClick={() => onTogglePinned(subscription.id)}>
+                    {subscription.pinned ? (
+                      <PinOff className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    ) : (
+                      <Pin className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    )}
+                    {subscription.pinned ? t("subscription.unpin") : t("subscription.pin")}
+                  </DropdownMenuItem>
+                ) : null}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={() => setShowDeleteDialog(true)}

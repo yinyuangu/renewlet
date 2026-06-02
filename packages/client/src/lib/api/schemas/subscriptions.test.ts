@@ -23,6 +23,7 @@ const validSubscriptionCreateBody = {
   repeatReminderEnabled: false,
   repeatReminderInterval: "1h",
   repeatReminderWindow: "72h",
+  pinned: false,
 };
 
 const validSubscriptionResponseBody = {
@@ -33,6 +34,7 @@ const validSubscriptionResponseBody = {
   billingCycle: validSubscriptionCreateBody.billingCycle,
   category: validSubscriptionCreateBody.category,
   status: validSubscriptionCreateBody.status,
+  pinned: validSubscriptionCreateBody.pinned,
   startDate: validSubscriptionCreateBody.startDate,
   nextBillingDate: validSubscriptionCreateBody.nextBillingDate,
   autoCalculateNextBillingDate: validSubscriptionCreateBody.autoCalculateNextBillingDate,

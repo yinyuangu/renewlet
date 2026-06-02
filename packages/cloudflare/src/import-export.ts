@@ -22,16 +22,16 @@ import type { Env, SubscriptionRow } from "./types";
 
 const INSERT_SUBSCRIPTION_SQL = `
   INSERT INTO subscriptions (
-    id, user_id, name, logo, price, currency, billing_cycle, custom_days, category, status, payment_method,
+    id, user_id, name, logo, price, currency, billing_cycle, custom_days, category, status, pinned, payment_method,
     start_date, next_billing_date, auto_calculate_next_billing_date, trial_end_date, website, notes, tags_json,
     reminder_days, repeat_reminder_enabled, repeat_reminder_interval, repeat_reminder_window, extra_json, created_at, updated_at
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `;
 
 const UPDATE_SUBSCRIPTION_SQL = `
   UPDATE subscriptions SET
     name = ?, logo = ?, price = ?, currency = ?, billing_cycle = ?, custom_days = ?, category = ?, status = ?,
-    payment_method = ?, start_date = ?, next_billing_date = ?, auto_calculate_next_billing_date = ?,
+    pinned = ?, payment_method = ?, start_date = ?, next_billing_date = ?, auto_calculate_next_billing_date = ?,
     trial_end_date = ?, website = ?, notes = ?, tags_json = ?, reminder_days = ?, repeat_reminder_enabled = ?,
     repeat_reminder_interval = ?, repeat_reminder_window = ?, extra_json = ?, updated_at = ?
   WHERE user_id = ? AND id = ?
@@ -92,6 +92,7 @@ export async function applyImport(request: Request, env: Env): Promise<Response>
         row.custom_days,
         row.category,
         row.status,
+        row.pinned,
         row.payment_method,
         row.start_date,
         row.next_billing_date,

@@ -34,6 +34,12 @@ export function useSubscriptionCrud(subscriptions: readonly Subscription[]) {
     deleteSubscription.mutate(id);
   };
 
+  const handleTogglePinnedSubscription = (id: string) => {
+    const subscription = subscriptions.find((item) => item.id === id);
+    if (!subscription) return;
+    updateSubscription.mutate({ ...subscription, pinned: !subscription.pinned });
+  };
+
   const handleEditSubscription = (id: string) => {
     // 编辑弹窗使用当前列表快照，避免额外请求；列表缓存由 mutations 成功后统一刷新。
     const subscription = subscriptions.find((item) => item.id === id);
@@ -63,6 +69,7 @@ export function useSubscriptionCrud(subscriptions: readonly Subscription[]) {
     setEditDialogOpen,
     handleAddSubscription,
     handleDeleteSubscription,
+    handleTogglePinnedSubscription,
     handleEditSubscription,
     handleSaveSubscription,
     handleEditDialogOpenChange,

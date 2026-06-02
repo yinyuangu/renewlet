@@ -103,6 +103,8 @@ export const messages = [
   msg({ id: "subscription.repeatReminderPreview.afterFirst", message: "首次提醒后，{interval}重复一次，直到到期日通知时间。" }),
   msg({ id: "subscription.repeatReminderPreview.finalWindow", message: "首次提醒照常发送，重复提醒只在到期前最后 {hours} 小时内发送。" }),
   msg({ id: "subscription.moreActions", message: "更多操作" }),
+  msg({ id: "subscription.pin", message: "置顶" }),
+  msg({ id: "subscription.unpin", message: "取消置顶" }),
   msg({ id: "subscription.card.startPrefix", message: "开始:" }),
   msg({ id: "subscription.card.renewsToday", message: "今天续费" }),
   msg({ id: "subscription.card.renewsInDays", message: "{days} 天后续费" }),

@@ -339,6 +339,7 @@ function makeImportSubscription(input: {
     customDays: input.billing.billingCycle === "custom" ? input.billing.customDays ?? 1 : null,
     category: input.category,
     status: input.status,
+    pinned: false,
     paymentMethod: input.paymentMethod ?? null,
     startDate: input.startDate as DateOnly,
     nextBillingDate: input.nextBillingDate as DateOnly,

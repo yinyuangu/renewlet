@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
   handleAddSubscription: vi.fn(),
   handleDeleteSubscription: vi.fn(),
   handleEditSubscription: vi.fn(),
+  handleTogglePinnedSubscription: vi.fn(),
   handleSaveSubscription: vi.fn(),
   handleEditDialogOpenChange: vi.fn(),
   exportToJSON: vi.fn(),
@@ -90,6 +91,7 @@ vi.mock("@/modules/subscriptions/application/use-subscription-crud", () => ({
     handleAddSubscription: mocks.handleAddSubscription,
     handleDeleteSubscription: mocks.handleDeleteSubscription,
     handleEditSubscription: mocks.handleEditSubscription,
+    handleTogglePinnedSubscription: mocks.handleTogglePinnedSubscription,
     handleSaveSubscription: mocks.handleSaveSubscription,
     handleEditDialogOpenChange: mocks.handleEditDialogOpenChange,
   }),
@@ -112,8 +114,13 @@ vi.mock("@/components/header", () => ({
 }));
 
 vi.mock("@/components/subscription-card", () => ({
-  SubscriptionCard: ({ subscription }: { subscription: Subscription }) => (
-    <article data-testid="subscription-card">{subscription.name}</article>
+  SubscriptionCard: ({ subscription, onTogglePinned }: { subscription: Subscription; onTogglePinned?: (id: string) => void }) => (
+    <article data-testid="subscription-card">
+      {subscription.name}
+      <button type="button" onClick={() => onTogglePinned?.(subscription.id)}>
+        置顶 {subscription.name}
+      </button>
+    </article>
   ),
 }));
 
@@ -146,6 +153,7 @@ function subscription(overrides: SubscriptionOverrides = {}): Subscription {
     repeatReminderEnabled: false,
     repeatReminderInterval: "1h",
     repeatReminderWindow: "72h",
+    pinned: false,
   };
 
   if (overrides.billingCycle === "custom") {
@@ -176,7 +184,7 @@ function renderSubscriptionsPage() {
 }
 
 function visibleSubscriptionNames() {
-  return screen.getAllByTestId("subscription-card").map((card) => card.textContent);
+  return screen.getAllByTestId("subscription-card").map((card) => card.firstChild?.textContent ?? "");
 }
 
 function mockMobileTagFilterMatch(isMobile: boolean, width = isMobile ? 390 : 1280) {
@@ -258,6 +266,25 @@ describe("Subscriptions page sorting", () => {
       expect(visibleSubscriptionNames()).toEqual(["Annual USD", "Monthly CNY", "Quarterly CNY"]);
     });
     expect(screen.getByRole("combobox", { name: "排序" })).toHaveTextContent("默认顺序");
+  });
+
+  it("keeps pinned subscriptions ahead and wires the pin action", async () => {
+    const user = userEvent.setup();
+    mocks.useInfiniteSubscriptions.mockReturnValue({
+      subscriptions: [
+        subscription({ id: "regular", name: "Regular Service", price: 999 }),
+        subscription({ id: "pinned", name: "Pinned Service", price: 1, pinned: true }),
+      ],
+      isPending: false,
+    });
+
+    renderSubscriptionsPage();
+
+    expect(visibleSubscriptionNames()).toEqual(["Pinned Service", "Regular Service"]);
+
+    await user.click(screen.getByRole("button", { name: "置顶 Regular Service" }));
+
+    expect(mocks.handleTogglePinnedSubscription).toHaveBeenCalledWith("regular");
   });
 
   it("shows the back-to-top float button when the app root is scrolled", async () => {

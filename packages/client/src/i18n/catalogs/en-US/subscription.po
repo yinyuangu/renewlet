@@ -939,6 +939,16 @@ msgid "subscription.moreActions"
 msgstr "More actions"
 
 #. js-lingui-explicit-id
+#: src/i18n/descriptors/subscription.ts:106
+msgid "subscription.pin"
+msgstr "Pin"
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/subscription.ts:107
+msgid "subscription.unpin"
+msgstr "Unpin"
+
+#. js-lingui-explicit-id
 #: src/i18n/descriptors/subscription.ts:179
 msgid "import.summaryReplace"
 msgstr "Replace"

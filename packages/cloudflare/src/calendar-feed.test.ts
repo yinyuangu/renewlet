@@ -270,6 +270,7 @@ function subscriptionRow(id: string, name: string, status: string, billingCycle:
     custom_days: null,
     category: "Productivity",
     status,
+    pinned: 0,
     payment_method: "Visa",
     start_date: "2099-01-01",
     next_billing_date: nextBillingDate,

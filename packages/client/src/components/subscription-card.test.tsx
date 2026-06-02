@@ -99,6 +99,7 @@ const baseSubscription: Subscription = {
   repeatReminderEnabled: false,
   repeatReminderInterval: "1h",
   repeatReminderWindow: "72h",
+  pinned: false,
 };
 
 function createSubscription(overrides: SubscriptionOverrides = {}): Subscription {
@@ -119,14 +120,15 @@ function createSubscription(overrides: SubscriptionOverrides = {}): Subscription
   };
 }
 
-function renderSubscriptionCard(overrides: SubscriptionOverrides = {}) {
+function renderSubscriptionCard(overrides: SubscriptionOverrides = {}, handlers: { onEdit?: (id: string) => void; onDelete?: (id: string) => void; onTogglePinned?: (id: string) => void } = {}) {
   return render(
     <TooltipProvider delayDuration={0}>
       <SubscriptionCard
         subscription={createSubscription(overrides)}
         timeZone="Asia/Shanghai"
-        onEdit={vi.fn()}
-        onDelete={vi.fn()}
+        onEdit={handlers.onEdit ?? vi.fn()}
+        onDelete={handlers.onDelete ?? vi.fn()}
+        onTogglePinned={handlers.onTogglePinned}
       />
     </TooltipProvider>,
   );
@@ -219,6 +221,74 @@ describe("SubscriptionCard", () => {
     expect(logoTile).not.toHaveClass("bg-gradient-to-br");
   });
 
+  it("shows pin actions from the card menu", () => {
+    const onTogglePinned = vi.fn();
+    renderSubscriptionCard({ pinned: false }, { onTogglePinned });
+
+    openMoreActionsMenu();
+    fireEvent.click(screen.getByRole("menuitem", { name: "置顶" }));
+
+    expect(onTogglePinned).toHaveBeenCalledWith("sub-1");
+  });
+
+  it("shows unpin actions for pinned subscriptions", () => {
+    renderSubscriptionCard({ pinned: true }, { onTogglePinned: vi.fn() });
+
+    openMoreActionsMenu();
+
+    expect(screen.getByRole("menuitem", { name: "取消置顶" })).toBeInTheDocument();
+  });
+
+  it("shows a title pin without adding card-level pinned accents", () => {
+    renderSubscriptionCard({ pinned: true, category: "productivity" }, { onTogglePinned: vi.fn() });
+
+    const pinnedIcon = screen.getByTestId("subscription-pinned-title-icon");
+    const subscriptionName = screen.getByText(baseSubscription.name);
+    const card = screen.getByTestId("subscription-card");
+    const cardContent = card.firstElementChild;
+
+    expect(screen.queryByTestId("subscription-pinned-accent")).not.toBeInTheDocument();
+    expect(pinnedIcon).toHaveClass("h-3.5", "w-3.5", "shrink-0", "text-primary");
+    expect(pinnedIcon).toHaveAttribute("aria-hidden", "true");
+    expect(pinnedIcon.compareDocumentPosition(subscriptionName) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByText("置顶")).toHaveClass("sr-only");
+    expect(cardContent).toHaveClass("relative", "z-10", "flex", "items-start", "gap-4");
+    expect(cardContent).not.toHaveClass("pt-7");
+  });
+
+  it("does not show pinned accents or reserve space for regular subscriptions", () => {
+    renderSubscriptionCard({ pinned: false }, { onTogglePinned: vi.fn() });
+
+    const card = screen.getByTestId("subscription-card");
+    const cardContent = card.firstElementChild;
+
+    expect(screen.queryByTestId("subscription-pinned-accent")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("subscription-pinned-title-icon")).not.toBeInTheDocument();
+    expect(screen.queryByText("置顶")).not.toBeInTheDocument();
+    expect(cardContent).not.toHaveClass("pt-7");
+  });
+
+  it("keeps category and status badges separate from the pinned state", () => {
+    renderSubscriptionCard({ pinned: true, category: "productivity" }, { onTogglePinned: vi.fn() });
+
+    const categoryBadge = screen.getByText(mocks.shortCategoryLabel).closest("div");
+    const badgeGroup = categoryBadge?.parentElement;
+    const statusBadge = screen.getByText("活跃").closest("div");
+
+    expect(badgeGroup).toHaveTextContent(mocks.shortCategoryLabel);
+    expect(badgeGroup).toHaveTextContent("活跃");
+    expect(badgeGroup).not.toHaveTextContent("置顶");
+    expect(categoryBadge?.compareDocumentPosition(statusBadge as Node) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("hides pin actions when the card is rendered without a pin handler", () => {
+    renderSubscriptionCard();
+
+    openMoreActionsMenu();
+
+    expect(screen.queryByRole("menuitem", { name: "置顶" })).not.toBeInTheDocument();
+  });
+
   it("falls back to initials when the subscription logo fails to load", () => {
     renderSubscriptionCard({ logo: "https://example.com/broken.svg", name: "OpenAI" });
 
@@ -278,15 +348,16 @@ describe("SubscriptionCard", () => {
   });
 
   it("orders overflow menu actions with matching icons and separates the destructive action", () => {
-    renderSubscriptionCard();
+    renderSubscriptionCard({}, { onTogglePinned: vi.fn() });
 
     openMoreActionsMenu();
 
     const menuItems = screen.getAllByRole("menuitem");
-    expect(menuItems.map((item) => item.textContent)).toEqual(["编辑", "添加到日历", "删除"]);
-    const [editItem, calendarItem, deleteItem] = menuItems as [HTMLElement, HTMLElement, HTMLElement];
+    expect(menuItems.map((item) => item.textContent)).toEqual(["编辑", "添加到日历", "置顶", "删除"]);
+    const [editItem, calendarItem, pinItem, deleteItem] = menuItems as [HTMLElement, HTMLElement, HTMLElement, HTMLElement];
     expect(editItem).toHaveClass("gap-2.5", "px-2.5", "py-2", "text-sm");
     expect(calendarItem).toHaveClass("gap-2.5", "px-2.5", "py-2", "text-sm");
+    expect(pinItem).toHaveClass("gap-2.5", "px-2.5", "py-2", "text-sm");
     expect(deleteItem).toHaveClass(
       "gap-2.5",
       "px-2.5",
@@ -298,6 +369,7 @@ describe("SubscriptionCard", () => {
     );
     expect(editItem).not.toHaveClass("text-destructive");
     expect(calendarItem).not.toHaveClass("text-destructive");
+    expect(pinItem).not.toHaveClass("text-destructive");
 
     const separator = screen.getByRole("separator");
     expect(calendarItem.compareDocumentPosition(separator) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();

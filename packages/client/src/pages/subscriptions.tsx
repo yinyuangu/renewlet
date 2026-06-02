@@ -95,9 +95,10 @@ type SubscriptionGridProps = {
   timeZone: string;
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
+  onTogglePinned: (id: string) => void;
 };
 
-function SubscriptionGrid({ subscriptions, viewMode, timeZone, onEdit, onDelete }: SubscriptionGridProps) {
+function SubscriptionGrid({ subscriptions, viewMode, timeZone, onEdit, onDelete, onTogglePinned }: SubscriptionGridProps) {
   const isTwoColumnGrid = useMediaQuery("(min-width: 640px)");
   const isThreeColumnGrid = useMediaQuery("(min-width: 1024px)");
   const columnCount = getSubscriptionColumnCount(viewMode, isTwoColumnGrid, isThreeColumnGrid);
@@ -128,6 +129,7 @@ function SubscriptionGrid({ subscriptions, viewMode, timeZone, onEdit, onDelete 
               timeZone={timeZone}
               onEdit={onEdit}
               onDelete={onDelete}
+              onTogglePinned={onTogglePinned}
             />
           </div>
         ));
@@ -137,9 +139,10 @@ function SubscriptionGrid({ subscriptions, viewMode, timeZone, onEdit, onDelete 
 }
 
 /** 订阅列表页组件。 */
-const Subscriptions = () => {
+  const Subscriptions = () => {
   const subscriptionsQuery = useInfiniteSubscriptions();
   const subscriptions = subscriptionsQuery.subscriptions ?? EMPTY_SUBSCRIPTIONS;
+  const { fetchNextPage } = subscriptionsQuery;
   const settingsQuery = useSettings();
   const timeZone = settingsQuery.data?.timezone ?? "UTC";
   const defaultCurrency = settingsQuery.data?.defaultCurrency ?? "CNY";
@@ -156,6 +159,7 @@ const Subscriptions = () => {
     handleAddSubscription,
     handleDeleteSubscription,
     handleEditSubscription,
+    handleTogglePinnedSubscription,
     handleSaveSubscription,
     handleEditDialogOpenChange,
   } = useSubscriptionCrud(subscriptions);
@@ -201,8 +205,8 @@ const Subscriptions = () => {
     setSelectedTags([]);
   }, [setSelectedTags]);
   const handleLoadMore = useCallback(() => {
-    void subscriptionsQuery.fetchNextPage();
-  }, [subscriptionsQuery.fetchNextPage]);
+    void fetchNextPage();
+  }, [fetchNextPage]);
 
   // 首次加载订阅列表时展示骨架屏（筛选条 + 卡片网格占位）。
   if (subscriptionsQuery.isPending) {
@@ -485,6 +489,7 @@ const Subscriptions = () => {
               timeZone={timeZone}
               onEdit={handleEditSubscription}
               onDelete={handleDeleteSubscription}
+              onTogglePinned={handleTogglePinnedSubscription}
             />
             {subscriptionsQuery.hasNextPage && (
               <div className="mt-6 flex justify-center [overflow-anchor:none]" data-testid="subscriptions-load-more-row">

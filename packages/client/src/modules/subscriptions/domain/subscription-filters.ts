@@ -108,13 +108,18 @@ function calculateMonthlyCost(
   return toMonthlyAmount(amountInDefault, subscription.billingCycle, subscription.customDays);
 }
 
-/** 按指定选项对订阅排序；相同排序值保持传入顺序，避免列表无意义跳动。 */
+function comparePinnedFirst(left: Subscription, right: Subscription): number {
+  if (left.pinned === right.pinned) return 0;
+  return left.pinned ? -1 : 1;
+}
+
+/** 按指定选项对订阅排序；置顶分组永远优先，相同排序值保持传入顺序，避免列表无意义跳动。 */
 export function sortSubscriptions(
   subscriptions: readonly Subscription[],
   { sortOption, defaultCurrency, convert, locale = "zh-CN" }: SubscriptionSortContext,
 ): Subscription[] {
   if (sortOption === "default") {
-    return Array.from(subscriptions);
+    return Array.from(subscriptions).sort((left, right) => comparePinnedFirst(left, right));
   }
 
   const direction = getSortDirection(sortOption);
@@ -130,6 +135,9 @@ export function sortSubscriptions(
 
   return decorated
     .sort((left, right) => {
+      const pinnedComparison = comparePinnedFirst(left.subscription, right.subscription);
+      if (pinnedComparison !== 0) return pinnedComparison;
+
       let comparison = 0;
 
       switch (sortOption) {

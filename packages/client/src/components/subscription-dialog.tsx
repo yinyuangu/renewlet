@@ -325,7 +325,7 @@ export function SubscriptionDialog(props: SubscriptionDialogProps) {
 
     const base = props.subscription;
     if (!base) return;
-    props.onSubmit({ ...base, ...draft });
+    props.onSubmit({ ...base, ...draft, pinned: base.pinned });
     setFormErrors({});
     props.onOpenChange(false);
   };

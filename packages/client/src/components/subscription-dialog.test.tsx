@@ -213,6 +213,7 @@ describe("SubscriptionDialog", () => {
       customDays: undefined,
       category: "productivity",
       status: "active",
+      pinned: false,
       paymentMethod: "alipay",
       startDate: assertDateOnly("2026-04-16"),
       nextBillingDate: assertDateOnly("2026-05-16"),
@@ -225,6 +226,7 @@ describe("SubscriptionDialog", () => {
       repeatReminderEnabled: true,
       repeatReminderInterval: "1h",
       repeatReminderWindow: "72h",
+      pinned: false,
     };
 
     render(
@@ -448,6 +450,7 @@ describe("SubscriptionDialog", () => {
       customDays: undefined,
       category: "productivity",
       status: "active",
+      pinned: false,
       paymentMethod: "alipay",
       startDate: assertDateOnly("2026-05-14"),
       nextBillingDate: assertDateOnly("2026-05-17"),

@@ -241,6 +241,7 @@ describe("renewlet import", () => {
       customDays: undefined,
       category: "developer_tools",
       status: "active",
+      pinned: false,
       paymentMethod: undefined,
       startDate: assertDateOnly("2026-05-01"),
       nextBillingDate: assertDateOnly("2026-06-01"),

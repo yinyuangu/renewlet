@@ -139,6 +139,7 @@ export function subscriptionToImportSubscription(subscription: Subscription, sou
     customDays: subscription.billingCycle === "custom" ? subscription.customDays : null,
     category: subscription.category,
     status: subscription.status,
+    pinned: subscription.pinned,
     paymentMethod: subscription.paymentMethod ?? null,
     startDate: subscription.startDate,
     nextBillingDate: subscription.nextBillingDate,

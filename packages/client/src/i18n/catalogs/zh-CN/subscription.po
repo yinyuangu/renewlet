@@ -939,6 +939,16 @@ msgid "subscription.moreActions"
 msgstr "更多操作"
 
 #. js-lingui-explicit-id
+#: src/i18n/descriptors/subscription.ts:106
+msgid "subscription.pin"
+msgstr "置顶"
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/subscription.ts:107
+msgid "subscription.unpin"
+msgstr "取消置顶"
+
+#. js-lingui-explicit-id
 #: src/i18n/descriptors/subscription.ts:179
 msgid "import.summaryReplace"
 msgstr "替换"

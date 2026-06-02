@@ -38,6 +38,7 @@ func TestEnsureSchemaCreatesContractFieldsAndIndexes(t *testing.T) {
 		"customDays":                   core.FieldTypeNumber,
 		"category":                     core.FieldTypeText,
 		"status":                       core.FieldTypeSelect,
+		"pinned":                       core.FieldTypeBool,
 		"paymentMethod":                core.FieldTypeText,
 		"startDate":                    core.FieldTypeText,
 		"nextBillingDate":              core.FieldTypeText,

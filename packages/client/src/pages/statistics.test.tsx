@@ -109,6 +109,7 @@ function subscription(overrides: SubscriptionOverrides): Subscription {
     repeatReminderEnabled: false,
     repeatReminderInterval: "1h",
     repeatReminderWindow: "72h",
+    pinned: false,
   };
 
   if (overrides.billingCycle === "custom") {

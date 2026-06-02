@@ -64,6 +64,7 @@ export interface SubscriptionRow {
   custom_days: number | null;
   category: string;
   status: string;
+  pinned: number;
   payment_method: string | null;
   start_date: string;
   next_billing_date: string;

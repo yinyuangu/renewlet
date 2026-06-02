@@ -24,6 +24,7 @@ type SubscriptionWritePayload = {
   customDays: number | null;
   category: string;
   status: Subscription["status"];
+  pinned: boolean;
   paymentMethod: string | null;
   startDate: string;
   nextBillingDate: string;
@@ -87,6 +88,7 @@ function apiSubscriptionFromPayload(id: string, payload: SubscriptionWritePayloa
     ...(payload.billingCycle === "custom" && payload.customDays !== null ? { customDays: payload.customDays } : {}),
     category: payload.category,
     status: payload.status,
+    pinned: payload.pinned,
     ...(payload.paymentMethod !== null ? { paymentMethod: payload.paymentMethod } : {}),
     startDate: payload.startDate,
     nextBillingDate: payload.nextBillingDate,
@@ -112,6 +114,7 @@ function apiSubscriptionFromDraft(id: string, draft: FixedSubscriptionDraft): Ap
     customDays: draft.customDays ?? null,
     category: draft.category,
     status: draft.status,
+    pinned: draft.pinned,
     paymentMethod: draft.paymentMethod ?? null,
     startDate: draft.startDate,
     nextBillingDate: draft.nextBillingDate,
@@ -137,6 +140,7 @@ function subscriptionDraft(overrides: Partial<FixedSubscriptionDraft> = {}): Fix
     customDays: undefined,
     category: "productivity",
     status: "active",
+    pinned: false,
     paymentMethod: undefined,
     startDate: assertDateOnly("2026-05-14"),
     nextBillingDate: assertDateOnly("2026-06-14"),
