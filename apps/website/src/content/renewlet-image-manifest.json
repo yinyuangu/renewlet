@@ -101,13 +101,14 @@
       "key": "notifications",
       "viewport": "desktop",
       "path": "/settings",
+      "sectionHash": "settings-timezone",
       "waitFor": {
-        "zh": "通知设置",
-        "en": "Notifications"
+        "zh": "时区设置",
+        "en": "Time zone"
       },
       "scrollToHeading": {
-        "zh": "通知设置",
-        "en": "Notifications"
+        "zh": "时区设置",
+        "en": "Time zone"
       },
       "website": true,
       "readme": true
@@ -127,6 +128,7 @@
       "key": "notifications-h5",
       "viewport": "mobile",
       "path": "/settings",
+      "sectionHash": "settings-notifications",
       "waitFor": {
         "zh": "通知设置",
         "en": "Notifications"
