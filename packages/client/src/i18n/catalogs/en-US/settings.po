@@ -102,6 +102,22 @@ msgid "settings.calendarFeedCopyFailedDescription"
 msgstr "The browser blocked clipboard access. Select and copy the URL manually."
 
 #. js-lingui-explicit-id
+msgid "settings.calendarFeedOpenSystemAttempted"
+msgstr "Tried to open the system calendar"
+
+#. js-lingui-explicit-id
+msgid "settings.calendarFeedOpenSystemAttemptedDescription"
+msgstr "If the system calendar rejects this URL, copy it and add the subscription manually in your calendar app."
+
+#. js-lingui-explicit-id
+msgid "settings.calendarFeedOpenSystemFailed"
+msgstr "Failed to open system calendar subscription"
+
+#. js-lingui-explicit-id
+msgid "settings.calendarFeedOpenSystemFailedDescription"
+msgstr "The subscription URL is not returning usable ICS content right now. Copy the URL to add the subscription manually."
+
+#. js-lingui-explicit-id
 msgid "settings.calendarFeedFailed"
 msgstr "Calendar subscription failed"
 

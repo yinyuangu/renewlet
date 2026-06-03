@@ -174,10 +174,14 @@ describe("SubscriptionCard", () => {
       updatedAt: "2026-05-18T00:00:00.000Z",
       feedUrl: "https://example.com/calendar/renewals.ics?token=secret",
     });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n", {
+      headers: { "content-type": "text/calendar; charset=utf-8" },
+    })));
   });
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.unstubAllGlobals();
     Object.defineProperty(window, "open", { configurable: true, value: originalWindowOpen });
   });
 
@@ -428,7 +432,7 @@ describe("SubscriptionCard", () => {
     expect(screen.getByRole("link", { name: "用 Outlook.com 打开" })).not.toHaveClass("bg-primary");
     expect(screen.getByRole("link", { name: "用 Office 365 打开" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "用 Yahoo Calendar 打开" })).toBeInTheDocument();
-    expect(screen.getByText("系统订阅使用私有 URL；下载 ICS 和在线日历入口都是一次性添加。")).toBeInTheDocument();
+    expect(screen.getByText("系统订阅需要日历 App 能持续访问这个 URL；下载 ICS 和在线日历入口都是一次性添加。")).toBeInTheDocument();
 
     vi.useRealTimers();
     fireEvent.click(generateButton);
@@ -437,13 +441,12 @@ describe("SubscriptionCard", () => {
     expect(screen.getByLabelText("本次订阅 URL")).toHaveValue("https://example.com/calendar/renewals.ics?token=secret");
     expect(screen.getByRole("button", { name: "复制 URL" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "重新生成订阅链接" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "在系统日历中订阅" })).toHaveAttribute(
-      "href",
-      "webcal://example.com/calendar/renewals.ics?token=secret",
-    );
+    expect(screen.getByRole("button", { name: "在系统日历中订阅" })).toBeInTheDocument();
   });
 
-  it("shows an existing per-subscription feed URL without generating a new token", () => {
+  it("shows an existing per-subscription feed URL without generating a new token", async () => {
+    const open = vi.fn();
+    Object.defineProperty(window, "open", { configurable: true, value: open });
     mocks.subscriptionCalendarFeedStatus = {
       data: {
         enabled: true,
@@ -457,13 +460,40 @@ describe("SubscriptionCard", () => {
     openMoreActionsMenu();
     fireEvent.click(screen.getByRole("menuitem", { name: "添加到日历" }));
 
-    expect(screen.getByRole("link", { name: "在系统日历中订阅" })).toHaveAttribute(
-      "href",
-      "webcal://example.com/calendar/renewals.ics?token=existing",
-    );
+    fireEvent.click(screen.getByRole("button", { name: "在系统日历中订阅" }));
+    await waitFor(() => expect(open).toHaveBeenCalledWith("webcal://example.com/calendar/renewals.ics?token=existing", "_self"));
     expect(screen.getByLabelText("本次订阅 URL")).toHaveValue("https://example.com/calendar/renewals.ics?token=existing");
     expect(screen.queryByRole("button", { name: "生成订阅链接" })).not.toBeInTheDocument();
     expect(mocks.createSubscriptionCalendarFeed).not.toHaveBeenCalled();
+  });
+
+  it("does not open the system calendar when the feed preflight returns HTML", async () => {
+    const open = vi.fn();
+    Object.defineProperty(window, "open", { configurable: true, value: open });
+    const fetchMock = vi.fn().mockResolvedValue(new Response("<html></html>", {
+      headers: { "content-type": "text/html" },
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    mocks.subscriptionCalendarFeedStatus = {
+      data: {
+        enabled: true,
+        feedUrl: "http://localhost:5173/calendar/renewals.ics?token=existing",
+      },
+      isLoading: false,
+    };
+
+    renderSubscriptionCard({ name: "Fastmail" });
+
+    openMoreActionsMenu();
+    fireEvent.click(screen.getByRole("menuitem", { name: "添加到日历" }));
+    fireEvent.click(screen.getByRole("button", { name: "在系统日历中订阅" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("http://localhost:5173/calendar/renewals.ics?token=existing", {
+      cache: "no-store",
+      credentials: "omit",
+      headers: { Accept: "text/calendar,*/*;q=0.1" },
+    }));
+    expect(open).not.toHaveBeenCalled();
   });
 
   it("uses an Android insert intent for the system calendar entry in Chrome on Android", () => {

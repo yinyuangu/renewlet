@@ -15,6 +15,15 @@ import { sha256 } from "./crypto";
 const SESSION_TOKEN = "session-token";
 const USER_ID = "usr_calendar";
 
+function expectCalendarIcsLineEndings(value: string) {
+  expect(value).toContain("\r\n");
+  for (let index = 0; index < value.length; index += 1) {
+    if (value[index] === "\n") {
+      expect(value[index - 1], `bare LF at index ${index}`).toBe("\r");
+    }
+  }
+}
+
 describe("calendar feed worker handlers", () => {
   it("creates a reusable global feed, returns the URL on status, renders filtered ICS by token, and revokes the URL", async () => {
     const env = await createCalendarFeedTestEnv();
@@ -43,6 +52,7 @@ describe("calendar feed worker handlers", () => {
     const icsResponse = await calendarFeedIcs(new Request(created.calendarFeed.feedUrl), env);
     expect(icsResponse.status).toBe(200);
     const ics = await icsResponse.text();
+    expectCalendarIcsLineEndings(ics);
     expect(ics).toContain("BEGIN:VCALENDAR");
     expect(ics).toContain("SUMMARY:Active Plan");
     expect(ics).toContain("DTSTART;VALUE=DATE:20990602");
@@ -83,6 +93,8 @@ describe("calendar feed worker handlers", () => {
 
     const firstIcs = await (await calendarFeedIcs(new Request(first.calendarFeed.feedUrl), env)).text();
     const secondIcs = await (await calendarFeedIcs(new Request(second.calendarFeed.feedUrl), env)).text();
+    expectCalendarIcsLineEndings(firstIcs);
+    expectCalendarIcsLineEndings(secondIcs);
     expect(firstIcs).toContain("NAME:Renewlet - Paused Plan");
     expect(firstIcs).toContain("SUMMARY:Paused Plan");
     expect(firstIcs).not.toContain("Active Plan");

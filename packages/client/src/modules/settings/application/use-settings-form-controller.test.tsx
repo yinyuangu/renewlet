@@ -1,6 +1,6 @@
 // Settings controller 测试保护远端设置、本地草稿、主题/i18n 预览和保存副作用的唯一写入口。
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_CUSTOM_CONFIG, type CustomConfig } from "@/types/config";
 import { DEFAULT_SETTINGS, type AppSettings } from "@/types/subscription";
 import {
@@ -32,6 +32,8 @@ const mocks = vi.hoisted(() => ({
   createCalendarFeedMutateAsync: vi.fn(),
   deleteCalendarFeedMutateAsync: vi.fn(),
   writeClipboard: vi.fn(),
+  fetch: vi.fn(),
+  openWindow: vi.fn(),
   isCloudflareRuntime: false,
   accountIdentity: { email: "alice@example.com" as string | null, role: "admin" },
 }));
@@ -127,6 +129,10 @@ vi.mock("@/i18n/I18nProvider", () => {
     "settings.calendarFeedCopiedDescription": "现在可以在日历应用中添加订阅日历。",
     "settings.calendarFeedCopyFailed": "复制失败",
     "settings.calendarFeedCopyFailedDescription": "浏览器拒绝了剪贴板访问，请手动选择并复制 URL。",
+    "settings.calendarFeedOpenSystemAttempted": "已尝试唤起系统日历",
+    "settings.calendarFeedOpenSystemAttemptedDescription": "如果系统日历拒绝此 URL，请复制 URL 后在日历 App 中手动添加订阅。",
+    "settings.calendarFeedOpenSystemFailed": "系统日历订阅打开失败",
+    "settings.calendarFeedOpenSystemFailedDescription": "订阅 URL 当前没有返回可用的 ICS 内容；请复制 URL 手动添加订阅。",
     "settings.calendarFeedFailed": "日历订阅操作失败",
     "settings.calendarFeedFailedDescription": "无法生成日历订阅，请稍后重试。",
     "settings.calendarFeedRevoked": "日历订阅已撤销",
@@ -200,6 +206,8 @@ describe("useSettingsFormController", () => {
     mocks.createCalendarFeedMutateAsync.mockReset();
     mocks.deleteCalendarFeedMutateAsync.mockReset();
     mocks.writeClipboard.mockReset();
+    mocks.fetch.mockReset();
+    mocks.openWindow.mockReset();
     localStorage.removeItem(APPEARANCE_PENDING_STORAGE_KEY);
     localStorage.removeItem(SETTINGS_APPEARANCE_PENDING_STORAGE_KEY);
     localStorage.removeItem(SETTINGS_THEME_MODE_STORAGE_KEY);
@@ -219,10 +227,22 @@ describe("useSettingsFormController", () => {
     });
     mocks.deleteCalendarFeedMutateAsync.mockResolvedValue({ ok: true });
     mocks.writeClipboard.mockResolvedValue(undefined);
+    mocks.fetch.mockResolvedValue(new Response("BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n", {
+      headers: { "content-type": "text/calendar; charset=utf-8" },
+    }));
     Object.defineProperty(navigator, "clipboard", {
       value: { writeText: mocks.writeClipboard },
       configurable: true,
     });
+    vi.stubGlobal("fetch", mocks.fetch);
+    Object.defineProperty(window, "open", {
+      value: mocks.openWindow,
+      configurable: true,
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it("starts clean and does not save or refresh when the exchange-rate source only changes draft", () => {
@@ -594,6 +614,21 @@ describe("useSettingsFormController", () => {
     expect(mocks.toast).toHaveBeenCalledWith({
       title: "URL 已复制",
       description: "现在可以在日历应用中添加订阅日历。",
+    });
+
+    await act(async () => {
+      await enabledResult.current.calendarFeed.openSystem();
+    });
+
+    expect(mocks.fetch).toHaveBeenCalledWith("https://example.com/calendar/renewals.ics?token=secret", {
+      cache: "no-store",
+      credentials: "omit",
+      headers: { Accept: "text/calendar,*/*;q=0.1" },
+    });
+    expect(mocks.openWindow).toHaveBeenCalledWith("webcal://example.com/calendar/renewals.ics?token=secret", "_self");
+    expect(mocks.toast).toHaveBeenCalledWith({
+      title: "已尝试唤起系统日历",
+      description: "如果系统日历拒绝此 URL，请复制 URL 后在日历 App 中手动添加订阅。",
     });
 
     await act(async () => {

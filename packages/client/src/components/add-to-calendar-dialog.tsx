@@ -23,7 +23,7 @@ import { useSettings } from "@/hooks/use-settings";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { useI18n } from "@/i18n/I18nProvider";
 import { addDateOnly } from "@/lib/time/date-only";
-import { buildAndroidCalendarIntentUrl, isAndroidChromeUserAgent, openWebcalUrl, toWebcalUrl } from "@/shared/browser/calendar-links";
+import { buildAndroidCalendarIntentUrl, isAndroidChromeUserAgent, openValidatedWebcalUrl } from "@/shared/browser/calendar-links";
 import { downloadFile } from "@/shared/browser/download-file";
 import {
   CYCLE_LABELS,
@@ -103,6 +103,7 @@ function ResolvedAddToCalendarDialog({ open, onOpenChange, subscription }: Resol
   const deleteSubscriptionFeed = useDeleteSubscriptionCalendarFeed();
   const [feedUrl, setFeedUrl] = useState<string | null>(null);
   const [confirmRegenerateOpen, setConfirmRegenerateOpen] = useState(false);
+  const [isOpeningSystemCalendar, setIsOpeningSystemCalendar] = useState(false);
   const visibleFeedUrl = feedUrl ?? subscriptionFeedStatus.data?.feedUrl ?? null;
   useEffect(() => {
     // 切换订阅时清掉刚生成的本地 token，防止上一张卡片的私有 feed URL 短暂展示到新弹窗。
@@ -190,18 +191,45 @@ function ResolvedAddToCalendarDialog({ open, onOpenChange, subscription }: Resol
   }), [links, renewalEvent.description, subscription.name, subscription.nextBillingDate]);
 
   const handleSubscribe = useCallback(async () => {
+    let createdFeedUrl: string | null = null;
+    setIsOpeningSystemCalendar(true);
     try {
       const created = await createSubscriptionFeed.mutateAsync(subscription.id);
+      createdFeedUrl = created.feedUrl;
       setFeedUrl(created.feedUrl);
-      // webcal 唤起依赖浏览器/系统协议处理；即使唤起失败，feed URL 仍留在 UI 中供复制。
-      openWebcalUrl(created.feedUrl);
+      await openValidatedWebcalUrl(created.feedUrl);
       toast.success(t("subscription.addToCalendarSubscribed"), {
         description: t("subscription.addToCalendarSubscribedDescription"),
       });
     } catch {
-      toast.error(t("subscription.addToCalendarSubscribeFailed"));
+      if (createdFeedUrl) {
+        toast.error(t("subscription.addToCalendarOpenSystemFailed"), {
+          description: t("subscription.addToCalendarOpenSystemFailedDescription"),
+        });
+      } else {
+        toast.error(t("subscription.addToCalendarSubscribeFailed"));
+      }
+    } finally {
+      setIsOpeningSystemCalendar(false);
     }
   }, [createSubscriptionFeed, subscription.id, t]);
+
+  const handleOpenExistingFeed = useCallback(async () => {
+    if (!visibleFeedUrl) return;
+    setIsOpeningSystemCalendar(true);
+    try {
+      await openValidatedWebcalUrl(visibleFeedUrl);
+      toast.success(t("subscription.addToCalendarSubscribed"), {
+        description: t("subscription.addToCalendarSubscribedDescription"),
+      });
+    } catch {
+      toast.error(t("subscription.addToCalendarOpenSystemFailed"), {
+        description: t("subscription.addToCalendarOpenSystemFailedDescription"),
+      });
+    } finally {
+      setIsOpeningSystemCalendar(false);
+    }
+  }, [visibleFeedUrl, t]);
 
   const handleRegenerate = useCallback(async () => {
     try {
@@ -252,13 +280,13 @@ function ResolvedAddToCalendarDialog({ open, onOpenChange, subscription }: Resol
       eventTypeValue={t("subscription.addToCalendarSubscriptionFeed")}
       feedUrl={visibleFeedUrl}
       feedUrlLabel={t("subscription.addToCalendarFeedUrl")}
-      isSubscribing={createSubscriptionFeed.isPending || deleteSubscriptionFeed.isPending || subscriptionFeedStatus.isLoading}
+      isSubscribing={isOpeningSystemCalendar || createSubscriptionFeed.isPending || deleteSubscriptionFeed.isPending || subscriptionFeedStatus.isLoading}
       links={links}
       notice={t("subscription.addToCalendarSingleEventNotice")}
       onCopyFeedUrl={handleCopyFeedUrl}
       onDownload={handleDownload}
       onRegenerate={() => setConfirmRegenerateOpen(true)}
-      onSubscribe={handleSubscribe}
+      onSubscribe={visibleFeedUrl ? handleOpenExistingFeed : handleSubscribe}
       regenerateLabel={t("subscription.addToCalendarRegenerate")}
       servicesLabel={t("subscription.addToCalendarOnlineServices")}
       subscribeLabel={visibleFeedUrl ? t("subscription.addToCalendarSubscribeSystem") : t("subscription.addToCalendarGenerateFeed")}
@@ -360,7 +388,6 @@ function AddToCalendarContent({
   syncStatusLabel,
   syncStatusValue,
 }: AddToCalendarContentProps) {
-  const feedWebcalUrl = feedUrl ? toWebcalUrl(feedUrl) : null;
   return (
     <div className="grid gap-5">
       <dl className="grid divide-y divide-border rounded-md border border-border bg-background/50 text-sm">
@@ -370,19 +397,10 @@ function AddToCalendarContent({
       </dl>
 
       <div className="grid gap-3">
-        {feedWebcalUrl ? (
-          <Button variant="default" className="h-10 w-full justify-center" asChild>
-            <a href={feedWebcalUrl}>
-              <CalendarPlus className="h-4 w-4" />
-              {subscribeLabel}
-            </a>
-          </Button>
-        ) : (
-          <Button type="button" variant="default" className="h-10 w-full justify-center" onClick={onSubscribe} disabled={isSubscribing}>
-            {isSubscribing ? <Loader2 className="h-4 w-4 animate-spin" /> : <CalendarPlus className="h-4 w-4" />}
-            {isSubscribing ? subscribeLoadingLabel : subscribeLabel}
-          </Button>
-        )}
+        <Button type="button" variant="default" className="h-10 w-full justify-center" onClick={onSubscribe} disabled={isSubscribing}>
+          {isSubscribing ? <Loader2 className="h-4 w-4 animate-spin" /> : <CalendarPlus className="h-4 w-4" />}
+          {isSubscribing ? subscribeLoadingLabel : subscribeLabel}
+        </Button>
         {feedUrl ? (
           <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
             <Input value={feedUrl} readOnly className="border-border bg-secondary font-mono text-xs" aria-label={feedUrlLabel} />

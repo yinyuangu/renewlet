@@ -29,6 +29,7 @@ import { useCalendarFeedStatus, useCreateCalendarFeed, useDeleteCalendarFeed } f
 import { useToast } from "@/hooks/use-toast";
 import { getDisplayErrorMessage } from "@/lib/display-error";
 import { applyThemeVariant } from "@/lib/theme-variant";
+import { openValidatedWebcalUrl } from "@/shared/browser/calendar-links";
 import {
   readAppearancePendingFromStorage,
   readSettingsAppearanceDraftFromStorage,
@@ -158,6 +159,7 @@ interface SettingsCalendarFeedController {
   isDeleting: boolean;
   createOrRotate: () => Promise<void>;
   copyUrl: () => Promise<void>;
+  openSystem: () => Promise<void>;
   regenerate: () => Promise<void>;
   revoke: () => Promise<void>;
 }
@@ -575,6 +577,24 @@ export function useSettingsFormController(): SettingsFormController {
     }
   }, [calendarFeedStatus.data?.feedUrl, t, toast]);
 
+  const handleOpenCalendarFeedSystem = useCallback(async () => {
+    const feedUrl = calendarFeedStatus.data?.feedUrl;
+    if (!feedUrl) return;
+    try {
+      await openValidatedWebcalUrl(feedUrl);
+      toast({
+        title: t("settings.calendarFeedOpenSystemAttempted"),
+        description: t("settings.calendarFeedOpenSystemAttemptedDescription"),
+      });
+    } catch (error) {
+      toast({
+        title: t("settings.calendarFeedOpenSystemFailed"),
+        description: getDisplayErrorMessage(error, t("settings.calendarFeedOpenSystemFailedDescription")),
+        variant: "destructive",
+      });
+    }
+  }, [calendarFeedStatus.data?.feedUrl, t, toast]);
+
   const handleRevokeCalendarFeed = useCallback(async () => {
     try {
       // 撤销必须立即清远端 token；前端缓存只负责让 UI 及时显示 disabled，不作为安全边界。
@@ -699,6 +719,7 @@ export function useSettingsFormController(): SettingsFormController {
       isDeleting: deleteCalendarFeed.isPending,
       createOrRotate: handleCreateCalendarFeed,
       copyUrl: handleCopyCalendarFeedUrl,
+      openSystem: handleOpenCalendarFeedSystem,
       regenerate: handleRegenerateCalendarFeed,
       revoke: handleRevokeCalendarFeed,
     },

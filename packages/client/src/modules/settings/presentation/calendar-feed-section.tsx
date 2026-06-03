@@ -15,7 +15,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useI18n } from "@/i18n/I18nProvider";
 import { cn } from "@/lib/utils";
-import { toWebcalUrl } from "@/shared/browser/calendar-links";
 import { LoadingButtonContent } from "./settings-shared-controls";
 
 interface CalendarFeedSectionProps {
@@ -34,6 +33,7 @@ interface CalendarFeedSectionProps {
   onCreate: () => void | Promise<void>;
   onCopy: () => void | Promise<void>;
   onDelete: () => void | Promise<void>;
+  onOpenSystem: () => void | Promise<void>;
   onRegenerate: () => void | Promise<void>;
 }
 
@@ -53,12 +53,12 @@ export function CalendarFeedSection({
   onCreate,
   onCopy,
   onDelete,
+  onOpenSystem,
   onRegenerate,
 }: CalendarFeedSectionProps) {
   const { t } = useI18n();
   const [confirmRegenerateOpen, setConfirmRegenerateOpen] = useState(false);
   const busy = isLoading || isCreating || isDeleting;
-  const webcalUrl = feedUrl ? toWebcalUrl(feedUrl) : null;
   return (
     <section id={id} className={cn("rounded-xl border border-border bg-card p-6", className)}>
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -91,13 +91,10 @@ export function CalendarFeedSection({
         )}
 
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-          {webcalUrl ? (
-            <Button variant="outline" size="sm" asChild className="justify-center gap-2 border-border">
-              {/* webcal 只交给系统/浏览器协议处理器；Google 和 Outlook 仍需要用户复制 HTTPS URL 去订阅。 */}
-              <a href={webcalUrl}>
-                <CalendarPlus className="h-4 w-4" />
-                {t("settings.calendarFeedOpenSystem")}
-              </a>
+          {feedUrl ? (
+            <Button type="button" variant="outline" size="sm" onClick={onOpenSystem} disabled={busy} className="justify-center gap-2 border-border">
+              <CalendarPlus className="h-4 w-4" />
+              {t("settings.calendarFeedOpenSystem")}
             </Button>
           ) : null}
           <Button

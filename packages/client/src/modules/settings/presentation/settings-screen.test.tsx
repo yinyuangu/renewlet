@@ -120,6 +120,7 @@ function createControllerState(overrides: {
       isDeleting: false,
       createOrRotate: fn,
       copyUrl: fn,
+      openSystem: fn,
       regenerate: fn,
       revoke: fn,
     },
@@ -314,16 +315,15 @@ describe("SettingsScreen SMTP email settings", () => {
     expect(screen.getByLabelText("日历订阅 URL")).toHaveValue("https://example.com/calendar/renewals.ics?token=secret");
     expect(screen.getByText("这是你的私有订阅链接；如果误分享，可以重新生成让旧链接失效。")).toBeInTheDocument();
     const copyButton = screen.getByRole("button", { name: "复制 URL" });
-    const systemCalendarLink = screen.getByRole("link", { name: "在系统日历中订阅" });
+    const systemCalendarButton = screen.getByRole("button", { name: "在系统日历中订阅" });
     expect(copyButton).toHaveClass("bg-primary");
-    expect(systemCalendarLink).not.toHaveClass("bg-primary");
-    expect(systemCalendarLink).toHaveAttribute(
-      "href",
-      "webcal://example.com/calendar/renewals.ics?token=secret",
-    );
+    expect(systemCalendarButton).not.toHaveClass("bg-primary");
 
     await user.click(copyButton);
     expect(controller.calendarFeed.copyUrl).toHaveBeenCalled();
+
+    await user.click(systemCalendarButton);
+    expect(controller.calendarFeed.openSystem).toHaveBeenCalled();
 
     await user.click(screen.getByRole("button", { name: "重新生成" }));
     const regenerateDialog = await screen.findByRole("alertdialog", { name: "重新生成日历订阅 URL？" });
@@ -346,7 +346,7 @@ describe("SettingsScreen SMTP email settings", () => {
     expect(screen.getByText("生成后可在 iOS、macOS、Android、Outlook、Thunderbird 等日历应用中通过 URL 订阅。")).toBeInTheDocument();
     expect(screen.queryByLabelText("日历订阅 URL")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "复制 URL" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "在系统日历中订阅" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "在系统日历中订阅" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "生成订阅 URL" })).toBeInTheDocument();
   });
 

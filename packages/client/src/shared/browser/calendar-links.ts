@@ -8,6 +8,13 @@ interface AndroidCalendarIntentInput {
   fallbackUrl?: string | undefined;
 }
 
+export class CalendarFeedValidationError extends Error {
+  constructor(message = "Calendar feed URL did not return iCalendar content.") {
+    super(message);
+    this.name = "CalendarFeedValidationError";
+  }
+}
+
 const ANDROID_CHROME_RE = /\bAndroid\b/i;
 const CHROME_RE = /\bChrome\/\d+/i;
 const CHROME_VARIANT_RE = /\b(?:EdgA|OPR|Firefox|SamsungBrowser|CriOS)\b/i;
@@ -34,6 +41,24 @@ export function openWebcalUrl(feedUrl: string): string {
     window.open(href, "_self");
   }
   return href;
+}
+
+export async function validateCalendarFeedUrl(feedUrl: string, fetcher: typeof fetch = fetch): Promise<void> {
+  const response = await fetcher(feedUrl, {
+    cache: "no-store",
+    credentials: "omit",
+    headers: { Accept: "text/calendar,*/*;q=0.1" },
+  });
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!response.ok || !/\btext\/calendar\b/i.test(contentType)) {
+    throw new CalendarFeedValidationError();
+  }
+}
+
+export async function openValidatedWebcalUrl(feedUrl: string, fetcher: typeof fetch = fetch): Promise<string> {
+  // 系统协议处理器没有可靠成功回调；只能先确认 feed 本身可匿名读取，再把 webcal 交给系统。
+  await validateCalendarFeedUrl(feedUrl, fetcher);
+  return openWebcalUrl(feedUrl);
 }
 
 export function isAndroidChromeUserAgent(userAgent = typeof navigator === "undefined" ? "" : navigator.userAgent): boolean {

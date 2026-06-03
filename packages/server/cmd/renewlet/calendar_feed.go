@@ -465,7 +465,14 @@ func buildCalendarFeedICS(options calendarFeedBuildOptions) string {
 		alarm.SetDescription(serverFormat(locale, "calendarFeed.alarmDescription", map[string]interface{}{"name": event.Summary}))
 		alarm.SetTrigger(calendarFeedAlarmTrigger(event.ReminderDays))
 	}
-	return cal.Serialize()
+	return normalizeCalendarFeedLineEndings(cal.Serialize())
+}
+
+func normalizeCalendarFeedLineEndings(value string) string {
+	// RFC 5545 要求 content line 使用 CRLF；macOS 订阅解析比本地 .ics 导入更严格，不能依赖库输出的裸 LF。
+	normalized := strings.ReplaceAll(value, "\r\n", "\n")
+	normalized = strings.ReplaceAll(normalized, "\r", "\n")
+	return strings.ReplaceAll(normalized, "\n", "\r\n")
 }
 
 func globalCalendarFeedEvents(items []calendarFeedSubscription, settings appSettings, now time.Time) []calendarFeedEvent {

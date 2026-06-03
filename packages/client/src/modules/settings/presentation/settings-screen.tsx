@@ -377,6 +377,7 @@ export function SettingsScreen() {
                 onCreate={calendarFeed.createOrRotate}
                 onCopy={calendarFeed.copyUrl}
                 onDelete={calendarFeed.revoke}
+                onOpenSystem={calendarFeed.openSystem}
                 onRegenerate={calendarFeed.regenerate}
               />
 

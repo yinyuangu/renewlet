@@ -2,9 +2,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   buildAndroidCalendarIntentUrl,
+  CalendarFeedValidationError,
   isAndroidChromeUserAgent,
   openWebcalUrl,
+  openValidatedWebcalUrl,
   toWebcalUrl,
+  validateCalendarFeedUrl,
 } from "./calendar-links";
 
 const originalWindowOpen = window.open;
@@ -56,5 +59,35 @@ describe("calendar-links", () => {
 
     expect(href).toBe("webcal://example.com/calendar/renewals.ics?token=secret");
     expect(open).toHaveBeenCalledWith("webcal://example.com/calendar/renewals.ics?token=secret", "_self");
+  });
+
+  it("validates iCalendar content before opening the system subscription handler", async () => {
+    const open = vi.fn();
+    const fetcher = vi.fn().mockResolvedValue(new Response("BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n", {
+      headers: { "content-type": "text/calendar; charset=utf-8" },
+    }));
+    Object.defineProperty(window, "open", { configurable: true, value: open });
+
+    const href = await openValidatedWebcalUrl("http://localhost:3000/calendar/renewals.ics?token=secret", fetcher);
+
+    expect(fetcher).toHaveBeenCalledWith("http://localhost:3000/calendar/renewals.ics?token=secret", {
+      cache: "no-store",
+      credentials: "omit",
+      headers: { Accept: "text/calendar,*/*;q=0.1" },
+    });
+    expect(href).toBe("webcal://localhost:3000/calendar/renewals.ics?token=secret");
+    expect(open).toHaveBeenCalledWith("webcal://localhost:3000/calendar/renewals.ics?token=secret", "_self");
+  });
+
+  it("rejects non-calendar responses before opening the system handler", async () => {
+    const open = vi.fn();
+    const fetcher = vi.fn().mockResolvedValue(new Response("<html></html>", {
+      headers: { "content-type": "text/html" },
+    }));
+    Object.defineProperty(window, "open", { configurable: true, value: open });
+
+    await expect(validateCalendarFeedUrl("https://example.com/calendar/renewals.ics?token=secret", fetcher))
+      .rejects.toBeInstanceOf(CalendarFeedValidationError);
+    expect(open).not.toHaveBeenCalled();
   });
 });

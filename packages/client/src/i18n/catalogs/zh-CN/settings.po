@@ -102,6 +102,22 @@ msgid "settings.calendarFeedCopyFailedDescription"
 msgstr "浏览器拒绝了剪贴板访问，请手动选择并复制 URL。"
 
 #. js-lingui-explicit-id
+msgid "settings.calendarFeedOpenSystemAttempted"
+msgstr "已尝试唤起系统日历"
+
+#. js-lingui-explicit-id
+msgid "settings.calendarFeedOpenSystemAttemptedDescription"
+msgstr "如果系统日历拒绝此 URL，请复制 URL 后在日历 App 中手动添加订阅。"
+
+#. js-lingui-explicit-id
+msgid "settings.calendarFeedOpenSystemFailed"
+msgstr "系统日历订阅打开失败"
+
+#. js-lingui-explicit-id
+msgid "settings.calendarFeedOpenSystemFailedDescription"
+msgstr "订阅 URL 当前没有返回可用的 ICS 内容；请复制 URL 手动添加订阅。"
+
+#. js-lingui-explicit-id
 msgid "settings.calendarFeedFailed"
 msgstr "日历订阅操作失败"
 

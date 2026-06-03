@@ -77,6 +77,7 @@ func TestCalendarFeedLifecycleAndICSRoute(t *testing.T) {
 		t.Fatalf("expected calendar feed ICS 200, got %d: %s", icsRes.Code, icsRes.Body.String())
 	}
 	ics := icsRes.Body.String()
+	assertCalendarFeedLineEndings(t, ics)
 	unfoldedICS := unfoldCalendarTestICS(ics)
 	for _, expected := range []string{
 		"BEGIN:VCALENDAR",
@@ -194,6 +195,7 @@ func TestSubscriptionCalendarFeedLifecycleAndICSRoute(t *testing.T) {
 	if firstICSRes.Code != http.StatusOK {
 		t.Fatalf("expected subscription feed ICS 200, got %d: %s", firstICSRes.Code, firstICSRes.Body.String())
 	}
+	assertCalendarFeedLineEndings(t, firstICSRes.Body.String())
 	unfoldedICS := unfoldCalendarTestICS(firstICSRes.Body.String())
 	for _, expected := range []string{
 		"NAME:Renewlet - Paused Plan",
@@ -322,6 +324,18 @@ func calendarFeedRequestTarget(t *testing.T, rawURL string) string {
 
 func unfoldCalendarTestICS(value string) string {
 	return strings.ReplaceAll(strings.ReplaceAll(value, "\r\n ", ""), "\n ", "")
+}
+
+func assertCalendarFeedLineEndings(t *testing.T, value string) {
+	t.Helper()
+	if !strings.Contains(value, "\r\n") {
+		t.Fatalf("expected ICS to use CRLF line endings, got:\n%s", value)
+	}
+	for index, char := range []byte(value) {
+		if char == '\n' && (index == 0 || value[index-1] != '\r') {
+			t.Fatalf("expected ICS to avoid bare LF at byte %d, got:\n%s", index, value)
+		}
+	}
 }
 
 func fallbackString(value string, fallback string) string {

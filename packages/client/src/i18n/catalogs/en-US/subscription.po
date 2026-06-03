@@ -1241,7 +1241,7 @@ msgstr "Syncs this subscription"
 #. js-lingui-explicit-id
 #: src/i18n/descriptors/subscription.ts:13
 msgid "subscription.addToCalendarSingleEventNotice"
-msgstr "System subscription uses a private URL. ICS download and online calendar links add a one-time event."
+msgstr "System subscription requires the calendar app to keep reaching this URL. ICS download and online calendar links add a one-time event."
 
 #. js-lingui-explicit-id
 #: src/i18n/descriptors/subscription.ts:15
@@ -1309,12 +1309,20 @@ msgstr "Calendar subscription generated"
 #. js-lingui-explicit-id
 #: src/i18n/descriptors/subscription.ts:22
 msgid "subscription.addToCalendarSubscribedDescription"
-msgstr "If the system calendar does not open, copy this URL and add the subscription manually."
+msgstr "Renewlet tried to open the system calendar. If the system rejects the URL, copy it and add the subscription manually in your calendar app."
 
 #. js-lingui-explicit-id
 #: src/i18n/descriptors/subscription.ts:23
 msgid "subscription.addToCalendarSubscribeFailed"
 msgstr "Failed to generate calendar subscription"
+
+#. js-lingui-explicit-id
+msgid "subscription.addToCalendarOpenSystemFailed"
+msgstr "Failed to open system calendar subscription"
+
+#. js-lingui-explicit-id
+msgid "subscription.addToCalendarOpenSystemFailedDescription"
+msgstr "The subscription URL is not returning usable ICS content right now. Copy the URL to add the subscription manually, or download the ICS file for a one-time import."
 
 #. js-lingui-explicit-id
 #: src/i18n/descriptors/subscription.ts:24

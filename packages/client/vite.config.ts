@@ -74,6 +74,7 @@ export default defineConfig({
     },
     proxy: {
       "/api": devProxyTarget,
+      "/calendar/renewals.ics": devProxyTarget,
       "/_": devProxyTarget,
     },
   },
