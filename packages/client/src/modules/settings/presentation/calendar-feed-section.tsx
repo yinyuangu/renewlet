@@ -14,10 +14,13 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useI18n } from "@/i18n/I18nProvider";
+import { cn } from "@/lib/utils";
 import { toWebcalUrl } from "@/shared/browser/calendar-links";
 import { LoadingButtonContent } from "./settings-shared-controls";
 
 interface CalendarFeedSectionProps {
+  id?: string;
+  className?: string;
   /** 是否已有可用 feed；公开 ICS route 只认 URL 中的高熵 token，不读取登录态。 */
   enabled: boolean;
   /** 当前用户可复制的 HTTPS 订阅 URL；为 null 时表示尚未生成或已撤销。 */
@@ -40,6 +43,8 @@ interface CalendarFeedSectionProps {
  * 注意：feed URL 是低权限 bearer secret；UI 只能复制/打开/撤销，不应把 token 拆出来展示或缓存到其它状态。
  */
 export function CalendarFeedSection({
+  id,
+  className,
   enabled,
   feedUrl,
   isLoading,
@@ -55,7 +60,7 @@ export function CalendarFeedSection({
   const busy = isLoading || isCreating || isDeleting;
   const webcalUrl = feedUrl ? toWebcalUrl(feedUrl) : null;
   return (
-    <section className="rounded-xl border border-border bg-card p-6">
+    <section id={id} className={cn("rounded-xl border border-border bg-card p-6", className)}>
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex min-w-0 items-start gap-3">
           <CalendarDays className="mt-0.5 h-5 w-5 shrink-0 text-primary" />

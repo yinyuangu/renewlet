@@ -18,6 +18,8 @@ import type { CustomConfig } from '@/types/config';
 import type { AppSettings } from '@/types/subscription';
 
 export interface ExchangeRatesSectionProps {
+  id?: string;
+  className?: string;
   settings: Pick<AppSettings, 'defaultCurrency' | 'exchangeRateProvider'>;
   customConfig: Pick<CustomConfig, 'currencies'>;
   rates: ExchangeRates;
@@ -33,6 +35,8 @@ export interface ExchangeRatesSectionProps {
 }
 
 export function ExchangeRatesSection({
+  id,
+  className,
   settings,
   customConfig,
   rates,
@@ -59,7 +63,7 @@ export function ExchangeRatesSection({
       : null;
 
   return (
-            <section className="rounded-xl border border-border bg-card p-6">
+            <section id={id} className={cn("rounded-xl border border-border bg-card p-6", className)}>
                 <div className="flex items-center justify-between mb-6">
                   <div className="flex items-center gap-2">
                     <TrendingUp className="h-5 w-5 text-primary" />

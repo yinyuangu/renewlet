@@ -1090,3 +1090,73 @@ msgstr "Official service is `https://api.day.app` by default. Enter your own Bar
 #: src/i18n/descriptors/settings.ts:100
 msgid "settings.notificationReminderDays"
 msgstr "Default reminder lead time"
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/settings.ts:7
+msgid "settings.sectionNavLabel"
+msgstr "Settings sections"
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/settings.ts:8
+msgid "settings.sectionNavTitle"
+msgstr "Settings menu"
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/settings.ts:9
+msgid "settings.sectionNavOpen"
+msgstr "Open settings menu"
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/settings.ts:10
+msgid "settings.sectionNavCompactTrigger"
+msgstr "Contents"
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/settings.ts:11
+msgid "settings.sectionNav.account"
+msgstr "Account"
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/settings.ts:12
+msgid "settings.sectionNav.appearance"
+msgstr "Appearance"
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/settings.ts:12
+msgid "settings.sectionNav.display"
+msgstr "Display"
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/settings.ts:13
+msgid "settings.sectionNav.iconSources"
+msgstr "Icon sources"
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/settings.ts:14
+msgid "settings.sectionNav.budget"
+msgstr "Budget"
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/settings.ts:15
+msgid "settings.sectionNav.dataConfig"
+msgstr "Data config"
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/settings.ts:16
+msgid "settings.sectionNav.exchange"
+msgstr "Exchange rates"
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/settings.ts:17
+msgid "settings.sectionNav.calendarFeed"
+msgstr "Calendar feed"
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/settings.ts:18
+msgid "settings.sectionNav.timezone"
+msgstr "Time zone"
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/settings.ts:19
+msgid "settings.sectionNav.notifications"
+msgstr "Notifications"

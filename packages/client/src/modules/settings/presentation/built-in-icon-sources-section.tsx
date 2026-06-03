@@ -19,6 +19,8 @@ import { useI18n } from '@/i18n/I18nProvider';
 import type { MessageKey, MessageParams } from '@/i18n/messages';
 
 interface BuiltInIconSourcesSectionProps {
+  id?: string;
+  className?: string;
   /** 内置图标 provider 开关，必须覆盖 shared 中声明的所有 provider。 */
   sources: AppSettings["builtInIconSources"];
   /** 受控更新；SettingsScreen 负责统一保存草稿，组件内不直接打 API。 */
@@ -31,7 +33,7 @@ interface BuiltInIconSourcesSectionProps {
  * 业务约束：至少保留一个 provider 启用，否则媒体候选会退化成纯 favicon/domain 兜底，
  * 导入自动匹配和手动搜索的结果质量都会明显下降。
  */
-export function BuiltInIconSourcesSection({ sources, onChange }: BuiltInIconSourcesSectionProps) {
+export function BuiltInIconSourcesSection({ id, className, sources, onChange }: BuiltInIconSourcesSectionProps) {
   const { t } = useI18n();
   const [dialogOpen, setDialogOpen] = useState(false);
   const enabledCount = BUILT_IN_ICON_PROVIDERS.filter((provider) => sources[provider].enabled).length;
@@ -58,7 +60,7 @@ export function BuiltInIconSourcesSection({ sources, onChange }: BuiltInIconSour
   };
 
   return (
-    <section className="rounded-xl border border-border bg-card p-6">
+    <section id={id} className={cn("rounded-xl border border-border bg-card p-6", className)}>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 gap-3">
           <ImageIcon className="mt-0.5 h-5 w-5 shrink-0 text-primary" />

@@ -1,8 +1,8 @@
 // SettingsScreen 测试保护设置页分区装配和 Cloudflare/Docker 差异入口，不验证普通控件样式。
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation } from "react-router-dom";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { DEFAULT_CUSTOM_CONFIG } from "@/types/config";
 import {
@@ -158,7 +158,22 @@ function renderSettingsScreen(initialEntries = ["/settings"]) {
 
 describe("SettingsScreen SMTP email settings", () => {
   beforeEach(() => {
+    vi.stubGlobal("matchMedia", vi.fn((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })));
     mocks.useSettingsFormController.mockReturnValue(createControllerState());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    window.history.replaceState(null, "", "/");
   });
 
   it("renders SMTP fields instead of Resend fields for email notifications", () => {
@@ -346,6 +361,155 @@ describe("SettingsScreen SMTP email settings", () => {
     expect(phoneInput).toHaveAttribute("inputmode", "tel");
     expect(phoneInput).toHaveAttribute("autocomplete", "tel");
     expect(phoneInput).toHaveAttribute("enterkeyhint", "done");
+  });
+
+  it("renders section navigation links that target every settings section", () => {
+    const { container } = renderSettingsScreen();
+    const sections = [
+      ["settings-account", "账户"],
+      ["settings-appearance", "外观"],
+      ["settings-display", "显示"],
+      ["settings-icon-sources", "图标来源"],
+      ["settings-budget", "预算"],
+      ["settings-data-config", "数据配置"],
+      ["settings-exchange", "汇率"],
+      ["settings-calendar-feed", "日历订阅"],
+      ["settings-timezone", "时区"],
+      ["settings-notifications", "通知"],
+    ] as const;
+
+    const desktopNav = screen.getByTestId("settings-section-nav-desktop");
+    expect(desktopNav).toHaveClass("sticky", "top-28", "bg-card/70", "backdrop-blur", "overflow-y-auto");
+    expect(screen.queryByTestId("settings-section-content-scroll")).not.toBeInTheDocument();
+    const content = screen.getByTestId("settings-section-content");
+    expect(content).not.toHaveClass("lg:overflow-y-auto");
+    const headings = within(content).getAllByRole("heading", { name: "系统配置" });
+    expect(headings).toHaveLength(2);
+    expect(headings[0].closest("[data-testid='settings-mobile-page-header']")).not.toBeNull();
+    expect(headings[1].closest(".hidden.lg\\:block")).not.toBeNull();
+    const subtitles = within(content).getAllByText("管理您的账户、显示和通知设置");
+    expect(subtitles).toHaveLength(2);
+    expect(subtitles[0]).toHaveAttribute("data-testid", "settings-mobile-page-subtitle");
+    expect(subtitles[0].closest("[data-testid='settings-mobile-page-header']")).toBeNull();
+    expect(subtitles[0].compareDocumentPosition(headings[0])).toBe(Node.DOCUMENT_POSITION_PRECEDING);
+    expect(subtitles[1].closest(".hidden.lg\\:block")).not.toBeNull();
+    expect(within(content).getByRole("heading", { name: "管理员账户" })).toBeInTheDocument();
+    expect(screen.queryByTestId("settings-section-nav-floating-trigger")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("settings-section-nav-toolbar")).not.toBeInTheDocument();
+    const mobileHeader = within(content).getByTestId("settings-mobile-page-header");
+    expect(mobileHeader).toHaveClass(
+      "sticky",
+      "top-[calc(8.25rem+env(safe-area-inset-top))]",
+      "bg-background/90",
+      "border-b",
+      "lg:hidden",
+    );
+    const accountSection = container.querySelector("#settings-account");
+    expect(accountSection).not.toBeNull();
+    expect(mobileHeader.compareDocumentPosition(accountSection as Element)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    const mobileTrigger = within(mobileHeader).getByRole("button", { name: /打开设置目录/ });
+    expect(mobileTrigger).toHaveClass("h-9", "w-9", "rounded-lg", "bg-card/80");
+    expect(mobileTrigger).not.toHaveTextContent("目录");
+    expect(mobileTrigger).not.toHaveTextContent("时区");
+    expect(within(mobileHeader).queryByText("管理您的账户、显示和通知设置")).not.toBeInTheDocument();
+    const sectionNav = within(desktopNav);
+
+    sections.forEach(([id, label]) => {
+      expect(container.querySelector(`section#${id}`)).toHaveClass(
+        "scroll-mt-[calc(13rem+env(safe-area-inset-top))]",
+        "lg:scroll-mt-24",
+      );
+      const links = sectionNav.getAllByRole("link", { name: label });
+      expect(links).toHaveLength(1);
+      links.forEach((link) => expect(link).toHaveAttribute("href", `#${id}`));
+    });
+  });
+
+  it("opens mobile section navigation as a left drawer", async () => {
+    const user = userEvent.setup();
+    renderSettingsScreen();
+
+    await user.click(within(screen.getByTestId("settings-mobile-page-header")).getByRole("button", { name: /打开设置目录/ }));
+
+    const drawer = await screen.findByTestId("settings-section-nav-drawer");
+    expect(drawer).toHaveClass(
+      "fixed",
+      "left-0",
+      "top-[var(--app-visual-viewport-offset-top)]",
+      "h-[var(--app-viewport-height)]",
+      "max-h-[var(--app-viewport-height)]",
+      "z-[80]",
+      "rounded-r-xl",
+      "bg-card/95",
+    );
+    const notificationLink = within(drawer).getByRole("link", { name: "通知" });
+    expect(notificationLink).toHaveClass("rounded-lg", "px-3", "py-2", "text-sm");
+    expect(notificationLink).not.toHaveClass("h5-mobile-option-item");
+    expect(notificationLink).not.toHaveClass("border", "bg-secondary/30");
+    expect(drawer.querySelector(".overflow-x-auto")).toBeNull();
+  });
+
+  it("marks the active section navigation item with aria-current", async () => {
+    const user = userEvent.setup();
+    renderSettingsScreen();
+
+    const nav = screen.getByTestId("settings-section-nav-desktop");
+    const notificationLink = within(nav).getByRole("link", { name: "通知" });
+    await user.click(notificationLink);
+
+    expect(notificationLink).toHaveAttribute("aria-current", "location");
+  });
+
+  it("keeps the active section tied to hash selection instead of scroll observers", async () => {
+    const intersectionObserverSpy = vi.fn();
+    vi.stubGlobal("IntersectionObserver", intersectionObserverSpy);
+    const user = userEvent.setup();
+    renderSettingsScreen();
+
+    expect(intersectionObserverSpy).not.toHaveBeenCalled();
+
+    const desktopNav = screen.getByTestId("settings-section-nav-desktop");
+    await user.click(within(desktopNav).getByRole("link", { name: "通知" }));
+
+    expect(within(desktopNav).getByRole("link", { name: "通知" })).toHaveAttribute("aria-current", "location");
+    expect(intersectionObserverSpy).not.toHaveBeenCalled();
+  });
+
+  it("closes the mobile drawer after selecting a settings section", async () => {
+    const user = userEvent.setup();
+    renderSettingsScreen();
+
+    await user.click(within(screen.getByTestId("settings-mobile-page-header")).getByRole("button", { name: /打开设置目录/ }));
+    const drawer = await screen.findByTestId("settings-section-nav-drawer");
+    await user.click(within(drawer).getByRole("link", { name: "通知" }));
+
+    await waitFor(() => expect(screen.queryByTestId("settings-section-nav-drawer")).not.toBeInTheDocument());
+    expect(window.location.hash).toBe("#settings-notifications");
+
+    await user.click(within(screen.getByTestId("settings-mobile-page-header")).getByRole("button", { name: /打开设置目录/ }));
+    const reopenedDrawer = await screen.findByTestId("settings-section-nav-drawer");
+    const activeNotificationLink = within(reopenedDrawer).getByRole("link", { name: "通知" });
+    expect(activeNotificationLink).toHaveAttribute("aria-current", "location");
+    expect(activeNotificationLink).toHaveClass("bg-primary/10", "text-primary");
+    expect(activeNotificationLink.querySelector(".absolute.left-0")).not.toBeNull();
+    expect(activeNotificationLink.querySelector("svg")).toBeNull();
+  });
+
+  it("does not ask for leave confirmation when unsaved changes navigate within settings hash", async () => {
+    const user = userEvent.setup();
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+    mocks.useSettingsFormController.mockReturnValue(createControllerState({
+      hasUnsavedChanges: true,
+    }));
+
+    renderSettingsScreen();
+
+    const nav = screen.getByTestId("settings-section-nav-desktop");
+    await user.click(within(nav).getByRole("link", { name: "通知" }));
+
+    expect(confirmSpy).not.toHaveBeenCalled();
+    expect(window.location.hash).toBe("#settings-notifications");
+    confirmSpy.mockRestore();
   });
 
   it("updates built-in icon source and variant settings without allowing all sources off", async () => {

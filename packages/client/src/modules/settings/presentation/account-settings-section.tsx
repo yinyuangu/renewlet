@@ -11,9 +11,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Link from '@/components/router-link';
 import { useI18n } from '@/i18n/I18nProvider';
+import { cn } from '@/lib/utils';
 import { ExternalLink } from 'lucide-react';
 
 export interface AccountSettingsSectionProps {
+  id?: string;
+  className?: string;
   accountEmail: string | null;
   canAccessPocketBaseAdmin: boolean;
   passwordResetEnabled: boolean;
@@ -31,6 +34,8 @@ export interface AccountSettingsSectionProps {
 }
 
 export function AccountSettingsSection({
+  id,
+  className,
   accountEmail,
   canAccessPocketBaseAdmin,
   passwordResetEnabled,
@@ -50,7 +55,7 @@ export function AccountSettingsSection({
 
   return (
     <>
-                  <section className="rounded-xl border border-border bg-card p-6">
+                  <section id={id} className={cn("rounded-xl border border-border bg-card p-6", className)}>
                     <h2 className="mb-6 text-lg font-semibold text-foreground">{t("settings.account")}</h2>
                     <div className="grid gap-6 sm:grid-cols-2">
                       <div className="grid gap-2">

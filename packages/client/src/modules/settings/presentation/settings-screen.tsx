@@ -15,7 +15,9 @@
  * 依赖方向保持为 presentation -> application -> domain。
  */
 
-import { useEffect, useState } from 'react';
+import type { MouseEvent as ReactMouseEvent } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { Drawer } from "vaul";
 import { Header } from '@/components/header';
 import { BackToTopFloatButton } from '@/components/back-to-top-float-button';
 import { Button } from '@/components/ui/button';
@@ -28,7 +30,7 @@ import { TimePicker } from '@/components/ui/time-picker';
 import { ConfigManagerDialog } from '@/modules/custom-config/presentation/config-manager-dialog';
 import { ThemeSelector } from '@/components/theme-selector';
 import { NotificationHistoryPanel } from './notification-history-panel';
-import { Settings2, FolderKanban, Activity, CreditCard, Coins, Palette } from 'lucide-react';
+import { Settings2, FolderKanban, Activity, CreditCard, Coins, Palette, Menu, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CURRENCY_OPTIONS, MAX_REMINDER_DAYS, type NotificationChannel } from '@/types/subscription';
 import { isBuiltInPaymentMethodValue } from '@/types/config';
@@ -45,6 +47,234 @@ import { ExchangeRatesSection } from './exchange-rates-section';
 import { BuiltInIconSourcesSection } from './built-in-icon-sources-section';
 import { CalendarFeedSection } from './calendar-feed-section';
 import { CheckboxSettingRow, LoadingButtonContent } from './settings-shared-controls';
+
+// H5 锚点定位需要同时避开全局顶部区和设置页局部 sticky 标题；scrollIntoView 会读取目标元素的 scroll-margin。
+const SETTINGS_SECTION_SCROLL_CLASS = "scroll-mt-[calc(13rem+env(safe-area-inset-top))] lg:scroll-mt-24";
+
+const SETTINGS_SECTIONS = [
+  { id: "settings-account", labelKey: "settings.sectionNav.account" },
+  { id: "settings-appearance", labelKey: "settings.sectionNav.appearance" },
+  { id: "settings-display", labelKey: "settings.sectionNav.display" },
+  { id: "settings-icon-sources", labelKey: "settings.sectionNav.iconSources" },
+  { id: "settings-budget", labelKey: "settings.sectionNav.budget" },
+  { id: "settings-data-config", labelKey: "settings.sectionNav.dataConfig" },
+  { id: "settings-exchange", labelKey: "settings.sectionNav.exchange" },
+  { id: "settings-calendar-feed", labelKey: "settings.sectionNav.calendarFeed" },
+  { id: "settings-timezone", labelKey: "settings.sectionNav.timezone" },
+  { id: "settings-notifications", labelKey: "settings.sectionNav.notifications" },
+] as const;
+
+type SettingsSectionId = typeof SETTINGS_SECTIONS[number]["id"];
+
+function getSectionFromHash(hash: string): SettingsSectionId | null {
+  const id = hash.startsWith("#") ? hash.slice(1) : hash;
+  return SETTINGS_SECTIONS.some((section) => section.id === id) ? (id as SettingsSectionId) : null;
+}
+
+function scrollToSettingsSection(id: SettingsSectionId) {
+  const section = document.getElementById(id);
+  if (!section) return;
+  section.scrollIntoView({ block: "start", behavior: "smooth" });
+}
+
+function useSettingsSectionNavigation() {
+  const [activeSectionId, setActiveSectionId] = useState<SettingsSectionId>(SETTINGS_SECTIONS[0].id);
+
+  useEffect(() => {
+    const syncActiveSectionFromHash = () => {
+      const sectionId = getSectionFromHash(window.location.hash);
+      if (!sectionId) return;
+      setActiveSectionId(sectionId);
+      // 目录当前态以用户选择/hash 为准；滚动监听会在平滑滚动和异步布局变化期间反复抢 active。
+      window.requestAnimationFrame(() => scrollToSettingsSection(sectionId));
+    };
+
+    syncActiveSectionFromHash();
+    window.addEventListener("hashchange", syncActiveSectionFromHash);
+    return () => window.removeEventListener("hashchange", syncActiveSectionFromHash);
+  }, []);
+
+  const handleSectionClick = useCallback((id: SettingsSectionId) => {
+    setActiveSectionId(id);
+    window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}#${id}`);
+    scrollToSettingsSection(id);
+  }, []);
+
+  return { activeSectionId, handleSectionClick };
+}
+
+function SettingsSectionNavLink({
+  section,
+  active,
+  onSectionClick,
+  variant,
+}: {
+  section: typeof SETTINGS_SECTIONS[number];
+  active: boolean;
+  onSectionClick: (id: SettingsSectionId) => void;
+  variant: "desktop" | "mobileDrawer";
+}) {
+  const { t } = useI18n();
+  const handleClick = (event: ReactMouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault();
+    onSectionClick(section.id);
+  };
+
+  return (
+    <a
+      href={`#${section.id}`}
+      aria-current={active ? "location" : undefined}
+      onClick={handleClick}
+      className={cn(
+        "group relative transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+        variant === "desktop"
+          ? "block rounded-lg px-3 py-2 text-sm font-medium"
+          : "block rounded-lg px-3 py-2 text-sm font-medium",
+        active && variant === "desktop" && "bg-primary/10 text-primary",
+        !active && variant === "desktop" && "text-muted-foreground hover:bg-secondary/70 hover:text-foreground",
+        active && variant === "mobileDrawer" && "bg-primary/10 text-primary",
+        !active && variant === "mobileDrawer" && "text-muted-foreground hover:bg-secondary/70 hover:text-foreground",
+      )}
+    >
+      {variant === "desktop" && active ? (
+        <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-primary" />
+      ) : null}
+      {variant === "mobileDrawer" && active ? (
+        <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-primary" />
+      ) : null}
+      <span className="min-w-0 truncate">{t(section.labelKey)}</span>
+    </a>
+  );
+}
+
+function DesktopSettingsSectionNav({
+  activeSectionId,
+  onSectionClick,
+}: {
+  activeSectionId: SettingsSectionId;
+  onSectionClick: (id: SettingsSectionId) => void;
+}) {
+  const { t } = useI18n();
+
+  return (
+    <nav
+      aria-label={t("settings.sectionNavLabel")}
+      className="sticky top-28 max-h-[calc(100vh-8rem)] overflow-y-auto rounded-xl border border-border bg-card/70 p-3 shadow-card backdrop-blur"
+      data-testid="settings-section-nav-desktop"
+    >
+      <div className="grid gap-3">
+        <p className="px-3 pt-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          {t("settings.sectionNavTitle")}
+        </p>
+        <div className="grid gap-1">
+          {SETTINGS_SECTIONS.map((section) => (
+            <SettingsSectionNavLink
+              key={section.id}
+              section={section}
+              active={activeSectionId === section.id}
+              onSectionClick={onSectionClick}
+              variant="desktop"
+            />
+          ))}
+        </div>
+      </div>
+    </nav>
+  );
+}
+
+function MobileSettingsSectionDrawer({
+  activeSectionId,
+  onSectionClick,
+  open,
+  onOpenChange,
+}: {
+  activeSectionId: SettingsSectionId;
+  onSectionClick: (id: SettingsSectionId) => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const { t } = useI18n();
+  const handleSectionClick = (id: SettingsSectionId) => {
+    onSectionClick(id);
+    onOpenChange(false);
+  };
+
+  return (
+    <Drawer.Root open={open} onOpenChange={onOpenChange} shouldScaleBackground={false} direction="left">
+      {open ? (
+        <Drawer.Portal>
+          <Drawer.Overlay className="fixed inset-0 z-[70] bg-black/60 data-[state=open]:animate-in data-[state=open]:fade-in-0" />
+          <Drawer.Content
+            className="fixed left-0 top-[var(--app-visual-viewport-offset-top)] z-[80] flex h-[var(--app-viewport-height)] max-h-[var(--app-viewport-height)] w-[min(18rem,calc(100vw-3.5rem))] flex-col overflow-hidden rounded-r-xl border-r border-border bg-card/95 text-card-foreground shadow-lg backdrop-blur-xl outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-left-4"
+            data-testid="settings-section-nav-drawer"
+          >
+            <div className="flex items-start justify-between gap-4 border-b border-border px-4 pb-3 pt-[calc(1rem+env(safe-area-inset-top))]">
+              <div className="min-w-0">
+                <Drawer.Title className="text-base font-semibold text-foreground">
+                  {t("settings.sectionNavTitle")}
+                </Drawer.Title>
+                <Drawer.Description className="sr-only">
+                  {t("settings.sectionNavLabel")}
+                </Drawer.Description>
+              </div>
+              <Drawer.Close asChild>
+                <Button variant="ghost" size="icon" className="-mr-2 -mt-2 h-9 w-9 text-muted-foreground">
+                  <X className="h-4 w-4" />
+                  <span className="sr-only">{t("common.close")}</span>
+                </Button>
+              </Drawer.Close>
+            </div>
+
+            <nav aria-label={t("settings.sectionNavLabel")} className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
+              <ul className="grid gap-1">
+                {SETTINGS_SECTIONS.map((section) => (
+                  <li key={section.id}>
+                    <SettingsSectionNavLink
+                      section={section}
+                      active={activeSectionId === section.id}
+                      onSectionClick={handleSectionClick}
+                      variant="mobileDrawer"
+                    />
+                  </li>
+                ))}
+              </ul>
+            </nav>
+          </Drawer.Content>
+        </Drawer.Portal>
+      ) : null}
+    </Drawer.Root>
+  );
+}
+
+function MobileSettingsPageHeader({ onOpen }: { onOpen: () => void }) {
+  const { t } = useI18n();
+
+  return (
+    <>
+      <div
+        className="sticky top-[calc(8.25rem+env(safe-area-inset-top))] z-30 -mx-4 border-b border-border/70 bg-background/90 px-4 py-3 backdrop-blur-xl lg:hidden"
+        data-testid="settings-mobile-page-header"
+      >
+        <div className="flex items-center justify-between gap-3">
+          <h1 className="min-w-0 truncate text-2xl font-bold text-foreground">{t("settings.title")}</h1>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 shrink-0 rounded-lg border border-border bg-card/80 text-muted-foreground hover:border-primary/40 hover:bg-secondary/80 hover:text-foreground"
+            aria-label={t("settings.sectionNavOpen")}
+            onClick={onOpen}
+          >
+            <Menu className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+      <p className="text-sm text-muted-foreground lg:hidden" data-testid="settings-mobile-page-subtitle">
+        {t("settings.subtitle")}
+      </p>
+    </>
+  );
+}
 
 function useUnsavedChangesGuard(enabled: boolean, message: string, onConfirmLeave: () => void) {
   useEffect(() => {
@@ -85,6 +315,10 @@ function useUnsavedChangesGuard(enabled: boolean, message: string, onConfirmLeav
         && nextUrl.search === currentUrl.search
         && nextUrl.hash === currentUrl.hash
       ) {
+        return;
+      }
+      // 设置目录只改 hash，属于页内定位；不应触发“离开设置页”的未保存确认。
+      if (nextUrl.pathname === currentUrl.pathname && nextUrl.search === currentUrl.search) {
         return;
       }
 
@@ -168,6 +402,8 @@ export function SettingsScreen() {
   });
   const [selectedNotificationChannel, setSelectedNotificationChannel] = useState<NotificationChannel | null>(null);
   const [notificationReminderDaysInput, setNotificationReminderDaysInput] = useState(String(settings.notificationReminderDays));
+  const [mobileSectionNavOpen, setMobileSectionNavOpen] = useState(false);
+  const { activeSectionId, handleSectionClick } = useSettingsSectionNavigation();
   const activeNotificationChannel = selectedNotificationChannel ?? settings.enabledChannels[0] ?? 'telegram';
   const handleNotificationChannelToggle = (channel: NotificationChannel) => {
     setSelectedNotificationChannel(channel);
@@ -193,329 +429,351 @@ export function SettingsScreen() {
     <div className="app-page bg-background flex flex-col">
       <Header />
 
+      <MobileSettingsSectionDrawer
+        activeSectionId={activeSectionId}
+        onSectionClick={handleSectionClick}
+        open={mobileSectionNavOpen}
+        onOpenChange={setMobileSectionNavOpen}
+      />
+
       <main className={cn("flex-1", hasUnsavedChanges && "h5-bottom-bar-space")} data-testid="settings-main">
         <div className="app-main mx-auto max-w-7xl">
-          <div className="mb-8">
-            <h1 className="text-2xl font-bold text-foreground">{t("settings.title")}</h1>
-            <p className="mt-1 text-sm text-muted-foreground">{t("settings.subtitle")}</p>
-          </div>
+          <div className="grid gap-8 lg:grid-cols-[14rem_minmax(0,1fr)]">
+            <aside className="hidden lg:block" data-testid="settings-section-nav-aside">
+              <DesktopSettingsSectionNav activeSectionId={activeSectionId} onSectionClick={handleSectionClick} />
+            </aside>
 
-          <div className="grid gap-8">
-            <AccountSettingsSection
-              accountEmail={accountEmail}
-              canAccessPocketBaseAdmin={canAccessPocketBaseAdmin}
-              passwordResetEnabled={passwordResetEnabled}
-              passwordDialogOpen={passwordDialogOpen}
-              setPasswordDialogOpen={setPasswordDialogOpen}
-              handlePasswordDialogOpenChange={handlePasswordDialogOpenChange}
-              currentPassword={currentPassword}
-              setCurrentPassword={setCurrentPassword}
-              newPassword={newPassword}
-              setNewPassword={setNewPassword}
-              confirmPassword={confirmPassword}
-              setConfirmPassword={setConfirmPassword}
-              isUpdatingPassword={isUpdatingPassword}
-              updatePassword={updatePassword}
-            />
+            <div className="grid min-w-0 gap-8" data-testid="settings-section-content">
+              <MobileSettingsPageHeader onOpen={() => setMobileSectionNavOpen(true)} />
 
-          {/* 外观设置 */}
-          <section className="rounded-xl border border-border bg-card p-6">
-            <div className="flex items-center gap-2 mb-6">
-              <Palette className="h-5 w-5 text-primary" />
-              <h2 className="text-lg font-semibold text-foreground">{t("settings.appearance")}</h2>
-            </div>
-            <ThemeSelector
-              mode={effectiveThemeMode}
-              variant={settings.themeVariant}
-              customColor={settings.themeCustomColor}
-              onModeChange={handleThemeModeChange}
-              onVariantChange={handleThemeVariantChange}
-              onCustomColorChange={handleThemeCustomColorChange}
-            />
-          </section>
+              <div className="hidden lg:block">
+                <h1 className="text-2xl font-bold text-foreground">{t("settings.title")}</h1>
+                <p className="mt-1 text-sm text-muted-foreground">{t("settings.subtitle")}</p>
+              </div>
 
-          {/* 显示设置 */}
-            <section className="rounded-xl border border-border bg-card p-6">
-              <h2 className="mb-6 text-lg font-semibold text-foreground">{t("settings.display")}</h2>
-              <div className="grid gap-6">
-                <div className="grid gap-2">
-                  <Label htmlFor="locale">{t("settings.language")}</Label>
-                  <Select value={settings.locale} onValueChange={handleLocaleChange}>
-                    <SelectTrigger id="locale" className="w-full border-border bg-secondary sm:w-[220px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="zh-CN">{t("locale.zhCN")}</SelectItem>
-                      <SelectItem value="en-US">{t("locale.enUS")}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">{t("settings.languageHelp")}</p>
+              <AccountSettingsSection
+                id="settings-account"
+                className={SETTINGS_SECTION_SCROLL_CLASS}
+                accountEmail={accountEmail}
+                canAccessPocketBaseAdmin={canAccessPocketBaseAdmin}
+                passwordResetEnabled={passwordResetEnabled}
+                passwordDialogOpen={passwordDialogOpen}
+                setPasswordDialogOpen={setPasswordDialogOpen}
+                handlePasswordDialogOpenChange={handlePasswordDialogOpenChange}
+                currentPassword={currentPassword}
+                setCurrentPassword={setCurrentPassword}
+                newPassword={newPassword}
+                setNewPassword={setNewPassword}
+                confirmPassword={confirmPassword}
+                setConfirmPassword={setConfirmPassword}
+                isUpdatingPassword={isUpdatingPassword}
+                updatePassword={updatePassword}
+              />
+
+              {/* 外观设置 */}
+              <section id="settings-appearance" className={cn("rounded-xl border border-border bg-card p-6", SETTINGS_SECTION_SCROLL_CLASS)}>
+                <div className="flex items-center gap-2 mb-6">
+                  <Palette className="h-5 w-5 text-primary" />
+                  <h2 className="text-lg font-semibold text-foreground">{t("settings.appearance")}</h2>
                 </div>
-                <CheckboxSettingRow
-                  id="showExpired"
-                  checked={settings.showExpired}
-                  onCheckedChange={(checked) => updateSetting('showExpired', checked)}
-                  label={t("settings.showExpired")}
-                  description={t("settings.showExpiredHelp")}
+                <ThemeSelector
+                  mode={effectiveThemeMode}
+                  variant={settings.themeVariant}
+                  customColor={settings.themeCustomColor}
+                  onModeChange={handleThemeModeChange}
+                  onVariantChange={handleThemeVariantChange}
+                  onCustomColorChange={handleThemeCustomColorChange}
                 />
-            </div>
-          </section>
+              </section>
 
-          <BuiltInIconSourcesSection
-            sources={settings.builtInIconSources}
-            onChange={(sources) => updateSetting('builtInIconSources', sources)}
-          />
-
-          {/* 预算设置 */}
-          <section className="rounded-xl border border-border bg-card p-6">
-            <h2 className="mb-6 text-lg font-semibold text-foreground">{t("settings.budget")}</h2>
-            <div className="grid gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="monthlyBudget">{t("settings.monthlyBudget")}</Label>
-                <div className="flex flex-col gap-2 min-[380px]:flex-row min-[380px]:items-center min-[380px]:gap-3">
-                  <NumericInput
-                    id="monthlyBudget"
-                    name="monthlyBudget"
-                    allowNegative={false}
-                    allowedDecimalSeparators={[".", "。"]}
-                    inputMode="decimal"
-                    enterKeyHint="done"
-                    value={settings.monthlyBudget}
-                    onRawValueChange={handleMonthlyBudgetInputChange}
-                    className="w-full border-border bg-secondary min-[380px]:w-[200px]"
-                    placeholder="1500"
-                    thousandSeparator
-                    aria-invalid={Boolean(monthlyBudgetError)}
-                    aria-describedby={monthlyBudgetError ? "monthlyBudget-error" : undefined}
+              {/* 显示设置 */}
+              <section id="settings-display" className={cn("rounded-xl border border-border bg-card p-6", SETTINGS_SECTION_SCROLL_CLASS)}>
+                <h2 className="mb-6 text-lg font-semibold text-foreground">{t("settings.display")}</h2>
+                <div className="grid gap-6">
+                  <div className="grid gap-2">
+                    <Label htmlFor="locale">{t("settings.language")}</Label>
+                    <Select value={settings.locale} onValueChange={handleLocaleChange}>
+                      <SelectTrigger id="locale" className="w-full border-border bg-secondary sm:w-[220px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="zh-CN">{t("locale.zhCN")}</SelectItem>
+                        <SelectItem value="en-US">{t("locale.enUS")}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">{t("settings.languageHelp")}</p>
+                  </div>
+                  <CheckboxSettingRow
+                    id="showExpired"
+                    checked={settings.showExpired}
+                    onCheckedChange={(checked) => updateSetting('showExpired', checked)}
+                    label={t("settings.showExpired")}
+                    description={t("settings.showExpiredHelp")}
                   />
-                  <span className="text-sm text-muted-foreground">
-                    {getCurrencySymbol(settings.defaultCurrency)} {t("settings.perMonth")}
-                  </span>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  {t("settings.monthlyBudgetHelp")}
+              </section>
+
+              <BuiltInIconSourcesSection
+                id="settings-icon-sources"
+                className={SETTINGS_SECTION_SCROLL_CLASS}
+                sources={settings.builtInIconSources}
+                onChange={(sources) => updateSetting('builtInIconSources', sources)}
+              />
+
+              {/* 预算设置 */}
+              <section id="settings-budget" className={cn("rounded-xl border border-border bg-card p-6", SETTINGS_SECTION_SCROLL_CLASS)}>
+                <h2 className="mb-6 text-lg font-semibold text-foreground">{t("settings.budget")}</h2>
+                <div className="grid gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="monthlyBudget">{t("settings.monthlyBudget")}</Label>
+                    <div className="flex flex-col gap-2 min-[380px]:flex-row min-[380px]:items-center min-[380px]:gap-3">
+                      <NumericInput
+                        id="monthlyBudget"
+                        name="monthlyBudget"
+                        allowNegative={false}
+                        allowedDecimalSeparators={[".", "。"]}
+                        inputMode="decimal"
+                        enterKeyHint="done"
+                        value={settings.monthlyBudget}
+                        onRawValueChange={handleMonthlyBudgetInputChange}
+                        className="w-full border-border bg-secondary min-[380px]:w-[200px]"
+                        placeholder="1500"
+                        thousandSeparator
+                        aria-invalid={Boolean(monthlyBudgetError)}
+                        aria-describedby={monthlyBudgetError ? "monthlyBudget-error" : undefined}
+                      />
+                      <span className="text-sm text-muted-foreground">
+                        {getCurrencySymbol(settings.defaultCurrency)} {t("settings.perMonth")}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {t("settings.monthlyBudgetHelp")}
+                    </p>
+                    {monthlyBudgetError ? (
+                      <p id="monthlyBudget-error" className="text-xs text-destructive">{monthlyBudgetError}</p>
+                    ) : null}
+                  </div>
+                </div>
+              </section>
+
+              {/* 数据配置 */}
+              <section id="settings-data-config" className={cn("rounded-xl border border-border bg-card p-6", SETTINGS_SECTION_SCROLL_CLASS)}>
+                <div className="flex items-center gap-2 mb-4">
+                  <Settings2 className="h-5 w-5 text-primary" />
+                  <h2 className="text-lg font-semibold text-foreground">{t("settings.dataConfig")}</h2>
+                </div>
+                <p className="text-sm text-muted-foreground mb-6">
+                  {t("settings.dataConfigDescription")}
                 </p>
-                {monthlyBudgetError ? (
-                  <p id="monthlyBudget-error" className="text-xs text-destructive">{monthlyBudgetError}</p>
-                ) : null}
-              </div>
-            </div>
-          </section>
 
-          {/* 数据配置 */}
-          <section className="rounded-xl border border-border bg-card p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <Settings2 className="h-5 w-5 text-primary" />
-              <h2 className="text-lg font-semibold text-foreground">{t("settings.dataConfig")}</h2>
-            </div>
-            <p className="text-sm text-muted-foreground mb-6">
-              {t("settings.dataConfigDescription")}
-            </p>
-            
-            <div className="grid gap-3 sm:grid-cols-2">
-              <ConfigManagerDialog
-                title={t("settings.categoryManager")}
-                description={t("settings.categoryManagerDescription")}
-                items={customConfig.categories}
-                onUpdate={updateCategories}
-                showColor={true}
-                icon={<FolderKanban className="h-4 w-4" />}
-                getDeleteBlockReason={(item) => {
-                  if (customConfig.categories.length <= 1) {
-                    return t("settings.categoryKeepOne");
-                  }
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <ConfigManagerDialog
+                    title={t("settings.categoryManager")}
+                    description={t("settings.categoryManagerDescription")}
+                    items={customConfig.categories}
+                    onUpdate={updateCategories}
+                    showColor={true}
+                    icon={<FolderKanban className="h-4 w-4" />}
+                    getDeleteBlockReason={(item) => {
+                      if (customConfig.categories.length <= 1) {
+                        return t("settings.categoryKeepOne");
+                      }
 
-                  // 删除校验依赖订阅数据；在加载/失败时先阻止删除，避免误判。
-                  if (subscriptionsQuery.isPending) {
-                    return t("settings.categoryChecking");
-                  }
-                  if (subscriptionsQuery.status === "error") {
-                    return t("settings.categoryCheckFailed");
-                  }
+                      // 删除校验依赖订阅数据；在加载/失败时先阻止删除，避免误判。
+                      if (subscriptionsQuery.isPending) {
+                        return t("settings.categoryChecking");
+                      }
+                      if (subscriptionsQuery.status === "error") {
+                        return t("settings.categoryCheckFailed");
+                      }
 
-                  const usedCount = categoryUsageCount.get(item.value) ?? 0;
-                  if (usedCount > 0) {
-                    return t("settings.categoryUsed", { count: usedCount });
-                  }
+                      const usedCount = categoryUsageCount.get(item.value) ?? 0;
+                      if (usedCount > 0) {
+                        return t("settings.categoryUsed", { count: usedCount });
+                      }
 
-                  return null;
-                }}
+                      return null;
+                    }}
+                  />
+
+                  <ConfigManagerDialog
+                    title={t("settings.statusManager")}
+                    description={t("settings.statusManagerDescription")}
+                    items={customConfig.statuses}
+                    onUpdate={updateStatuses}
+                    showColor={true}
+                    readOnly={true}
+                    icon={<Activity className="h-4 w-4" />}
+                  />
+
+                  <ConfigManagerDialog
+                    title={t("settings.paymentManager")}
+                    description={t("settings.paymentManagerDescription")}
+                    items={customConfig.paymentMethods}
+                    onUpdate={updatePaymentMethods}
+                    icon={<CreditCard className="h-4 w-4" />}
+                    showIcon={true}
+                    isItemReadOnly={(item) => isBuiltInPaymentMethodValue(item.value)}
+                  />
+
+                  <ConfigManagerDialog
+                    title={t("settings.currencyManager")}
+                    description={t("settings.currencyManagerDescription")}
+                    items={customConfig.currencies}
+                    onUpdate={handleUpdateCurrencies}
+                    icon={<Coins className="h-4 w-4" />}
+                    toggleMode={true}
+                    searchable={true}
+                    searchPlaceholder={t("settings.currencySearch")}
+                    searchEmptyMessage={t("settings.currencyEmpty")}
+                  />
+                </div>
+              </section>
+
+              <ExchangeRatesSection
+                id="settings-exchange"
+                className={SETTINGS_SECTION_SCROLL_CLASS}
+                settings={settings}
+                customConfig={customConfig}
+                rates={rates}
+                activeRateProvider={activeRateProvider}
+                ratesLoading={ratesLoading}
+                ratesError={ratesError}
+                lastUpdated={lastUpdated}
+                defaultCurrencyOptions={defaultCurrencyOptions}
+                handleRefreshRates={handleRefreshRates}
+                handleDefaultCurrencyChange={handleDefaultCurrencyChange}
+                handleExchangeRateProviderChange={handleExchangeRateProviderChange}
+                getCurrencySymbol={getCurrencySymbol}
               />
 
-              <ConfigManagerDialog
-                title={t("settings.statusManager")}
-                description={t("settings.statusManagerDescription")}
-                items={customConfig.statuses}
-                onUpdate={updateStatuses}
-                showColor={true}
-                readOnly={true}
-                icon={<Activity className="h-4 w-4" />}
+              <CalendarFeedSection
+                id="settings-calendar-feed"
+                className={SETTINGS_SECTION_SCROLL_CLASS}
+                enabled={calendarFeed.data?.enabled ?? false}
+                feedUrl={calendarFeed.feedUrl}
+                isLoading={calendarFeed.isLoading}
+                isCreating={calendarFeed.isCreating}
+                isDeleting={calendarFeed.isDeleting}
+                onCreate={calendarFeed.createOrRotate}
+                onCopy={calendarFeed.copyUrl}
+                onDelete={calendarFeed.revoke}
+                onRegenerate={calendarFeed.regenerate}
               />
 
-              <ConfigManagerDialog
-                title={t("settings.paymentManager")}
-                description={t("settings.paymentManagerDescription")}
-                items={customConfig.paymentMethods}
-                onUpdate={updatePaymentMethods}
-                icon={<CreditCard className="h-4 w-4" />}
-                showIcon={true}
-                isItemReadOnly={(item) => isBuiltInPaymentMethodValue(item.value)}
-              />
-
-              <ConfigManagerDialog
-                title={t("settings.currencyManager")}
-                description={t("settings.currencyManagerDescription")}
-                items={customConfig.currencies}
-                onUpdate={handleUpdateCurrencies}
-                icon={<Coins className="h-4 w-4" />}
-                toggleMode={true}
-                searchable={true}
-                searchPlaceholder={t("settings.currencySearch")}
-                searchEmptyMessage={t("settings.currencyEmpty")}
-              />
-            </div>
-          </section>
-
-          <ExchangeRatesSection
-            settings={settings}
-            customConfig={customConfig}
-            rates={rates}
-            activeRateProvider={activeRateProvider}
-            ratesLoading={ratesLoading}
-            ratesError={ratesError}
-            lastUpdated={lastUpdated}
-            defaultCurrencyOptions={defaultCurrencyOptions}
-            handleRefreshRates={handleRefreshRates}
-            handleDefaultCurrencyChange={handleDefaultCurrencyChange}
-            handleExchangeRateProviderChange={handleExchangeRateProviderChange}
-            getCurrencySymbol={getCurrencySymbol}
-          />
-
-          <CalendarFeedSection
-            enabled={calendarFeed.data?.enabled ?? false}
-            feedUrl={calendarFeed.feedUrl}
-            isLoading={calendarFeed.isLoading}
-            isCreating={calendarFeed.isCreating}
-            isDeleting={calendarFeed.isDeleting}
-            onCreate={calendarFeed.createOrRotate}
-            onCopy={calendarFeed.copyUrl}
-            onDelete={calendarFeed.revoke}
-            onRegenerate={calendarFeed.regenerate}
-          />
-
-          {/* 时区设置 */}
-          <section className="rounded-xl border border-border bg-card p-6">
-            <h2 className="mb-6 text-lg font-semibold text-foreground">{t("settings.timezone")}</h2>
-            <div className="grid gap-2">
-              <Label htmlFor="timezone">{t("settings.timezoneSelect")}</Label>
-              <SearchableSelect
-                value={settings.timezone}
-                onValueChange={(value) => updateSetting('timezone', value)}
-                options={timezoneOptions}
-                placeholder={t("settings.timezonePlaceholder")}
-                searchPlaceholder={t("settings.timezoneSearch")}
-                emptyMessage={t("settings.timezoneEmpty")}
-                className="w-full max-w-md border-border bg-secondary"
-                contentClassName="max-w-md"
-                aria-label={t("settings.timezoneSelect")}
-              />
-              <p className="text-xs text-muted-foreground">
-                {t("settings.timezoneHelp")}
-              </p>
-            </div>
-          </section>
-
-          {/* 通知设置 */}
-          <section className="rounded-xl border border-border bg-card p-6">
-            <h2 className="mb-6 text-lg font-semibold text-foreground">{t("settings.notifications")}</h2>
-            
-            <div className="grid gap-6">
-              <div className="grid gap-6 sm:grid-cols-2">
+              {/* 时区设置 */}
+              <section id="settings-timezone" className={cn("rounded-xl border border-border bg-card p-6", SETTINGS_SECTION_SCROLL_CLASS)}>
+                <h2 className="mb-6 text-lg font-semibold text-foreground">{t("settings.timezone")}</h2>
                 <div className="grid gap-2">
-                  <Label>{t("settings.notificationTime")}</Label>
-                  <TimePicker
-                    value={settings.notificationTimeLocal}
-                    onChange={(value) => updateSetting('notificationTimeLocal', assertLocalTime(value))}
-                    className="w-full"
+                  <Label htmlFor="timezone">{t("settings.timezoneSelect")}</Label>
+                  <SearchableSelect
+                    value={settings.timezone}
+                    onValueChange={(value) => updateSetting('timezone', value)}
+                    options={timezoneOptions}
+                    placeholder={t("settings.timezonePlaceholder")}
+                    searchPlaceholder={t("settings.timezoneSearch")}
+                    emptyMessage={t("settings.timezoneEmpty")}
+                    className="w-full max-w-md border-border bg-secondary"
+                    contentClassName="max-w-md"
+                    aria-label={t("settings.timezoneSelect")}
                   />
                   <p className="text-xs text-muted-foreground">
-                    {t("settings.notificationTimeHelp")}
+                    {t("settings.timezoneHelp")}
                   </p>
                 </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="notificationReminderDays">{t("settings.notificationReminderDays")}</Label>
-                  <NumericInput
-                    id="notificationReminderDays"
-                    name="notificationReminderDays"
-                    allowNegative={false}
-                    decimalScale={0}
-                    inputMode="numeric"
-                    enterKeyHint="done"
-                    value={notificationReminderDaysInput}
-                    onRawValueChange={handleNotificationReminderDaysInputChange}
-                    className="border-border bg-secondary"
+              </section>
+
+              {/* 通知设置 */}
+              <section id="settings-notifications" className={cn("rounded-xl border border-border bg-card p-6", SETTINGS_SECTION_SCROLL_CLASS)}>
+                <h2 className="mb-6 text-lg font-semibold text-foreground">{t("settings.notifications")}</h2>
+
+                <div className="grid gap-6">
+                  <div className="grid gap-6 sm:grid-cols-2">
+                    <div className="grid gap-2">
+                      <Label>{t("settings.notificationTime")}</Label>
+                      <TimePicker
+                        value={settings.notificationTimeLocal}
+                        onChange={(value) => updateSetting('notificationTimeLocal', assertLocalTime(value))}
+                        className="w-full"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        {t("settings.notificationTimeHelp")}
+                      </p>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="notificationReminderDays">{t("settings.notificationReminderDays")}</Label>
+                      <NumericInput
+                        id="notificationReminderDays"
+                        name="notificationReminderDays"
+                        allowNegative={false}
+                        decimalScale={0}
+                        inputMode="numeric"
+                        enterKeyHint="done"
+                        value={notificationReminderDaysInput}
+                        onRawValueChange={handleNotificationReminderDaysInputChange}
+                        className="border-border bg-secondary"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        {t("settings.notificationReminderDaysHelp")}
+                      </p>
+                    </div>
+                    <div className="grid content-start gap-2">
+                      <Label>{t("settings.tip")}</Label>
+                      <p className="text-xs text-muted-foreground">
+                        {t("settings.cronTip")}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-6 lg:grid-cols-[minmax(0,280px)_1fr]">
+                    <NotificationChannelList
+                      settings={settings}
+                      activeChannel={activeNotificationChannel}
+                      onSelect={setSelectedNotificationChannel}
+                      onToggle={handleNotificationChannelToggle}
+                    />
+                    <NotificationChannelConfigPanel
+                      channel={activeNotificationChannel}
+                      settings={settings}
+                      enabled={settings.enabledChannels.includes(activeNotificationChannel)}
+                      updateSetting={updateSetting}
+                      testingChannel={testingChannel}
+                      onTest={handleTestConnection}
+                    />
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="testPhone">{t("settings.testPhone")}</Label>
+                    <Input
+                      id="testPhone"
+                      name="testPhone"
+                      type="tel"
+                      inputMode="tel"
+                      enterKeyHint="done"
+                      autoComplete="tel"
+                      placeholder={t("settings.testPhonePlaceholder")}
+                      value={settings.testPhone}
+                      onChange={(e) => updateSetting('testPhone', e.target.value)}
+                      className="border-border bg-secondary"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {t("settings.testPhoneHelp")}
+                    </p>
+                  </div>
+
+                  <NotificationHistoryPanel
+                    data={notificationHistory.data}
+                    isLoading={notificationHistory.isLoading}
+                    isFetching={notificationHistory.isFetching}
+                    error={notificationHistory.error}
+                    status={notificationHistory.historyStatus}
+                    setStatus={notificationHistory.setStatus}
+                    loadMore={notificationHistory.loadMore}
+                    refetch={notificationHistory.refetch}
                   />
-                  <p className="text-xs text-muted-foreground">
-                    {t("settings.notificationReminderDaysHelp")}
-                  </p>
                 </div>
-                <div className="grid content-start gap-2">
-                  <Label>{t("settings.tip")}</Label>
-                  <p className="text-xs text-muted-foreground">
-                    {t("settings.cronTip")}
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid gap-6 lg:grid-cols-[minmax(0,280px)_1fr]">
-                <NotificationChannelList
-                  settings={settings}
-                  activeChannel={activeNotificationChannel}
-                  onSelect={setSelectedNotificationChannel}
-                  onToggle={handleNotificationChannelToggle}
-                />
-                <NotificationChannelConfigPanel
-                  channel={activeNotificationChannel}
-                  settings={settings}
-                  enabled={settings.enabledChannels.includes(activeNotificationChannel)}
-                  updateSetting={updateSetting}
-                  testingChannel={testingChannel}
-                  onTest={handleTestConnection}
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="testPhone">{t("settings.testPhone")}</Label>
-                <Input
-                  id="testPhone"
-                  name="testPhone"
-                  type="tel"
-                  inputMode="tel"
-                  enterKeyHint="done"
-                  autoComplete="tel"
-                  placeholder={t("settings.testPhonePlaceholder")}
-                  value={settings.testPhone}
-                  onChange={(e) => updateSetting('testPhone', e.target.value)}
-                  className="border-border bg-secondary"
-                />
-                <p className="text-xs text-muted-foreground">
-                  {t("settings.testPhoneHelp")}
-                </p>
-              </div>
-
-              <NotificationHistoryPanel
-                data={notificationHistory.data}
-                isLoading={notificationHistory.isLoading}
-                isFetching={notificationHistory.isFetching}
-                error={notificationHistory.error}
-                status={notificationHistory.historyStatus}
-                setStatus={notificationHistory.setStatus}
-                loadMore={notificationHistory.loadMore}
-                refetch={notificationHistory.refetch}
-              />
+              </section>
             </div>
-          </section>
-
           </div>
         </div>
       </main>
