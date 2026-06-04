@@ -35,9 +35,17 @@ function assetBasePath() {
   return `${import.meta.env.BASE_URL}${manifest.assetBase}`
 }
 
-function viewportForName(name: string) {
-  const capture = manifest.captures.find((item) => name.startsWith(`${item.key}-`))
+function captureForName(name: string) {
+  const locale = manifest.locales.find((item) => name.endsWith(`-${item.suffix}`))
+  const key = locale ? name.slice(0, -`-${locale.suffix}`.length) : name
+  // 截图 key 会互为前缀（如 notifications / notifications-h5），必须剥离语言后缀后精确匹配。
+  const capture = manifest.captures.find((item) => item.key === key)
   if (!capture) throw new Error(`Unknown Renewlet screenshot asset: ${name}`)
+  return capture
+}
+
+function viewportForName(name: string) {
+  const capture = captureForName(name)
   return manifest.viewports[capture.viewport as ScreenshotViewport]
 }
 

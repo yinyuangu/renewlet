@@ -10,6 +10,8 @@ import {
 
 const dashboardViewport = screenshotViewport('dashboard')
 const dashboardRetinaWidth = dashboardViewport.websiteWidths[1]
+const notificationsH5Viewport = screenshotViewport('notifications-h5')
+const [notificationsH5Width, notificationsH5RetinaWidth] = notificationsH5Viewport.websiteWidths
 const desktopViewport = {
   width: renewletImageManifest.viewports.desktop.width,
   height: renewletImageManifest.viewports.desktop.height,
@@ -28,6 +30,8 @@ async function expectLocalizedScreenshots(page: Page, suffix: 'zh' | 'en') {
   const otherSuffix = suffix === 'zh' ? 'en' : 'zh'
   const heroPicture = page.locator('[data-responsive-image="hero-dashboard"]')
   const dashboard = retinaName('dashboard', suffix)
+  const notificationsH5 = retinaName('notifications-h5', suffix)
+  const phonePicture = page.locator('[data-responsive-image="feature-phone"]')
 
   await expect(heroPicture.locator('source[type="image/avif"]')).toHaveAttribute(
     'srcset',
@@ -56,6 +60,34 @@ async function expectLocalizedScreenshots(page: Page, suffix: 'zh' | 'en') {
 
   expect(featureSources.some((value) => value.includes(screenshotName('notifications-h5', suffix)))).toBe(true)
   expect(featureSources.some((value) => value.includes(screenshotName('notifications-h5', otherSuffix)))).toBe(false)
+  expect(featureSources.some((value) => value.includes(`${notificationsH5}-1400`))).toBe(false)
+  expect(featureSources.some((value) => value.includes(`${notificationsH5}-2800`))).toBe(false)
+
+  await expect(phonePicture.locator('source[type="image/avif"]')).toHaveAttribute(
+    'srcset',
+    new RegExp(
+      `${notificationsH5}-${notificationsH5Width}\\.avif ${notificationsH5Width}w, .*${notificationsH5}-${notificationsH5RetinaWidth}\\.avif ${notificationsH5RetinaWidth}w`,
+    ),
+  )
+  await expect(phonePicture.locator('source[type="image/webp"]')).toHaveAttribute(
+    'srcset',
+    new RegExp(
+      `${notificationsH5}-${notificationsH5Width}\\.webp ${notificationsH5Width}w, .*${notificationsH5}-${notificationsH5RetinaWidth}\\.webp ${notificationsH5RetinaWidth}w`,
+    ),
+  )
+  await page.locator('[data-card="reminders"]').scrollIntoViewIfNeeded()
+  await page.waitForFunction(
+    (candidate) => {
+      const image = document.querySelector('[data-responsive-image="feature-phone"] img')
+      return (
+        image instanceof HTMLImageElement &&
+        image.complete &&
+        image.naturalWidth > 0 &&
+        image.currentSrc.includes(candidate)
+      )
+    },
+    notificationsH5,
+  )
 }
 
 test('renders the Renewlet homepage and opens deployment dialog from both entry points', async ({ page }) => {
