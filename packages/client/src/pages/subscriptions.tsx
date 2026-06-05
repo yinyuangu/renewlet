@@ -16,6 +16,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { Header } from '@/components/header';
 import { BackToTopFloatButton } from '@/components/back-to-top-float-button';
 import { SubscriptionCard, type SubscriptionCardLookup } from '@/components/subscription-card';
+import { SubscriptionDetailDialog } from '@/components/subscription-detail-dialog';
 import { AddSubscriptionDialog } from '@/components/add-subscription-dialog';
 import { EditSubscriptionDialog } from '@/components/edit-subscription-dialog';
 import { ImportDataDialog } from '@/components/import-data-dialog';
@@ -45,6 +46,8 @@ import { useExchangeRates } from '@/hooks/use-exchange-rates';
 import { useI18n } from '@/i18n/I18nProvider';
 import type { MessageKey } from '@/i18n/messages';
 import { useMediaQuery } from '@/hooks/use-media-query';
+import { useDeferredDialogCleanup } from '@/hooks/use-deferred-dialog-cleanup';
+import { todayDateOnlyInTimeZone } from '@/lib/time/date-only';
 import {
   SelectedTagScroller,
   SubscriptionTagFilterDrawer,
@@ -99,6 +102,7 @@ type SubscriptionGridProps = {
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
   onTogglePinned: (id: string) => void;
+  onViewDetails: (id: string) => void;
 };
 
 function SubscriptionGrid({
@@ -111,6 +115,7 @@ function SubscriptionGrid({
   onEdit,
   onDelete,
   onTogglePinned,
+  onViewDetails,
 }: SubscriptionGridProps) {
   const isTwoColumnGrid = useMediaQuery("(min-width: 640px)");
   const isThreeColumnGrid = useMediaQuery("(min-width: 1024px)");
@@ -146,6 +151,7 @@ function SubscriptionGrid({
               onEdit={onEdit}
               onDelete={onDelete}
               onTogglePinned={onTogglePinned}
+              onViewDetails={onViewDetails}
             />
           </div>
         ));
@@ -171,6 +177,8 @@ function SubscriptionGrid({
   const { convert } = useExchangeRates(exchangeRateProvider);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [detailSubscriptionId, setDetailSubscriptionId] = useState<string | null>(null);
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const isMobileTagFilter = useMediaQuery("(max-width: 767px)");
   const {
     editingSubscription,
@@ -203,6 +211,16 @@ function SubscriptionGrid({
   const settings = settingsQuery.data ?? DEFAULT_SETTINGS;
   const { exportToJSON, exportToJSONWithSecrets, exportToCSV } =
     useSubscriptionExport(filteredSubscriptions, subscriptions, config, settings, locale, timeZone);
+  const selectedDetailSubscription = useMemo(
+    () => subscriptions.find((item) => item.id === detailSubscriptionId) ?? null,
+    [detailSubscriptionId, subscriptions],
+  );
+  const today = useMemo(() => todayDateOnlyInTimeZone(new Date(), timeZone), [timeZone]);
+  const { scheduleCleanup: scheduleDetailCleanup, cancelCleanup: cancelDetailCleanup } =
+    useDeferredDialogCleanup(() => {
+      // 详情弹窗关闭动画期间仍要保留内容快照，避免 Dialog/Drawer fade-out 时标题和备注闪空。
+      setDetailSubscriptionId(null);
+    });
   // 筛选标签来自用户配置，可能被删除或禁用；找不到配置时仍显示原始值，避免筛选状态变成空白。
   const categoryFilterLabel =
     categoryFilter === "all"
@@ -226,6 +244,22 @@ function SubscriptionGrid({
   const handleLoadMore = useCallback(() => {
     void fetchNextPage();
   }, [fetchNextPage]);
+  const handleViewDetails = useCallback((id: string) => {
+    cancelDetailCleanup();
+    setDetailSubscriptionId(id);
+    setDetailDialogOpen(true);
+  }, [cancelDetailCleanup]);
+  const handleDetailDialogOpenChange = useCallback((nextOpen: boolean) => {
+    setDetailDialogOpen(nextOpen);
+    if (nextOpen) {
+      cancelDetailCleanup();
+      return;
+    }
+    scheduleDetailCleanup();
+  }, [cancelDetailCleanup, scheduleDetailCleanup]);
+  const handleEditFromDetail = useCallback((subscription: Subscription) => {
+    handleEditSubscription(subscription.id);
+  }, [handleEditSubscription]);
 
   // 首次加载订阅列表时展示骨架屏（筛选条 + 卡片网格占位）。
   if (subscriptionsQuery.isPending) {
@@ -508,6 +542,7 @@ function SubscriptionGrid({
               onEdit={handleEditSubscription}
               onDelete={handleDeleteSubscription}
               onTogglePinned={handleTogglePinnedSubscription}
+              onViewDetails={handleViewDetails}
             />
             {subscriptionsQuery.hasNextPage && (
               <div className="mt-6 flex justify-center [overflow-anchor:none]" data-testid="subscriptions-load-more-row">
@@ -528,19 +563,26 @@ function SubscriptionGrid({
 
       <BackToTopFloatButton />
 
-        <EditSubscriptionDialog
+      <EditSubscriptionDialog
         subscription={editingSubscription}
         open={editDialogOpen}
         onOpenChange={handleEditDialogOpenChange}
         onSave={handleSaveSubscription}
         availableTags={allTags}
-        />
-        <ImportDataDialog
-          open={importDialogOpen}
-          onOpenChange={setImportDialogOpen}
-          settings={settings}
-          config={config}
-        />
+      />
+      <SubscriptionDetailDialog
+        open={detailDialogOpen}
+        onOpenChange={handleDetailDialogOpenChange}
+        subscription={selectedDetailSubscription}
+        onEditSubscription={handleEditFromDetail}
+        today={today}
+      />
+      <ImportDataDialog
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        settings={settings}
+        config={config}
+      />
     </div>
   );
 };

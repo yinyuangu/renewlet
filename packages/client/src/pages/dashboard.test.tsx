@@ -1,5 +1,6 @@
 // Dashboard 页面测试保护首页 hook 装配和统计入口，避免页面层绕过 domain 模型直接计算金额。
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { assertDateOnly } from "@/lib/time/date-only";
 import { DEFAULT_CUSTOM_CONFIG } from "@/types/config";
@@ -32,11 +33,30 @@ vi.mock("@/components/loading-skeleton", () => ({
 }));
 
 vi.mock("@/components/subscription-card", () => ({
-  SubscriptionCard: ({ subscription, inheritedReminderDays }: { subscription: Subscription; inheritedReminderDays: number }) => (
+  SubscriptionCard: ({
+    subscription,
+    inheritedReminderDays,
+    onViewDetails,
+  }: {
+    subscription: Subscription;
+    inheritedReminderDays: number;
+    onViewDetails?: (id: string) => void;
+  }) => (
     <article data-testid="subscription-card">
       {subscription.name}
       <span data-testid="subscription-card-reminder">{inheritedReminderDays}</span>
+      <button type="button" onClick={() => onViewDetails?.(subscription.id)}>
+        查看 {subscription.name} 的详情
+      </button>
     </article>
+  ),
+}));
+
+vi.mock("@/components/subscription-detail-dialog", () => ({
+  SubscriptionDetailDialog: ({ open, subscription }: { open: boolean; subscription: Subscription | null }) => (
+    <div data-testid="subscription-detail-dialog">
+      {open && subscription ? <span>{subscription.name} 详情</span> : null}
+    </div>
   ),
 }));
 
@@ -166,6 +186,16 @@ describe("Dashboard page loading state", () => {
     expect(screen.getByTestId("subscription-card-reminder")).toHaveTextContent("5");
     expect(screen.getByTestId("spending-chart")).toHaveTextContent("1:CNY:Asia/Shanghai:exchange-api");
     expect(screen.getByText("汇率加载中...")).toBeInTheDocument();
+  });
+
+  it("opens subscription details from a recent subscription card", async () => {
+    const user = userEvent.setup();
+
+    render(<Dashboard />);
+
+    await user.click(screen.getByRole("button", { name: "查看 Codex Pro 的详情" }));
+
+    expect(screen.getByText("Codex Pro 详情")).toBeInTheDocument();
   });
 
   it.each([

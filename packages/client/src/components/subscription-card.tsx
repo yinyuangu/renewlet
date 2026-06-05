@@ -67,6 +67,8 @@ interface SubscriptionCardProps {
   onDelete?: (id: string) => void;
   /** 置顶切换动作由页面持有 mutation，卡片只负责菜单入口。 */
   onTogglePinned?: (id: string) => void;
+  /** 卡片主体 primary action：打开只读详情；菜单内动作保持独立。 */
+  onViewDetails?: (id: string) => void;
   /** 用户 IANA 时区，用于续费/试用提示窗口。 */
   timeZone: string;
   /** 分类配置查找表由页面级容器构建，避免虚拟列表 item 重复订阅全局配置。 */
@@ -95,6 +97,7 @@ export function SubscriptionCard({
   onEdit,
   onDelete,
   onTogglePinned,
+  onViewDetails,
   timeZone,
   categoryByValue,
   paymentMethodByValue,
@@ -129,6 +132,9 @@ export function SubscriptionCard({
     onDelete?.(subscription.id);
     setShowDeleteDialog(false);
   };
+  const handleViewDetails = () => {
+    onViewDetails?.(subscription.id);
+  };
 
   return (
     <>
@@ -136,12 +142,22 @@ export function SubscriptionCard({
       data-testid="subscription-card"
       className={cn(
         "group relative h-full overflow-hidden rounded-xl border border-border bg-card p-5 shadow-card transition-all duration-300 hover:bg-card-hover",
+        onViewDetails && "cursor-pointer",
         isExpired && "border-destructive/40",
         isRenewingSoon && "border-warning/40",
         isTrialEndingSoon && "animate-pulse-glow"
       )}
     >
-      <div className="relative z-10 flex items-start gap-4">
+      {onViewDetails ? (
+        <button
+          type="button"
+          aria-label={t("subscription.viewDetailsLabel", { name: subscription.name })}
+          className="absolute inset-0 z-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          onClick={handleViewDetails}
+          data-testid="subscription-card-primary-action"
+        />
+      ) : null}
+      <div className={cn("relative z-10 flex items-start gap-4", onViewDetails && "pointer-events-none")}>
         <SubscriptionLogo name={subscription.name} logo={subscription.logo} fallbackColor={categoryColor} size="md" />
 
         <div className="min-w-0 flex-1 grid gap-3">
@@ -174,13 +190,13 @@ export function SubscriptionCard({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 shrink-0 text-muted-foreground transition-colors hover:text-foreground"
+                  className="pointer-events-auto h-8 w-8 shrink-0 text-muted-foreground transition-colors hover:text-foreground"
                   aria-label={t("subscription.moreActions")}
                 >
                   <MoreHorizontal className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-40">
+              <DropdownMenuContent align="end" className="pointer-events-auto w-40">
                 <DropdownMenuItem className="gap-2.5 px-2.5 py-2 text-sm" onClick={() => onEdit?.(subscription.id)}>
                   <Pencil className="h-4 w-4 shrink-0 text-muted-foreground" />
                   {t("common.edit")}

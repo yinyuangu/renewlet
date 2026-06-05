@@ -2,6 +2,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { assertDateOnly } from "@/lib/time/date-only";
@@ -16,6 +17,12 @@ type SubscriptionOverrides = Partial<Omit<Subscription, "billingCycle" | "custom
   | { billingCycle?: FixedBillingCycle; customDays?: undefined }
   | { billingCycle: "custom"; customDays?: number }
 );
+type SubscriptionCardHandlers = {
+  onEdit?: (id: string) => void;
+  onDelete?: (id: string) => void;
+  onTogglePinned?: (id: string) => void;
+  onViewDetails?: (id: string) => void;
+};
 
 const mocks = vi.hoisted(() => {
   const longCategoryLabel = "生产力平台和开发者基础设施";
@@ -126,7 +133,7 @@ function createSubscription(overrides: SubscriptionOverrides = {}): Subscription
   };
 }
 
-function renderSubscriptionCard(overrides: SubscriptionOverrides = {}, handlers: { onEdit?: (id: string) => void; onDelete?: (id: string) => void; onTogglePinned?: (id: string) => void } = {}) {
+function renderSubscriptionCard(overrides: SubscriptionOverrides = {}, handlers: SubscriptionCardHandlers = {}) {
   return render(
     <TooltipProvider delayDuration={0}>
       <SubscriptionCard
@@ -138,6 +145,7 @@ function renderSubscriptionCard(overrides: SubscriptionOverrides = {}, handlers:
         onEdit={handlers.onEdit ?? vi.fn()}
         onDelete={handlers.onDelete ?? vi.fn()}
         {...(handlers.onTogglePinned ? { onTogglePinned: handlers.onTogglePinned } : {})}
+        {...(handlers.onViewDetails ? { onViewDetails: handlers.onViewDetails } : {})}
       />
     </TooltipProvider>,
   );
@@ -370,6 +378,27 @@ describe("SubscriptionCard", () => {
     expect(menuButton.getAttribute("class")).not.toContain("group-hover:opacity-100");
   });
 
+  it("opens subscription details from the card primary action", () => {
+    const onViewDetails = vi.fn();
+    renderSubscriptionCard({ name: "Fastmail" }, { onViewDetails });
+
+    fireEvent.click(screen.getByRole("button", { name: "查看 Fastmail 的详情" }));
+
+    expect(onViewDetails).toHaveBeenCalledWith("sub-1");
+  });
+
+  it("opens subscription details from keyboard activation", async () => {
+    vi.useRealTimers();
+    const user = userEvent.setup();
+    const onViewDetails = vi.fn();
+    renderSubscriptionCard({ name: "Fastmail" }, { onViewDetails });
+
+    screen.getByRole("button", { name: "查看 Fastmail 的详情" }).focus();
+    await user.keyboard("{Enter}");
+
+    expect(onViewDetails).toHaveBeenCalledWith("sub-1");
+  });
+
   it("orders overflow menu actions with matching icons and separates the destructive action", () => {
     renderSubscriptionCard({}, { onTogglePinned: vi.fn() });
 
@@ -397,6 +426,18 @@ describe("SubscriptionCard", () => {
     const separator = screen.getByRole("separator");
     expect(calendarItem.compareDocumentPosition(separator) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(separator.compareDocumentPosition(deleteItem) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("keeps overflow actions separate from the card detail action", () => {
+    const onViewDetails = vi.fn();
+    const onEdit = vi.fn();
+    renderSubscriptionCard({}, { onViewDetails, onEdit, onTogglePinned: vi.fn() });
+
+    openMoreActionsMenu();
+    fireEvent.click(screen.getByRole("menuitem", { name: "编辑" }));
+
+    expect(onEdit).toHaveBeenCalledWith("sub-1");
+    expect(onViewDetails).not.toHaveBeenCalled();
   });
 
   it("opens the add-to-calendar dialog from the overflow menu", async () => {

@@ -12,12 +12,13 @@
  * - 首页统计由 `useDashboardStats` 生成，CRUD 弹窗状态由 `useSubscriptionCrud` 管理。
  */
 
-import { useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import Link from '@/components/router-link';
 import type { Subscription } from "@/types/subscription";
 import { Header } from "@/components/header";
 import { StatCard } from "@/components/ui/stat-card";
 import { SubscriptionCard } from "@/components/subscription-card";
+import { SubscriptionDetailDialog } from "@/components/subscription-detail-dialog";
 import { SpendingChart } from "@/components/spending-chart";
 import { UpcomingRenewals } from "@/components/upcoming-renewals";
 import { DashboardPageSkeleton } from "@/components/loading-skeleton";
@@ -33,6 +34,8 @@ import { useSubscriptionCrud } from "@/modules/subscriptions/application/use-sub
 import { collectSubscriptionTags } from "@/modules/subscriptions/domain/subscription-filters";
 import { useI18n } from "@/i18n/I18nProvider";
 import { DEFAULT_NOTIFICATION_REMINDER_DAYS } from "@/types/subscription";
+import { useDeferredDialogCleanup } from "@/hooks/use-deferred-dialog-cleanup";
+import { todayDateOnlyInTimeZone } from "@/lib/time/date-only";
 
 const EMPTY_SUBSCRIPTIONS: Subscription[] = [];
 
@@ -52,6 +55,18 @@ export default function Index() {
   const categoryByValue = useMemo(() => new Map(config.categories.map((category) => [category.value, category])), [config.categories]);
   const paymentMethodByValue = useMemo(() => new Map(config.paymentMethods.map((method) => [method.value, method])), [config.paymentMethods]);
   const availableTags = useMemo(() => collectSubscriptionTags(subscriptions), [subscriptions]);
+  const today = useMemo(() => todayDateOnlyInTimeZone(new Date(), timeZone), [timeZone]);
+  const [detailSubscriptionId, setDetailSubscriptionId] = useState<string | null>(null);
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const selectedDetailSubscription = useMemo(
+    () => subscriptions.find((item) => item.id === detailSubscriptionId) ?? null,
+    [detailSubscriptionId, subscriptions],
+  );
+  const { scheduleCleanup: scheduleDetailCleanup, cancelCleanup: cancelDetailCleanup } =
+    useDeferredDialogCleanup(() => {
+      // 详情弹窗关闭动画期间仍要保留内容快照，避免 Dialog/Drawer fade-out 时标题和备注闪空。
+      setDetailSubscriptionId(null);
+    });
   const { activeSubscriptions, totalMonthly, upcomingCount, trialCount } = useDashboardStats(
     subscriptions,
     defaultCurrency,
@@ -67,6 +82,22 @@ export default function Index() {
     handleSaveSubscription,
     handleEditDialogOpenChange,
   } = useSubscriptionCrud(subscriptions);
+  const handleViewDetails = useCallback((id: string) => {
+    cancelDetailCleanup();
+    setDetailSubscriptionId(id);
+    setDetailDialogOpen(true);
+  }, [cancelDetailCleanup]);
+  const handleDetailDialogOpenChange = useCallback((nextOpen: boolean) => {
+    setDetailDialogOpen(nextOpen);
+    if (nextOpen) {
+      cancelDetailCleanup();
+      return;
+    }
+    scheduleDetailCleanup();
+  }, [cancelDetailCleanup, scheduleDetailCleanup]);
+  const handleEditFromDetail = useCallback((subscription: Subscription) => {
+    handleEditSubscription(subscription.id);
+  }, [handleEditSubscription]);
 
   // 只有页面主数据还没有首屏结果时才展示骨架屏。
   // 汇率刷新期间保留已有内容，并在统计卡片副标题里提示加载状态，避免整页闪回 loading。
@@ -147,6 +178,7 @@ export default function Index() {
                     paymentMethodByValue={paymentMethodByValue}
                     onEdit={handleEditSubscription}
                     onDelete={handleDeleteSubscription}
+                    onViewDetails={handleViewDetails}
                   />
                 </div>
               ))}
@@ -191,6 +223,13 @@ export default function Index() {
         onOpenChange={handleEditDialogOpenChange}
         onSave={handleSaveSubscription}
         availableTags={availableTags}
+      />
+      <SubscriptionDetailDialog
+        open={detailDialogOpen}
+        onOpenChange={handleDetailDialogOpenChange}
+        subscription={selectedDetailSubscription}
+        onEditSubscription={handleEditFromDetail}
+        today={today}
       />
     </div>
   );

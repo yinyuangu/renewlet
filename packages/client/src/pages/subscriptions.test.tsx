@@ -118,18 +118,46 @@ vi.mock("@/components/subscription-card", () => ({
     subscription,
     inheritedReminderDays,
     onTogglePinned,
+    onViewDetails,
   }: {
     subscription: Subscription;
     inheritedReminderDays: number;
     onTogglePinned?: (id: string) => void;
+    onViewDetails?: (id: string) => void;
   }) => (
     <article data-testid="subscription-card">
       {subscription.name}
       <span data-testid="subscription-card-reminder">{inheritedReminderDays}</span>
+      <button type="button" onClick={() => onViewDetails?.(subscription.id)}>
+        查看 {subscription.name} 的详情
+      </button>
       <button type="button" onClick={() => onTogglePinned?.(subscription.id)}>
         置顶 {subscription.name}
       </button>
     </article>
+  ),
+}));
+
+vi.mock("@/components/subscription-detail-dialog", () => ({
+  SubscriptionDetailDialog: ({
+    open,
+    subscription,
+    onEditSubscription,
+  }: {
+    open: boolean;
+    subscription: Subscription | null;
+    onEditSubscription?: (subscription: Subscription) => void;
+  }) => (
+    <div data-testid="subscription-detail-dialog">
+      {open && subscription ? (
+        <>
+          <span>{subscription.name} 详情</span>
+          <button type="button" onClick={() => onEditSubscription?.(subscription)}>
+            编辑详情 {subscription.name}
+          </button>
+        </>
+      ) : null}
+    </div>
   ),
 }));
 
@@ -309,6 +337,24 @@ describe("Subscriptions page sorting", () => {
     await user.click(screen.getByRole("button", { name: "置顶 Regular Service" }));
 
     expect(mocks.handleTogglePinnedSubscription).toHaveBeenCalledWith("regular");
+  });
+
+  it("opens the read-only detail view from a subscription card and edits from that detail view", async () => {
+    const user = userEvent.setup();
+    mocks.useInfiniteSubscriptions.mockReturnValue({
+      subscriptions: [subscription({ id: "readable", name: "Readable Service" })],
+      isPending: false,
+    });
+
+    renderSubscriptionsPage();
+
+    await user.click(screen.getByRole("button", { name: "查看 Readable Service 的详情" }));
+
+    expect(screen.getByText("Readable Service 详情")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "编辑详情 Readable Service" }));
+
+    expect(mocks.handleEditSubscription).toHaveBeenCalledWith("readable");
   });
 
   it("shows the back-to-top float button when the app root is scrolled", async () => {

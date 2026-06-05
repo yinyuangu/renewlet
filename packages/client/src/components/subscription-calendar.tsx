@@ -2,7 +2,7 @@
  * 续费日历月视图入口（subscription-calendar.tsx）。
  *
  * 架构位置：这里持有当前月份、选中订阅和单日列表状态，负责把订阅
- * 将 DateOnly 分组为日历网格；详情弹窗拆到 subscription-calendar-dialogs.tsx。
+ * 将 DateOnly 分组为日历网格；详情视图复用通用 SubscriptionDetailDialog。
  *
  * 注意： nextBillingDate 已经是 DateOnly，分组时不能重新用 Date 解析，
  * 否则浏览器时区会导致续费日期跨日。
@@ -35,7 +35,8 @@ import { dateToDateOnly, isSameMonthDateOnly, todayDateOnlyInTimeZone } from '@/
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useI18n } from '@/i18n/I18nProvider';
-import { DaySubscriptionsDialog, SubscriptionDetailDialog } from './subscription-calendar-dialogs';
+import { SubscriptionDetailDialog } from '@/components/subscription-detail-dialog';
+import { DaySubscriptionsDialog } from './subscription-calendar-dialogs';
 import type { CalendarDaySubscriptions } from './subscription-calendar-dialogs';
 import { isEffectivelyActiveSubscription } from '@/modules/subscriptions/domain/subscription-status';
 
@@ -573,8 +574,8 @@ export const SubscriptionCalendar = ({ subscriptions, onEditSubscription }: Subs
         open={detailOpen}
         onOpenChange={setDetailOpen}
         subscription={selectedSubscription}
-        onEditSubscription={onEditSubscription}
         today={today}
+        {...(onEditSubscription ? { onEditSubscription } : {})}
       />
 
       <DaySubscriptionsDialog
