@@ -13,6 +13,7 @@ import Link, { NavLink } from '@/components/router-link';
 import { useRouter } from '@/lib/router';
 import { LayoutDashboard, List, CalendarDays, BarChart3, Settings, Sun, Moon, LogOut } from 'lucide-react';
 import { useState } from 'react';
+import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import type { SubscriptionDraft } from '@/types/subscription';
 import { Button } from '@/components/ui/button';
@@ -30,6 +31,8 @@ interface HeaderProps {
   onAddSubscription?: (subscription: SubscriptionDraft) => void;
   /** 当前用户已有标签建议，用于新增订阅弹窗复用。 */
   availableTags?: readonly string[] | undefined;
+  /** 订阅页专属快捷动作，渲染在“新增订阅”旁边。 */
+  subscriptionActions?: ReactNode;
 }
 
 type NavIconKey = "dashboard" | "subscriptions" | "calendar" | "statistics" | "settings";
@@ -59,7 +62,7 @@ function renderNavIcon(icon: NavIconKey, className: string) {
 }
 
 /** Header 组件：全局导航 + 主题切换 + 新增订阅入口。 */
-export function Header({ onAddSubscription, availableTags }: HeaderProps) {
+export function Header({ onAddSubscription, availableTags, subscriptionActions }: HeaderProps) {
   const router = useRouter();
   const { theme, setTheme } = useTheme();
   const { toast } = useToast();
@@ -143,7 +146,10 @@ export function Header({ onAddSubscription, availableTags }: HeaderProps) {
           </Button>
           
           {onAddSubscription && (
-            <AddSubscriptionDialog onAdd={onAddSubscription} availableTags={availableTags} />
+            <>
+              <AddSubscriptionDialog onAdd={onAddSubscription} availableTags={availableTags} />
+              {subscriptionActions}
+            </>
           )}
 
           <Button

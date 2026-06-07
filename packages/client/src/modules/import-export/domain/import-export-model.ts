@@ -82,6 +82,12 @@ export const IMPORT_MESSAGE_CODES = {
   wallosTableTooLarge: "IMPORT_ERROR_WALLOS_TABLE_TOO_LARGE",
   workerParseFailed: "IMPORT_ERROR_WORKER_PARSE_FAILED",
   workerUnsupported: "IMPORT_ERROR_WORKER_UNSUPPORTED",
+  aiBillingCycleDefaulted: "IMPORT_WARNING_AI_BILLING_CYCLE_DEFAULTED",
+  aiCurrencyDefaulted: "IMPORT_WARNING_AI_CURRENCY_DEFAULTED",
+  aiCustomCycleDefaulted: "IMPORT_WARNING_AI_CUSTOM_CYCLE_DEFAULTED",
+  aiDateDefaulted: "IMPORT_WARNING_AI_DATE_DEFAULTED",
+  aiPriceDefaulted: "IMPORT_WARNING_AI_PRICE_DEFAULTED",
+  aiWebsiteSuggested: "IMPORT_WARNING_AI_WEBSITE_SUGGESTED",
 } as const;
 
 /** importMessage 用 `|` 串联 code 参数，便于服务端/前端在数组里传递可本地化 warning。 */
@@ -120,7 +126,15 @@ type RenewletExportSubscription = RenewletExportV1["data"]["subscriptions"][numb
  */
 export function sanitizeSettingsForExport(settings: AppSettings, includeSecrets: boolean): Partial<AppSettings> {
   const entries = Object.entries(settings).filter(([key]) => includeSecrets || !SECRET_SETTING_KEYS.has(key as keyof AppSettings));
-  return Object.fromEntries(entries) as Partial<AppSettings>;
+  const sanitized = Object.fromEntries(entries) as Partial<AppSettings>;
+  if (!includeSecrets && sanitized.aiRecognition) {
+    sanitized.aiRecognition = {
+      ...sanitized.aiRecognition,
+      baseUrl: "",
+      apiKey: "",
+    };
+  }
+  return sanitized;
 }
 
 /**

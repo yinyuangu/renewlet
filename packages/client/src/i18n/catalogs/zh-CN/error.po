@@ -14,6 +14,26 @@ msgstr ""
 "Plural-Forms: \n"
 
 #. js-lingui-explicit-id
+#: src/i18n/descriptors/error.ts:90
+msgid "error.code.AI_RECOGNITION_EMPTY"
+msgstr "AI 没有识别到可导入的订阅"
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/error.ts:91
+msgid "error.code.AI_RECOGNITION_FAILED"
+msgstr "AI 识别失败，请检查输入和模型配置"
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/error.ts:92
+msgid "error.code.AI_RECOGNITION_SCHEMA_MISMATCH"
+msgstr "AI 返回内容无法整理成订阅草稿，请换用更强的模型或补充更明确的信息"
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/error.ts:93
+msgid "error.code.AI_RECOGNITION_TEST_FAILED"
+msgstr "AI 连接测试失败，请检查模型配置"
+
+#. js-lingui-explicit-id
 #: src/i18n/descriptors/error.ts:34
 msgid "error.code.LOGO_URL_USERINFO_INVALID"
 msgstr "Logo 地址不能包含用户名或密码"
@@ -84,6 +104,11 @@ msgid "error.code.ASSET_KIND_INVALID"
 msgstr "图片用途无效"
 
 #. js-lingui-explicit-id
+#: src/i18n/descriptors/error.ts:89
+msgid "error.code.AI_IMAGE_TYPE_INVALID"
+msgstr "图片类型无效，仅支持 PNG、JPG 或 WebP"
+
+#. js-lingui-explicit-id
 #: src/i18n/descriptors/error.ts:36
 msgid "error.code.WEBSITE_URL_SCHEME_INVALID"
 msgstr "官网地址必须使用 http:// 或 https://"
@@ -142,6 +167,11 @@ msgstr "开始日期必须是 YYYY-MM-DD"
 #: src/i18n/descriptors/error.ts:25
 msgid "error.code.START_DATE_DATE_INVALID"
 msgstr "开始日期无效"
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/error.ts:88
+msgid "error.code.AI_THINKING_PROVIDER_MISMATCH"
+msgstr "思考控制与当前模型来源不匹配"
 
 #. js-lingui-explicit-id
 #: src/i18n/descriptors/error.ts:40
@@ -267,6 +297,26 @@ msgstr "试用结束日期必须是 YYYY-MM-DD"
 #: src/i18n/descriptors/error.ts:30
 msgid "error.code.TRIAL_END_DATE_DATE_INVALID"
 msgstr "试用结束日期无效"
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/error.ts:86
+msgid "error.code.AI_API_KEY_REQUIRED"
+msgstr "请先填写 AI API Key"
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/error.ts:85
+msgid "error.code.AI_BASE_URL_REQUIRED"
+msgstr "请先填写 AI Base URL"
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/error.ts:84
+msgid "error.code.AI_MODEL_REQUIRED"
+msgstr "请先填写 AI 模型"
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/error.ts:87
+msgid "error.code.AI_RECOGNITION_INPUT_REQUIRED"
+msgstr "请先粘贴文本或上传图片"
 
 #. js-lingui-explicit-id
 #: src/i18n/descriptors/error.ts:69

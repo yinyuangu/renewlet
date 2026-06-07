@@ -96,7 +96,18 @@ describe("SubscriptionDialog", () => {
 
     expect(screen.getByText("请输入服务名称")).toBeInTheDocument();
     expect(screen.getByText("金额必须是 0 到 1,000,000,000 之间的有效数字")).toBeInTheDocument();
-    expect(screen.getByText("请选择开始日期和下次扣费日期")).toBeInTheDocument();
+    const startDateButton = document.getElementById("startDate");
+    const nextBillingDateButton = document.getElementById("nextBillingDate");
+    if (!(startDateButton instanceof HTMLButtonElement) || !(nextBillingDateButton instanceof HTMLButtonElement)) {
+      throw new Error("Date buttons were not rendered");
+    }
+    const dateError = screen.getByText("请选择开始日期和下次扣费日期");
+    expect(dateError).toBeInTheDocument();
+    expect(startDateButton).toHaveAttribute("aria-invalid", "true");
+    expect(startDateButton).toHaveAttribute("aria-describedby", "dates-error");
+    expect(startDateButton.parentElement).toContainElement(dateError);
+    expect(nextBillingDateButton).toHaveAttribute("aria-invalid", "false");
+    expect(nextBillingDateButton).not.toHaveAttribute("aria-describedby");
     expect(onSubmit).not.toHaveBeenCalled();
   });
 

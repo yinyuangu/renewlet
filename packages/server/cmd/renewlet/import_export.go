@@ -165,7 +165,7 @@ func validateImportPayload(payload importPayload, conflictMode string, skipIndex
 	if conflictMode != "replace" && conflictMode != "skip" {
 		return errors.New("IMPORT_CONFLICT_MODE_INVALID")
 	}
-	if payload.Source != "renewlet" && payload.Source != "wallos" {
+	if payload.Source != "renewlet" && payload.Source != "wallos" && payload.Source != "ai" {
 		return errors.New("IMPORT_SOURCE_INVALID")
 	}
 	if len(payload.Subscriptions) > maxSubscriptions {
@@ -514,7 +514,7 @@ func importKeyFromExtra(extra map[string]interface{}) (importKey, error) {
 	confidence, _ := raw["confidence"].(string)
 	source = strings.TrimSpace(source)
 	sourceID = strings.TrimSpace(sourceID)
-	if source != "renewlet" && source != "wallos" {
+	if source != "renewlet" && source != "wallos" && source != "ai" {
 		return importKey{}, errors.New("IMPORT_SOURCE_INVALID")
 	}
 	if sourceID == "" || len([]rune(sourceID)) > 256 {

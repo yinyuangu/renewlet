@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { assertDateOnly } from "@/lib/time/date-only";
-import type { Subscription } from "@/types/subscription";
+import { DEFAULT_SETTINGS, type Subscription } from "@/types/subscription";
 import Subscriptions from "./subscriptions";
 
 type RecurringBillingCycle = Exclude<Subscription["billingCycle"], "custom" | "one-time">;
@@ -288,6 +288,7 @@ describe("Subscriptions page sorting", () => {
     mockMobileTagFilterMatch(false);
     mocks.useSettings.mockReturnValue({
       data: {
+        ...DEFAULT_SETTINGS,
         timezone: "Asia/Shanghai",
         defaultCurrency: "CNY",
         notificationReminderDays: 5,
@@ -466,6 +467,7 @@ describe("Subscriptions page desktop tag filters", () => {
     mockMobileTagFilterMatch(false);
     mocks.useSettings.mockReturnValue({
       data: {
+        ...DEFAULT_SETTINGS,
         timezone: "Asia/Shanghai",
         defaultCurrency: "CNY",
         notificationReminderDays: 5,
@@ -545,6 +547,7 @@ describe("Subscriptions page mobile tag filters", () => {
     mockMobileTagFilterMatch(true);
     mocks.useSettings.mockReturnValue({
       data: {
+        ...DEFAULT_SETTINGS,
         timezone: "Asia/Shanghai",
         defaultCurrency: "CNY",
         notificationReminderDays: 5,
@@ -642,6 +645,7 @@ describe("Subscriptions page virtualization", () => {
     mockMobileTagFilterMatch(false, 1280);
     mocks.useSettings.mockReturnValue({
       data: {
+        ...DEFAULT_SETTINGS,
         timezone: "Asia/Shanghai",
         defaultCurrency: "CNY",
         notificationReminderDays: 5,

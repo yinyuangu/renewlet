@@ -51,6 +51,32 @@ func TestImportApplyCreatesAndSkipsByImportKey(t *testing.T) {
 	}
 }
 
+func TestImportApplyAcceptsAIImportSource(t *testing.T) {
+	app := newSchemaTestApp(t)
+	if err := ensureSchema(app); err != nil {
+		t.Fatal(err)
+	}
+	registerRecordHooks(app)
+	user, token := createRouteTestUser(t, app, "user")
+	body := importRequestBodyWithSource("skip", "ai", "ai-github", 12)
+
+	res := serveTestRequest(t, app, http.MethodPost, "/api/app/import/apply", body, token)
+	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), `"creates":1`) {
+		t.Fatalf("expected AI import to create, got %d: %s", res.Code, res.Body.String())
+	}
+	if count := subscriptionCountForUser(t, app, user.Id); count != 1 {
+		t.Fatalf("subscription count = %d, want 1", count)
+	}
+
+	res = serveTestRequest(t, app, http.MethodPost, "/api/app/import/apply", body, token)
+	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), `"skips":1`) {
+		t.Fatalf("expected second AI import to skip, got %d: %s", res.Code, res.Body.String())
+	}
+	if count := subscriptionCountForUser(t, app, user.Id); count != 1 {
+		t.Fatalf("subscription count after skip = %d, want 1", count)
+	}
+}
+
 func TestImportApplyReplacesCurrentUserRecord(t *testing.T) {
 	app := newSchemaTestApp(t)
 	if err := ensureSchema(app); err != nil {

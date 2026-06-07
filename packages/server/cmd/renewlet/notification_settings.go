@@ -88,6 +88,7 @@ func sanitizeSettings(settings appSettings) appSettings {
 		settings.ExchangeRateProvider = "floatrates"
 	}
 	settings.BuiltInIconSources = sanitizeBuiltInIconSources(settings.BuiltInIconSources)
+	settings.AIRecognition = sanitizeAIRecognitionSettings(settings.AIRecognition)
 	if _, err := time.LoadLocation(settings.Timezone); err != nil {
 		settings.Timezone = "UTC"
 	}

@@ -33,6 +33,8 @@ interface SearchableSelectProps {
   /** 未输入搜索词前最多渲染的选项数量；长货币/时区列表依赖它控制首屏开销。 */
   initialRenderLimit?: number;
   "aria-label"?: string;
+  "aria-describedby"?: string | undefined;
+  "aria-invalid"?: boolean | "true" | "false" | "grammar" | "spelling" | undefined;
 }
 
 const DEFAULT_INITIAL_RENDER_LIMIT = 100;
@@ -51,6 +53,8 @@ export function SearchableSelect({
   renderValue,
   initialRenderLimit = DEFAULT_INITIAL_RENDER_LIMIT,
   "aria-label": ariaLabel,
+  "aria-describedby": ariaDescribedBy,
+  "aria-invalid": ariaInvalid,
 }: SearchableSelectProps) {
   const [open, setOpen] = React.useState(false);
   const [search, setSearch] = React.useState("");
@@ -94,6 +98,8 @@ export function SearchableSelect({
           role="combobox"
           aria-expanded={open}
           aria-label={ariaLabel}
+          aria-describedby={ariaDescribedBy}
+          aria-invalid={ariaInvalid}
           disabled={disabled}
           className={cn(
             "flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm font-normal ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",

@@ -47,6 +47,13 @@
     min-height: 0;
   }
 
+  /* AI 输入页要固定外框但不能像草稿审阅那样铺满 90vh；内层 tabs 才是滚动主人。 */
+  .h5-ai-recognition-input-dialog-frame {
+    height: min(40rem, calc(var(--app-viewport-height) - 2rem - env(safe-area-inset-top) - env(safe-area-inset-bottom)));
+    max-height: calc(var(--app-viewport-height) - 2rem - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    min-height: 0;
+  }
+
   /* 订阅弹窗用 Grid 而非 Flex：header 固定、表单轨道可压缩，footer 不再靠魔法高度猜位置。 */
   .h5-subscription-dialog-panel {
     display: grid;
@@ -273,7 +280,8 @@
 
   @media (max-width: 767px) {
     /* visual viewport 顶部偏移来自运行时，专治 iOS 键盘/地址栏把 fixed Dialog 顶错位。 */
-    .h5-dialog-frame {
+    .h5-dialog-frame,
+    .h5-ai-recognition-input-dialog-frame {
       top: calc(var(--app-visual-viewport-offset-top) + 1rem + env(safe-area-inset-top));
       bottom: auto;
       margin-top: 0;

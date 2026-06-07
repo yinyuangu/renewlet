@@ -22,7 +22,6 @@ import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { SubscriptionFormFields, type SubscriptionFormErrors } from "@/components/subscription-form-fields";
 import type { UploadStatus as LogoUploadStatus } from "@/components/logo-picker";
-import { calculateNextBillingDate, calculateOneTimeTermEndDate } from "@/lib/subscription-billing";
 import {
   isOptionalHttpUrl,
   getTagsValidationError,
@@ -37,6 +36,7 @@ import {
 } from "@/lib/subscription-form";
 import { useCustomConfig } from "@/contexts/CustomConfigContext";
 import { useDeferredDialogCleanup } from "@/hooks/use-deferred-dialog-cleanup";
+import { useSubscriptionFormAutoDates } from "@/hooks/use-subscription-form-auto-dates";
 import { useSettings } from "@/hooks/use-settings";
 import type { Subscription, SubscriptionDraft } from "@/types/subscription";
 import { DEFAULT_NOTIFICATION_REMINDER_DAYS, DISABLED_REMINDER_DAYS, INHERIT_REMINDER_DAYS, REMINDER_DAYS_OPTIONS } from "@/types/subscription";
@@ -208,39 +208,7 @@ export function SubscriptionDialog(props: SubscriptionDialogProps) {
     setFormErrors({});
   }, [editSubscription, props.mode, props.open]);
 
-  // 自动推算 nextBillingDate（仅当 autoCalculate=true 或 one-time 固定服务期，且已选择 startDate）。
-  // 注意： 这里依赖 DateOnly 字符串算法，不应引入 JS Date 时区换算，否则跨时区用户会看到扣费日漂移。
-  useEffect(() => {
-    if (formData.billingCycle === "one-time") {
-      const oneTimeTermCount = formData.oneTimeMode === "term" ? parsePositiveIntegerInput(formData.oneTimeTermCount) : null;
-      // one-time 固定服务期的 nextBillingDate 是权益到期日；买断记录保留购买日，避免被后续统计/提醒误当续费。
-      const nextDate = formData.startDate && oneTimeTermCount
-        ? calculateOneTimeTermEndDate(formData.startDate, oneTimeTermCount, formData.oneTimeTermUnit)
-        : formData.startDate;
-      setFormData((prev) => ({
-        ...prev,
-        autoCalculate: false,
-        nextBillingDate: nextDate,
-      }));
-      return;
-    }
-    if (formData.autoCalculate && formData.startDate) {
-      const customDays = formData.billingCycle === "custom" ? parsePositiveIntegerInput(formData.customDays) ?? 30 : undefined;
-      const customCycleUnit = formData.billingCycle === "custom" ? formData.customCycleUnit : "day";
-      const nextDate = calculateNextBillingDate(formData.startDate, formData.billingCycle, customDays, billingReferenceDate, customCycleUnit);
-      setFormData((prev) => ({ ...prev, nextBillingDate: nextDate }));
-    }
-  }, [
-    billingReferenceDate,
-    formData.startDate,
-    formData.billingCycle,
-    formData.customDays,
-    formData.customCycleUnit,
-    formData.oneTimeMode,
-    formData.oneTimeTermCount,
-    formData.oneTimeTermUnit,
-    formData.autoCalculate,
-  ]);
+  useSubscriptionFormAutoDates(formData, setFormData, billingReferenceDate);
 
   /** 表单提交：create → 回传 draft；edit → merge id 后回传完整 Subscription。 */
   const handleFieldChange = useCallback(

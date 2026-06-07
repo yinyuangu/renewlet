@@ -13,7 +13,7 @@ export const IMPORT_APPLY_SUBSCRIPTION_LIMIT = 200;
 export const importConflictModeSchema = z.enum(["replace", "skip"]);
 export type ImportConflictMode = z.infer<typeof importConflictModeSchema>;
 
-export const importSourceSchema = z.enum(["renewlet", "wallos"]);
+export const importSourceSchema = z.enum(["renewlet", "wallos", "ai"]);
 export type ImportSource = z.infer<typeof importSourceSchema>;
 
 export const importConfidenceSchema = z.enum(["high", "low"]);

@@ -16,6 +16,7 @@ import {
   normalizeExchangeRateProvider,
   type LocalTime,
 } from "../runtime";
+import { aiRecognitionSettingsSchema } from "./ai-recognition";
 import { exchangeRateProviderSchema } from "./exchange-rates";
 
 const hhmmSchema = z.string().refine(isValidLocalTime, "时间格式必须为 HH:mm").transform((value) => value as LocalTime);
@@ -107,6 +108,7 @@ const appSettingsShape = {
   barkDeviceKey: z.string().trim().max(256),
   barkSilentPush: z.boolean(),
   serverchanSendKey: z.string().trim().max(256),
+  aiRecognition: aiRecognitionSettingsSchema,
 };
 
 const builtInIconSourcesPatchSchema = z.object({

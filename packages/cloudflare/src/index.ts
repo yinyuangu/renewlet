@@ -25,6 +25,8 @@ import {
 import { readCustomConfig, readSettings, updateCustomConfig, updateSettings } from "./settings";
 import { createSubscription, deleteSubscription, readSubscriptions, updateSubscription } from "./subscriptions";
 import { applyImport, previewImport } from "./import-export";
+import { recognizeSubscriptions, testAIRecognitionConnection } from "./ai-recognition";
+import { listAIModels } from "./ai-models";
 import { mediaCandidates } from "./search";
 import { notificationHistory, notificationRun, notificationTest, runScheduledNotifications } from "./notifications";
 import { systemRestart, systemUpdate, systemVersion } from "./system";
@@ -139,6 +141,15 @@ async function routeApp(request: Request, env: Env, url: URL): Promise<Response>
 
   if (head === "import" && second === "preview") return routeMethods(request, { POST: () => previewImport(request, env) });
   if (head === "import" && second === "apply") return routeMethods(request, { POST: () => applyImport(request, env) });
+  if (head === "ai" && second === "subscriptions" && third === "recognize") {
+    return routeMethods(request, { POST: () => recognizeSubscriptions(request, env) });
+  }
+  if (head === "ai" && second === "subscriptions" && third === "test") {
+    return routeMethods(request, { POST: () => testAIRecognitionConnection(request, env) });
+  }
+  if (head === "ai" && second === "models" && third === "list") {
+    return routeMethods(request, { POST: () => listAIModels(request, env) });
+  }
 
   if (head === "assets" && !second) return routeMethods(request, {
     GET: () => listUploadedAssets(request, env),

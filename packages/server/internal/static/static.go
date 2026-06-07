@@ -23,3 +23,9 @@ var BuiltInIconsIndex []byte
 //
 //go:embed data/media-resolver-config.json
 var MediaResolverConfig []byte
+
+// AIRecognitionPrompt 是 AI 识别提示词事实源的 Go 嵌入副本。
+// 该副本由 scripts/sync-ai-recognition-prompt.mjs 从 packages/shared/data 同步，避免 Docker/Worker 提示词漂移。
+//
+//go:embed data/ai-recognition-prompt.json
+var AIRecognitionPrompt []byte

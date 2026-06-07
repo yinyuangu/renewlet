@@ -3,6 +3,7 @@ import { appSettingsSchema, settingsUpdateBodySchema, type ApiAppSettings } from
 import { apiSubscriptionSchema, type ApiSubscription } from "@renewlet/shared/schemas/subscriptions";
 import { cleanBuiltInIconSourceSettingsPatch, mergeBuiltInIconSourceSettings } from "@renewlet/shared/built-in-icons";
 import type { AdminUser } from "@renewlet/shared/schemas/admin";
+import type { z } from "zod";
 import type { AssetRow, Env, NotificationJobRow, SubscriptionRow, UserRow } from "./types";
 
 /**
@@ -172,6 +173,21 @@ export async function putSettings(env: Env, userId: string, settings: ApiAppSett
   return parsed;
 }
 
+export type ApiAppSettingsPatch = z.infer<typeof settingsUpdateBodySchema>;
+
+/** settings_json 的 nested 字段必须在同一处合并；调用方不能用浅拷贝覆盖来源开关或 AI 凭据对象。 */
+export function mergeSettingsPatch(current: ApiAppSettings, patch: ApiAppSettingsPatch): ApiAppSettings {
+  return appSettingsSchema.parse({
+    ...current,
+    ...patch,
+    aiRecognition: {
+      ...current.aiRecognition,
+      ...patch.aiRecognition,
+    },
+    builtInIconSources: mergeBuiltInIconSourceSettings(current.builtInIconSources, cleanBuiltInIconSourceSettingsPatch(patch.builtInIconSources)),
+  });
+}
+
 export function normalizeSettingsJson(value: string): ApiAppSettings {
   try {
     const parsed = JSON.parse(value) as unknown;
@@ -179,11 +195,7 @@ export function normalizeSettingsJson(value: string): ApiAppSettings {
     if (result.success) {
       const defaults = createDefaultAppSettings();
       // 历史 settings_json 缺字段时只在读取边界补默认值，不写回 D1，也不触碰订阅自己的显式 reminder_days。
-      return appSettingsSchema.parse({
-        ...defaults,
-        ...result.data,
-        builtInIconSources: mergeBuiltInIconSourceSettings(defaults.builtInIconSources, cleanBuiltInIconSourceSettingsPatch(result.data.builtInIconSources)),
-      });
+      return mergeSettingsPatch(defaults, result.data);
     }
   } catch {
     // D1 里 settings_json 不是可信源；坏 JSON 只能回落默认值，不能拖垮整个 Worker。
@@ -328,6 +340,26 @@ export async function listAssets(env: Env, userId: string, kind: string, page: n
     .bind(userId, kind, perPage, offset)
     .all<AssetRow>();
   return { items: rows.results, total: totalRow?.count ?? 0 };
+}
+
+export async function listSubscriptionTags(env: Env, userId: string, limit = 200): Promise<string[]> {
+  // 这些标签名会进入第三方 AI prompt；只传用户已经持久化的标签文本，不带历史订阅名称、金额或备注。
+  const rows = await env.DB.prepare("SELECT tags_json FROM subscriptions WHERE user_id = ? AND tags_json != '[]' ORDER BY updated_at DESC LIMIT 1000")
+    .bind(userId)
+    .all<{ tags_json: string }>();
+  const tags: string[] = [];
+  const seen = new Set<string>();
+  for (const row of rows.results) {
+    for (const tag of parseStringArray(row.tags_json)) {
+      const value = tag.trim();
+      const key = value.toLowerCase();
+      if (!value || seen.has(key)) continue;
+      seen.add(key);
+      tags.push(value);
+      if (tags.length >= limit) return tags;
+    }
+  }
+  return tags;
 }
 
 /** parseStringArray 用于读取历史 JSON 字段；坏值回落为空数组，不把脏数据继续传给前端。 */

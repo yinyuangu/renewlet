@@ -30,6 +30,39 @@ const IMPORT_MESSAGE_KEYS: Record<string, MessageKey> = {
   IMPORT_WARNING_WALLOS_NOTIFY_DISABLED: "import.warning.wallosNotifyDisabled",
   IMPORT_WARNING_WALLOS_ONE_TIME: "import.warning.wallosOneTime",
   IMPORT_WARNING_WALLOS_UNKNOWN_CYCLE: "import.warning.wallosUnknownCycle",
+  IMPORT_WARNING_AI_BILLING_CYCLE_DEFAULTED: "import.warning.aiBillingCycleDefaulted",
+  IMPORT_WARNING_AI_CURRENCY_DEFAULTED: "import.warning.aiCurrencyDefaulted",
+  IMPORT_WARNING_AI_CUSTOM_CYCLE_DEFAULTED: "import.warning.aiCustomCycleDefaulted",
+  IMPORT_WARNING_AI_DATE_DEFAULTED: "import.warning.aiDateDefaulted",
+  IMPORT_WARNING_AI_PRICE_DEFAULTED: "import.warning.aiPriceDefaulted",
+  IMPORT_WARNING_AI_WEBSITE_SUGGESTED: "import.warning.aiWebsiteSuggested",
+};
+
+const AI_RECOGNITION_WARNING_KEYS: Record<string, MessageKey> = {
+  AI_WARNING_BILLING_CYCLE_INVALID: "import.warning.aiBillingCycleInvalid",
+  AI_WARNING_BILLING_CYCLE_UNCERTAIN: "import.warning.aiBillingCycleUncertain",
+  AI_WARNING_CURRENCY_INVALID: "import.warning.aiCurrencyInvalid",
+  AI_WARNING_CURRENCY_UNCERTAIN: "import.warning.aiCurrencyUncertain",
+  AI_WARNING_CUSTOM_CYCLE_UNIT_INVALID: "import.warning.aiCustomCycleInvalid",
+  AI_WARNING_CUSTOM_DAYS_INVALID: "import.warning.aiCustomCycleInvalid",
+  AI_WARNING_CUSTOM_CYCLE_UNCERTAIN: "import.warning.aiCustomCycleInvalid",
+  AI_WARNING_CYCLE_UNCERTAIN: "import.warning.aiBillingCycleUncertain",
+  AI_WARNING_DATE_UNCERTAIN: "import.warning.aiDateUncertain",
+  AI_WARNING_EMPTY_SUBSCRIPTION_SKIPPED: "import.warning.aiEmptySubscriptionSkipped",
+  AI_WARNING_LOW_CONFIDENCE: "import.warning.aiLowConfidence",
+  AI_WARNING_NOTES_MISSING: "import.warning.aiNotesMissing",
+  AI_WARNING_ONE_TIME_TERM_COUNT_INVALID: "import.warning.aiOneTimeTermInvalid",
+  AI_WARNING_ONE_TIME_TERM_UNIT_INVALID: "import.warning.aiOneTimeTermInvalid",
+  AI_WARNING_PRICE_INVALID: "import.warning.aiPriceInvalid",
+  AI_WARNING_PRICE_UNCERTAIN: "import.warning.aiPriceUncertain",
+  AI_WARNING_REMINDER_DAYS_INVALID: "import.warning.aiReminderInvalid",
+  AI_WARNING_REPEAT_INTERVAL_INVALID: "import.warning.aiRepeatReminderInvalid",
+  AI_WARNING_REPEAT_WINDOW_INVALID: "import.warning.aiRepeatReminderInvalid",
+  AI_WARNING_SERVICE_UNSPECIFIED: "import.warning.aiServiceUnspecified",
+  AI_WARNING_STATUS_INVALID: "import.warning.aiStatusInvalid",
+  AI_WARNING_STATUS_UNCERTAIN: "import.warning.aiLowConfidence",
+  AI_WARNING_TOO_MANY_SUBSCRIPTIONS_TRUNCATED: "import.warning.aiTooManySubscriptionsTruncated",
+  AI_WARNING_WEBSITE_UNCERTAIN: "import.warning.aiWebsiteUncertain",
 };
 
 const IMPORT_DATE_FIELD_KEYS: Record<string, MessageKey> = {
@@ -65,6 +98,10 @@ export function formatImportMessage(message: string, t: Translate): string {
   if (code === "IMPORT_WARNING_CURRENCY_SYMBOL_AMBIGUOUS") {
     return t("import.warning.currencySymbolAmbiguous", { symbol: parts[1] ?? "", currency: parts[2] ?? "" });
   }
+  const aiRecognitionKey = AI_RECOGNITION_WARNING_KEYS[code];
+  if (aiRecognitionKey) return t(aiRecognitionKey);
+  if (code.startsWith("AI_WARNING_DATE_INVALID")) return t("import.warning.aiDateInvalid");
+  if (code.startsWith("AI_WARNING_")) return t("import.warning.aiGeneric");
   if (code === "IMPORT_WARNING_RENEWLET_LEGACY_CURRENCY_DEFAULTED") {
     return t("import.warning.renewletLegacyCurrencyDefaulted", { fallback: parts[1] ?? "" });
   }

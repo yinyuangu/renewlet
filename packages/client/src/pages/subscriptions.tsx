@@ -20,6 +20,7 @@ import { SubscriptionDetailDialog } from '@/components/subscription-detail-dialo
 import { AddSubscriptionDialog } from '@/components/add-subscription-dialog';
 import { EditSubscriptionDialog } from '@/components/edit-subscription-dialog';
 import { ImportDataDialog } from '@/components/import-data-dialog';
+import { AIRecognizeSubscriptionDialog } from '@/components/ai-recognize-subscription-dialog';
 import { SubscriptionsPageSkeleton } from '@/components/loading-skeleton';
 import { VirtualizedList } from '@/components/ui/virtualized-list';
 import { Input } from '@/components/ui/input';
@@ -27,7 +28,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { Category, Subscription, SubscriptionStatus } from '@/types/subscription';
 import { DEFAULT_NOTIFICATION_REMINDER_DAYS, DEFAULT_SETTINGS } from '@/types/subscription';
-import { Search, Plus, Grid, List as ListIcon, Download, Upload } from 'lucide-react';
+import { Search, Plus, Grid, List as ListIcon, Download, Upload, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
@@ -177,6 +178,7 @@ function SubscriptionGrid({
   const { convert } = useExchangeRates(exchangeRateProvider);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [aiRecognitionDialogOpen, setAIRecognitionDialogOpen] = useState(false);
   const [detailSubscriptionId, setDetailSubscriptionId] = useState<string | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const isMobileTagFilter = useMediaQuery("(max-width: 767px)");
@@ -260,12 +262,25 @@ function SubscriptionGrid({
   const handleEditFromDetail = useCallback((subscription: Subscription) => {
     handleEditSubscription(subscription.id);
   }, [handleEditSubscription]);
+  const aiRecognitionAction = (
+    <Button
+      type="button"
+      variant="outline"
+      size="icon"
+      onClick={() => setAIRecognitionDialogOpen(true)}
+      className="h-9 w-9 border-border text-primary"
+      aria-label={t("subscriptions.aiRecognizeAdd")}
+      title={t("subscriptions.aiRecognizeAdd")}
+    >
+      <Sparkles className="h-4 w-4" />
+    </Button>
+  );
 
   // 首次加载订阅列表时展示骨架屏（筛选条 + 卡片网格占位）。
   if (subscriptionsQuery.isPending) {
     return (
       <div className="app-page bg-background">
-        <Header onAddSubscription={handleAddSubscription} availableTags={allTags} />
+        <Header onAddSubscription={handleAddSubscription} availableTags={allTags} subscriptionActions={aiRecognitionAction} />
         <main className="app-main mx-auto max-w-7xl">
           <SubscriptionsPageSkeleton withPageShell={false} />
         </main>
@@ -275,7 +290,7 @@ function SubscriptionGrid({
 
   return (
     <div className="app-page bg-background">
-      <Header onAddSubscription={handleAddSubscription} availableTags={allTags} />
+      <Header onAddSubscription={handleAddSubscription} availableTags={allTags} subscriptionActions={aiRecognitionAction} />
 
       <main className="app-main mx-auto max-w-7xl">
         <div className="mb-8 flex items-center justify-between">
@@ -583,6 +598,15 @@ function SubscriptionGrid({
         settings={settings}
         config={config}
       />
+      {aiRecognitionDialogOpen ? (
+        <AIRecognizeSubscriptionDialog
+          open={aiRecognitionDialogOpen}
+          onOpenChange={setAIRecognitionDialogOpen}
+          settings={settings}
+          config={config}
+          availableTags={allTags}
+        />
+      ) : null}
     </div>
   );
 };

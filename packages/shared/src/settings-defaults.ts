@@ -55,5 +55,13 @@ export function createDefaultAppSettings(options: DefaultSettingsOptions = {}): 
     barkDeviceKey: "",
     barkSilentPush: false,
     serverchanSendKey: "",
+    aiRecognition: {
+      provider: "openai",
+      model: "",
+      modelInputMode: "select",
+      baseUrl: "",
+      apiKey: "",
+      defaultThinkingControl: null,
+    },
   };
 }

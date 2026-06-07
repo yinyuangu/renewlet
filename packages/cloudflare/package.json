@@ -9,7 +9,12 @@
     "typecheck": "tsc --noEmit --project tsconfig.json"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "3.0.81",
+    "@ai-sdk/google": "3.0.80",
+    "@ai-sdk/openai": "3.0.68",
+    "@ai-sdk/openai-compatible": "2.0.48",
     "@renewlet/shared": "workspace:*",
+    "ai": "6.0.197",
     "zod": "^4.4.3"
   },
   "devDependencies": {

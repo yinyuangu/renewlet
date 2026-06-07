@@ -54,6 +54,7 @@ type appSettings struct {
 	DefaultCurrency          string                    `json:"defaultCurrency"`
 	ExchangeRateProvider     string                    `json:"exchangeRateProvider"`
 	BuiltInIconSources       builtInIconSourceSettings `json:"builtInIconSources"`
+	AIRecognition            aiRecognitionSettings     `json:"aiRecognition"`
 	MonthlyBudget            float64                   `json:"monthlyBudget"`
 	Timezone                 string                    `json:"timezone"`
 	NotificationTimeLocal    string                    `json:"notificationTimeLocal"`
@@ -376,15 +377,23 @@ type serverChanSendResponse struct {
 
 func defaultAppSettings() appSettings {
 	return appSettings{
-		AdminUsername:            "admin",
-		ThemeMode:                "dark",
-		ThemeVariant:             "emerald",
-		ThemeCustomColor:         themeCustomColor{H: 160, S: 84, L: 39},
-		ShowExpired:              true,
-		Locale:                   string(defaultAppLocale),
-		DefaultCurrency:          "CNY",
-		ExchangeRateProvider:     "floatrates",
-		BuiltInIconSources:       defaultBuiltInIconSourceSettings(),
+		AdminUsername:        "admin",
+		ThemeMode:            "dark",
+		ThemeVariant:         "emerald",
+		ThemeCustomColor:     themeCustomColor{H: 160, S: 84, L: 39},
+		ShowExpired:          true,
+		Locale:               string(defaultAppLocale),
+		DefaultCurrency:      "CNY",
+		ExchangeRateProvider: "floatrates",
+		BuiltInIconSources:   defaultBuiltInIconSourceSettings(),
+		AIRecognition: aiRecognitionSettings{
+			Provider:               "openai",
+			Model:                  "",
+			ModelInputMode:         "select",
+			BaseURL:                "",
+			APIKey:                 "",
+			DefaultThinkingControl: nil,
+		},
 		MonthlyBudget:            1500,
 		Timezone:                 "UTC",
 		NotificationTimeLocal:    "08:00",

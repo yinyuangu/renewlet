@@ -1,7 +1,6 @@
 import { customConfigResponseSchema } from "@renewlet/shared/schemas/custom-config";
-import { appSettingsSchema, settingsUpdateBodySchema } from "@renewlet/shared/schemas/settings";
-import { cleanBuiltInIconSourceSettingsPatch, mergeBuiltInIconSourceSettings } from "@renewlet/shared/built-in-icons";
-import { getCustomConfig, getSettings, putCustomConfig, putSettings } from "./db";
+import { settingsUpdateBodySchema } from "@renewlet/shared/schemas/settings";
+import { getCustomConfig, getSettings, mergeSettingsPatch, putCustomConfig, putSettings } from "./db";
 import { json, readJson, requestLocale } from "./http";
 import { requireAuth } from "./auth";
 import type { Env } from "./types";
@@ -27,11 +26,7 @@ export async function updateSettings(request: Request, env: Env): Promise<Respon
   const current = await getSettings(env, auth.user.id);
   const patch = await readJson(request, settingsUpdateBodySchema, locale);
   // PATCH 语义由“当前设置 + 局部字段”合成，最终仍过完整 schema，防止删除隐式默认项。
-  const next = appSettingsSchema.parse({
-    ...current,
-    ...patch,
-    builtInIconSources: mergeBuiltInIconSourceSettings(current.builtInIconSources, cleanBuiltInIconSourceSettingsPatch(patch.builtInIconSources)),
-  });
+  const next = mergeSettingsPatch(current, patch);
   return json({ settings: await putSettings(env, auth.user.id, next) });
 }
 

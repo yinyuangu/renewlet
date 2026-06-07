@@ -34,6 +34,10 @@ export function normalizeSettings(value: unknown): AppSettings {
   const settings: AppSettings = {
     ...defaults,
     ...patch,
+    aiRecognition: {
+      ...defaults.aiRecognition,
+      ...patch.aiRecognition,
+    },
     builtInIconSources: mergeBuiltInIconSourceSettings(defaults.builtInIconSources, cleanBuiltInIconSourceSettingsPatch(patch.builtInIconSources)),
   };
   return {

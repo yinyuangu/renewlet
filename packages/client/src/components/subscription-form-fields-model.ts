@@ -10,6 +10,7 @@ export interface SubscriptionFormFieldsProps {
   formData: SubscriptionFormState;
   setFormData: Dispatch<SetStateAction<SubscriptionFormState>>;
   availableTags?: readonly string[] | undefined;
+  showLogoField?: boolean | undefined;
   onLogoUploadStatusChange: (status: LogoUploadStatus) => void;
   onFieldChange?: <K extends keyof SubscriptionFormState>(key: K, value: SubscriptionFormState[K]) => void;
   errors?: SubscriptionFormErrors | undefined;
@@ -19,7 +20,7 @@ export interface SubscriptionFormFieldsProps {
 
 /** 表单错误按 UI 区块聚合，而不是逐 DTO 字段暴露，避免跨字段日期和提醒规则在不同输入上重复显示。 */
 export type SubscriptionFormErrors = Partial<Record<
-  "name" | "price" | "dates" | "customDays" | "oneTimeTerm" | "reminderDays" | "website" | "tags",
+  "name" | "price" | "currency" | "billingCycle" | "dates" | "customDays" | "oneTimeTerm" | "reminderDays" | "website" | "tags",
   string
 >>;
 
@@ -32,7 +33,8 @@ export type SubscriptionFormFieldUpdater = <K extends keyof SubscriptionFormStat
 export const errorFieldByFormKey: Partial<Record<keyof SubscriptionFormState, keyof SubscriptionFormErrors>> = {
   name: "name",
   price: "price",
-  billingCycle: "customDays",
+  currency: "currency",
+  billingCycle: "billingCycle",
   customDays: "customDays",
   oneTimeMode: "oneTimeTerm",
   oneTimeTermCount: "oneTimeTerm",

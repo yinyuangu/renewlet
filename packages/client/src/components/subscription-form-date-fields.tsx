@@ -41,6 +41,13 @@ export function SubscriptionFormDateFields({ id, formData, update, errors }: Sub
   const nextBillingDateLabel = formData.billingCycle === "one-time"
     ? t("subscription.field.expiryDate")
     : t("subscription.field.nextBillingDate");
+  const dateErrorTarget: "start" | "next" | null = !errors.dates
+    ? null
+    : !formData.startDate || isNextBillingDateDisabled
+      ? "start"
+      : "next";
+  const startDateHasError = dateErrorTarget === "start";
+  const nextBillingDateHasError = dateErrorTarget === "next";
 
   return (
     <div className="grid gap-4 rounded-lg border border-border bg-secondary/30 p-4">
@@ -70,12 +77,12 @@ export function SubscriptionFormDateFields({ id, formData, update, errors }: Sub
                 id={startDateId}
                 variant="outline"
                 aria-labelledby={`${startDateLabelId} ${startDateValueId}`}
-                aria-invalid={Boolean(errors.dates)}
-                aria-describedby={errors.dates ? id("dates-error") : undefined}
+                aria-invalid={startDateHasError}
+                aria-describedby={startDateHasError ? id("dates-error") : undefined}
                 className={cn(
                   "w-full justify-start text-left font-normal border-border bg-secondary",
                   !formData.startDate && "text-muted-foreground",
-                  errors.dates && "border-destructive focus-visible:ring-destructive/40",
+                  startDateHasError && "border-destructive focus-visible:ring-destructive/40",
                 )}
               >
                 <CalendarIcon className="mr-2 h-4 w-4" />
@@ -102,75 +109,76 @@ export function SubscriptionFormDateFields({ id, formData, update, errors }: Sub
               />
             </PopoverContent>
           </Popover>
+          <FieldError id={id("dates-error")} message={startDateHasError ? errors.dates : undefined} />
         </div>
 
         {!isOneTimeBuyout ? (
-        <div className="grid gap-2">
-          <Label id={nextBillingDateLabelId} htmlFor={nextBillingDateId}>
-            {nextBillingDateLabel}
-          </Label>
-          <Popover
-            open={isNextBillingDateDisabled ? false : nextBillingDatePickerOpen}
-            onOpenChange={setNextBillingDatePickerOpen}
-          >
-            <PopoverTrigger asChild>
-              <Button
-                id={nextBillingDateId}
-                variant="outline"
-                disabled={isNextBillingDateDisabled}
-                aria-labelledby={`${nextBillingDateLabelId} ${nextBillingDateValueId}`}
-                aria-invalid={Boolean(errors.dates)}
-                aria-describedby={errors.dates ? id("dates-error") : undefined}
-                className={cn(
-                  "w-full justify-start text-left font-normal border-border bg-secondary",
-                  !formData.nextBillingDate && "text-muted-foreground",
-                  isNextBillingDateDisabled && "opacity-60",
-                  errors.dates && "border-destructive focus-visible:ring-destructive/40",
-                )}
-              >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                <span id={nextBillingDateValueId}>
-                  {formData.nextBillingDate
-                    ? formatDateOnly(formData.nextBillingDate, "full")
-                    : t("subscription.placeholder.date")}
-                </span>
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent
-              className="w-auto p-0 border-border bg-card"
-              align="start"
-              mobileDetent="compact"
-              mobileKind="calendar"
+          <div className="grid gap-2">
+            <Label id={nextBillingDateLabelId} htmlFor={nextBillingDateId}>
+              {nextBillingDateLabel}
+            </Label>
+            <Popover
+              open={isNextBillingDateDisabled ? false : nextBillingDatePickerOpen}
+              onOpenChange={setNextBillingDatePickerOpen}
             >
-              <Calendar
-                mode="single"
-                {...(selectedNextBillingDate ? { selected: selectedNextBillingDate } : {})}
-                {...(nextBillingDateCalendarMonth ? { defaultMonth: nextBillingDateCalendarMonth } : {})}
-                // DayPicker 的 before 是排他边界：禁用开始日前的日期，同时保留“同一天到期”这个合法选择。
-                {...(selectedStartDate ? { disabled: { before: selectedStartDate } } : {})}
-                onSelect={(date) => {
-                  update("nextBillingDate", date ? dateToDateOnly(date) : undefined);
-                  setNextBillingDatePickerOpen(false);
-                }}
-                autoFocus
-                className="p-3 pointer-events-auto"
-              />
-            </PopoverContent>
-          </Popover>
-          {formData.autoCalculate && (
-            <p className="text-xs text-muted-foreground">{t("subscription.autoCalculateHelp")}</p>
-          )}
-          {formData.billingCycle === "one-time" && formData.oneTimeMode === "term" && (
-            <p className="text-xs text-muted-foreground">{t("subscription.oneTimeTermDateHelp")}</p>
-          )}
-        </div>
+              <PopoverTrigger asChild>
+                <Button
+                  id={nextBillingDateId}
+                  variant="outline"
+                  disabled={isNextBillingDateDisabled}
+                  aria-labelledby={`${nextBillingDateLabelId} ${nextBillingDateValueId}`}
+                  aria-invalid={nextBillingDateHasError}
+                  aria-describedby={nextBillingDateHasError ? id("dates-error") : undefined}
+                  className={cn(
+                    "w-full justify-start text-left font-normal border-border bg-secondary",
+                    !formData.nextBillingDate && "text-muted-foreground",
+                    isNextBillingDateDisabled && "opacity-60",
+                    nextBillingDateHasError && "border-destructive focus-visible:ring-destructive/40",
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  <span id={nextBillingDateValueId}>
+                    {formData.nextBillingDate
+                      ? formatDateOnly(formData.nextBillingDate, "full")
+                      : t("subscription.placeholder.date")}
+                  </span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent
+                className="w-auto p-0 border-border bg-card"
+                align="start"
+                mobileDetent="compact"
+                mobileKind="calendar"
+              >
+                <Calendar
+                  mode="single"
+                  {...(selectedNextBillingDate ? { selected: selectedNextBillingDate } : {})}
+                  {...(nextBillingDateCalendarMonth ? { defaultMonth: nextBillingDateCalendarMonth } : {})}
+                  // DayPicker 的 before 是排他边界：禁用开始日前的日期，同时保留“同一天到期”这个合法选择。
+                  {...(selectedStartDate ? { disabled: { before: selectedStartDate } } : {})}
+                  onSelect={(date) => {
+                    update("nextBillingDate", date ? dateToDateOnly(date) : undefined);
+                    setNextBillingDatePickerOpen(false);
+                  }}
+                  autoFocus
+                  className="p-3 pointer-events-auto"
+                />
+              </PopoverContent>
+            </Popover>
+            <FieldError id={id("dates-error")} message={nextBillingDateHasError ? errors.dates : undefined} />
+            {formData.autoCalculate && (
+              <p className="text-xs text-muted-foreground">{t("subscription.autoCalculateHelp")}</p>
+            )}
+            {formData.billingCycle === "one-time" && formData.oneTimeMode === "term" && (
+              <p className="text-xs text-muted-foreground">{t("subscription.oneTimeTermDateHelp")}</p>
+            )}
+          </div>
         ) : (
           <div className="grid content-end gap-2 rounded-md border border-dashed border-border bg-background/50 p-3 text-sm text-muted-foreground">
             {t("subscription.oneTimeBuyoutDateHelp")}
           </div>
         )}
       </div>
-      <FieldError id={id("dates-error")} message={errors.dates} />
     </div>
   );
 }

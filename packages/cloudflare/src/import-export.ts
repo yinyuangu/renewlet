@@ -11,10 +11,8 @@ import {
   type ImportSummary,
   type ImportSubscription,
 } from "@renewlet/shared/schemas/import-export";
-import { appSettingsSchema } from "@renewlet/shared/schemas/settings";
 import { customConfigSchema } from "@renewlet/shared/schemas/custom-config";
-import { cleanBuiltInIconSourceSettingsPatch, mergeBuiltInIconSourceSettings } from "@renewlet/shared/built-in-icons";
-import { getSettings, listSubscriptions, newId, nowIso, parseJsonObject } from "./db";
+import { getSettings, listSubscriptions, mergeSettingsPatch, newId, nowIso, parseJsonObject } from "./db";
 import { requestLocale, json, readJsonWithLimit, HttpError, type AppLocale } from "./http";
 import { serverText } from "./server-i18n";
 import { requireAuth } from "./auth";
@@ -123,11 +121,7 @@ export async function applyImport(request: Request, env: Env): Promise<Response>
 
   if (body.payload.settings) {
     const current = await getSettings(env, auth.user.id);
-    const next = appSettingsSchema.parse({
-      ...current,
-      ...body.payload.settings,
-      builtInIconSources: mergeBuiltInIconSourceSettings(current.builtInIconSources, cleanBuiltInIconSourceSettingsPatch(body.payload.settings.builtInIconSources)),
-    });
+    const next = mergeSettingsPatch(current, body.payload.settings);
     statements.push(env.DB.prepare(`
       INSERT INTO settings (user_id, settings_json, created_at, updated_at)
       VALUES (?, ?, ?, ?)
@@ -308,7 +302,7 @@ function resolveExistingImportMatch(
 function isImportKey(value: unknown): value is ImportSubscription["extra"]["import"] {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const record = value as Record<string, unknown>;
-  return (record["source"] === "renewlet" || record["source"] === "wallos")
+  return (record["source"] === "renewlet" || record["source"] === "wallos" || record["source"] === "ai")
     && typeof record["sourceId"] === "string"
     && (record["confidence"] === undefined || record["confidence"] === "high" || record["confidence"] === "low");
 }

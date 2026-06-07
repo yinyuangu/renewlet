@@ -8,6 +8,7 @@
  */
 import type { CustomThemeColor, ThemeMode, ThemeVariant } from './theme';
 import type { BuiltInIconSourceSettings } from "@renewlet/shared/built-in-icons";
+import type { AiRecognitionSettings } from "@renewlet/shared/schemas/ai-recognition";
 import { labelsFromCatalog } from "@/i18n/label-messages";
 import { getInitialLocale, labels, type Locale, type LocalizedLabels } from '@/i18n/locales';
 import { SUPPORTED_EXCHANGE_RATE_CURRENCIES, getIntlCurrencyOptionLabel } from '@/lib/currency-data';
@@ -251,6 +252,8 @@ export interface AppSettings {
   exchangeRateProvider: ExchangeRateProvider;
   /** 内置 Logo/Icon 来源配置；影响搜索候选和导入自动匹配。 */
   builtInIconSources: BuiltInIconSourceSettings;
+  /** AI 识别订阅导入使用的第三方模型配置。 */
+  aiRecognition: AiRecognitionSettings;
   
   // 预算
   /** 月度预算（用于统计页预算占比）。 */

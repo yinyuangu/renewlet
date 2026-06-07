@@ -14,6 +14,26 @@ msgstr ""
 "Plural-Forms: \n"
 
 #. js-lingui-explicit-id
+#: src/i18n/descriptors/error.ts:90
+msgid "error.code.AI_RECOGNITION_EMPTY"
+msgstr "AI did not recognize any subscriptions that can be imported."
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/error.ts:91
+msgid "error.code.AI_RECOGNITION_FAILED"
+msgstr "AI recognition failed. Check the input and model configuration."
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/error.ts:92
+msgid "error.code.AI_RECOGNITION_SCHEMA_MISMATCH"
+msgstr "The AI response could not be turned into subscription drafts. Try a stronger model or add clearer details."
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/error.ts:93
+msgid "error.code.AI_RECOGNITION_TEST_FAILED"
+msgstr "AI connection test failed. Check the model configuration."
+
+#. js-lingui-explicit-id
 #: src/i18n/descriptors/error.ts:34
 msgid "error.code.LOGO_URL_USERINFO_INVALID"
 msgstr "Logo URL cannot include a username or password."
@@ -84,6 +104,11 @@ msgid "error.code.ASSET_KIND_INVALID"
 msgstr "Image purpose is invalid."
 
 #. js-lingui-explicit-id
+#: src/i18n/descriptors/error.ts:89
+msgid "error.code.AI_IMAGE_TYPE_INVALID"
+msgstr "Invalid image type. Only PNG, JPG, or WebP is supported."
+
+#. js-lingui-explicit-id
 #: src/i18n/descriptors/error.ts:36
 msgid "error.code.WEBSITE_URL_SCHEME_INVALID"
 msgstr "Website URL must use http:// or https://."
@@ -142,6 +167,11 @@ msgstr "Start date must be YYYY-MM-DD."
 #: src/i18n/descriptors/error.ts:25
 msgid "error.code.START_DATE_DATE_INVALID"
 msgstr "Start date is invalid."
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/error.ts:88
+msgid "error.code.AI_THINKING_PROVIDER_MISMATCH"
+msgstr "Thinking control does not match the current model provider."
 
 #. js-lingui-explicit-id
 #: src/i18n/descriptors/error.ts:40
@@ -267,6 +297,26 @@ msgstr "Trial end date must be YYYY-MM-DD."
 #: src/i18n/descriptors/error.ts:30
 msgid "error.code.TRIAL_END_DATE_DATE_INVALID"
 msgstr "Trial end date is invalid."
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/error.ts:86
+msgid "error.code.AI_API_KEY_REQUIRED"
+msgstr "Fill in the AI API Key first."
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/error.ts:85
+msgid "error.code.AI_BASE_URL_REQUIRED"
+msgstr "Fill in the AI Base URL first."
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/error.ts:84
+msgid "error.code.AI_MODEL_REQUIRED"
+msgstr "Fill in the AI model first."
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/error.ts:87
+msgid "error.code.AI_RECOGNITION_INPUT_REQUIRED"
+msgstr "Paste text or upload images first."
 
 #. js-lingui-explicit-id
 #: src/i18n/descriptors/error.ts:69

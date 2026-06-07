@@ -53,6 +53,7 @@ import { NotificationChannelConfigPanel } from './notification-channel-config-pa
 import { NotificationChannelList } from './notification-channel-list';
 import { ExchangeRatesSection } from './exchange-rates-section';
 import { BuiltInIconSourcesSection } from './built-in-icon-sources-section';
+import { AIRecognitionSettingsSection } from './ai-recognition-settings-section';
 import { CalendarFeedSection } from './calendar-feed-section';
 import { CheckboxSettingRow, LoadingButtonContent } from './settings-shared-controls';
 import {
@@ -247,6 +248,13 @@ export function SettingsScreen() {
                 className={SETTINGS_SECTION_SCROLL_CLASS}
                 sources={settings.builtInIconSources}
                 onChange={(sources) => updateSetting('builtInIconSources', sources)}
+              />
+
+              <AIRecognitionSettingsSection
+                id="settings-ai-recognition"
+                className={SETTINGS_SECTION_SCROLL_CLASS}
+                settings={settings.aiRecognition}
+                onChange={(aiRecognition) => updateSetting('aiRecognition', aiRecognition)}
               />
 
               {/* 预算设置 */}

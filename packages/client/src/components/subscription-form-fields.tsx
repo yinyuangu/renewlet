@@ -47,6 +47,7 @@ export const SubscriptionFormFields = memo(function SubscriptionFormFields({
   formData,
   setFormData,
   availableTags = [],
+  showLogoField = true,
   onLogoUploadStatusChange,
   onFieldChange,
   errors = {},
@@ -93,6 +94,10 @@ export const SubscriptionFormFields = memo(function SubscriptionFormFields({
     });
     const errorField = errorFieldByFormKey[key];
     if (errorField) onClearFieldError?.(errorField);
+    if (key === "billingCycle") {
+      onClearFieldError?.("customDays");
+      onClearFieldError?.("oneTimeTerm");
+    }
     // onFieldChange 是外层识别“用户明确修改过某字段”的钩子，例如新增订阅默认货币同步策略。
     // 这里保持泛型 key/value 绑定，避免调用方把字段和值的类型拆散。
     onFieldChange?.(key, value);
@@ -147,12 +152,14 @@ export const SubscriptionFormFields = memo(function SubscriptionFormFields({
         <FieldError id={id("name-error")} message={errors.name} />
       </div>
 
-      <LogoPicker
-        value={formData.logo}
-        onChange={(logo) => update("logo", logo)}
-        onUploadStatusChange={onLogoUploadStatusChange}
-        serviceName={formData.name}
-      />
+      {showLogoField ? (
+        <LogoPicker
+          value={formData.logo}
+          onChange={(logo) => update("logo", logo)}
+          onUploadStatusChange={onLogoUploadStatusChange}
+          serviceName={formData.name}
+        />
+      ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="grid gap-2">
@@ -182,9 +189,15 @@ export const SubscriptionFormFields = memo(function SubscriptionFormFields({
             placeholder={t("subscription.placeholder.currency")}
             searchPlaceholder={t("subscription.search.currency")}
             emptyMessage={t("subscription.empty.currency")}
-            className="border-border bg-secondary"
+            className={cn(
+              "border-border bg-secondary",
+              errors.currency && "border-destructive focus:ring-destructive/40",
+            )}
             aria-label={t("subscription.placeholder.currency")}
+            aria-invalid={Boolean(errors.currency)}
+            aria-describedby={errors.currency ? id("currency-error") : undefined}
           />
+          <FieldError id={id("currency-error")} message={errors.currency} />
         </div>
       </div>
 
@@ -231,8 +244,13 @@ export const SubscriptionFormFields = memo(function SubscriptionFormFields({
           >
             <SelectTrigger
               id={id("cycle")}
-              className="border-border bg-secondary"
+              className={cn(
+                "border-border bg-secondary",
+                errors.billingCycle && "border-destructive focus:ring-destructive/40",
+              )}
               aria-label={t("subscription.field.billingCycle")}
+              aria-invalid={Boolean(errors.billingCycle)}
+              aria-describedby={errors.billingCycle ? id("billingCycle-error") : undefined}
             >
               <SelectValue />
             </SelectTrigger>
@@ -244,6 +262,7 @@ export const SubscriptionFormFields = memo(function SubscriptionFormFields({
               ))}
             </SelectContent>
           </Select>
+          <FieldError id={id("billingCycle-error")} message={errors.billingCycle} />
         </div>
 
         {formData.billingCycle === "custom" ? (
