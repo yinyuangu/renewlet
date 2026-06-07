@@ -17,7 +17,7 @@ import {
 } from "@/modules/ai-recognition/domain/model-capabilities";
 import { getAIRecognitionSettingsBlocker } from "@/modules/ai-recognition/domain/settings-readiness";
 import { aiRecognitionService } from "@/services/ai-recognition-service";
-import { AIModelCombobox } from "./ai-model-combobox";
+import { AIModelCombobox, AIModelModeSwitch } from "./ai-model-combobox";
 import { LoadingButtonContent } from "./settings-shared-controls";
 
 const AI_PROVIDERS = ["openai", "gemini", "anthropic", "openai-compatible"] as const satisfies readonly AiRecognitionProvider[];
@@ -137,6 +137,18 @@ export function AIRecognitionSettingsSection({
     }
   };
 
+  const handleModelInputModeChange = (modelInputMode: AiRecognitionSettings["modelInputMode"]) => {
+    update({ modelInputMode });
+    if (
+      modelInputMode === "select"
+      && canListAIModels(settings)
+      && modelListState.status !== "loading"
+      && (modelListState.status === "idle" || modelListState.status === "error" || modelListState.models.length === 0)
+    ) {
+      void handleRefreshModels();
+    }
+  };
+
   const handleTestConnection = async () => {
     if (testBlocker) {
       toast({
@@ -189,63 +201,79 @@ export function AIRecognitionSettingsSection({
         </Button>
       </div>
 
-      <div className="grid gap-5 md:grid-cols-2">
-        <div className="grid gap-2">
-          <Label htmlFor="ai-provider">{t("aiRecognition.provider")}</Label>
-          <Select value={settings.provider} onValueChange={(value) => handleProviderChange(value as AiRecognitionProvider)}>
-            <SelectTrigger id="ai-provider" className="border-border bg-secondary">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {AI_PROVIDERS.map((provider) => (
-                <SelectItem key={provider} value={provider}>{t(AI_PROVIDER_LABEL_KEYS[provider])}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      <div className="grid gap-5">
+        <div className="grid items-start gap-5 md:grid-cols-2 md:gap-x-5 md:gap-y-2" data-testid="ai-provider-model-grid">
+          <div className="grid gap-2 md:contents" data-testid="ai-provider-field">
+            <div className="flex min-h-7 items-end md:order-1" data-testid="ai-provider-label-row">
+              <Label htmlFor="ai-provider">{t("aiRecognition.provider")}</Label>
+            </div>
+            <div className="self-start md:order-3" data-testid="ai-provider-control-row">
+              <Select value={settings.provider} onValueChange={(value) => handleProviderChange(value as AiRecognitionProvider)}>
+                <SelectTrigger id="ai-provider" className="border-border bg-secondary">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {AI_PROVIDERS.map((provider) => (
+                    <SelectItem key={provider} value={provider}>{t(AI_PROVIDER_LABEL_KEYS[provider])}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid gap-2 md:contents" data-testid="ai-model-field">
+            <div className="flex min-h-7 min-w-0 flex-wrap items-end justify-between gap-x-3 gap-y-1 md:order-2" data-testid="ai-model-label-row">
+              <Label htmlFor="ai-model">{t("aiRecognition.model")}</Label>
+              <AIModelModeSwitch
+                mode={settings.modelInputMode}
+                onModeChange={handleModelInputModeChange}
+              />
+            </div>
+            <div className="self-start md:order-4" data-testid="ai-model-control-row">
+              <AIModelCombobox
+                id="ai-model"
+                value={settings.model}
+                onValueChange={(model) => update({ model })}
+                mode={settings.modelInputMode}
+                models={modelListState.models}
+                status={modelListState.status}
+                error={modelListState.error}
+                truncated={modelListState.truncated}
+                canAutoRefreshModels={canListAIModels(settings)}
+                onRequestModels={() => void handleRefreshModels()}
+                placeholder={t("aiRecognition.modelPlaceholder")}
+              />
+            </div>
+          </div>
         </div>
 
-        <div className="grid gap-2">
-          <AIModelCombobox
-            id="ai-model"
-            value={settings.model}
-            onValueChange={(model) => update({ model })}
-            mode={settings.modelInputMode}
-            onModeChange={(modelInputMode) => update({ modelInputMode })}
-            models={modelListState.models}
-            status={modelListState.status}
-            error={modelListState.error}
-            truncated={modelListState.truncated}
-            canAutoRefreshModels={canListAIModels(settings)}
-            onRequestModels={() => void handleRefreshModels()}
-            placeholder={t("aiRecognition.modelPlaceholder")}
-          />
-        </div>
+        <div className="grid gap-5 md:grid-cols-2">
+          <div className="grid gap-2">
+            <Label htmlFor="ai-base-url">{t("aiRecognition.baseUrl")}</Label>
+            <Input
+              id="ai-base-url"
+              value={settings.baseUrl}
+              onChange={(event) => update({ baseUrl: event.target.value })}
+              placeholder={settings.provider === "openai-compatible" ? "https://api.example.com/v1" : t("aiRecognition.baseUrlPlaceholder")}
+              className="border-border bg-secondary"
+              inputMode="url"
+            />
+            <p className="text-xs text-muted-foreground">{t("aiRecognition.baseUrlHelp")}</p>
+          </div>
 
-        <div className="grid gap-2">
-          <Label htmlFor="ai-base-url">{t("aiRecognition.baseUrl")}</Label>
-          <Input
-            id="ai-base-url"
-            value={settings.baseUrl}
-            onChange={(event) => update({ baseUrl: event.target.value })}
-            placeholder={settings.provider === "openai-compatible" ? "https://api.example.com/v1" : t("aiRecognition.baseUrlPlaceholder")}
-            className="border-border bg-secondary"
-            inputMode="url"
-          />
-          <p className="text-xs text-muted-foreground">{t("aiRecognition.baseUrlHelp")}</p>
-        </div>
-
-        <div className="grid gap-2">
-          <Label htmlFor="ai-api-key">{t("aiRecognition.apiKey")}</Label>
-          <Input
-            id="ai-api-key"
-            type="password"
-            autoComplete="off"
-            value={settings.apiKey}
-            onChange={(event) => update({ apiKey: event.target.value })}
-            placeholder={settings.provider === "openai-compatible" ? t("aiRecognition.apiKeyOptionalPlaceholder") : "sk-..."}
-            className="border-border bg-secondary"
-          />
-          <p className="text-xs text-muted-foreground">{t("aiRecognition.apiKeyHelp")}</p>
+          <div className="grid gap-2">
+            <Label htmlFor="ai-api-key">{t("aiRecognition.apiKey")}</Label>
+            <Input
+              id="ai-api-key"
+              type="password"
+              autoComplete="off"
+              value={settings.apiKey}
+              onChange={(event) => update({ apiKey: event.target.value })}
+              placeholder={settings.provider === "openai-compatible" ? t("aiRecognition.apiKeyOptionalPlaceholder") : "sk-..."}
+              className="border-border bg-secondary"
+            />
+            <p className="text-xs text-muted-foreground">{t("aiRecognition.apiKeyHelp")}</p>
+          </div>
         </div>
       </div>
 

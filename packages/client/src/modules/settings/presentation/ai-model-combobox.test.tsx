@@ -4,7 +4,7 @@ import { useState, type ComponentProps } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import type { AiModelListItem } from "@/lib/api/schemas/ai-recognition";
-import { AIModelCombobox } from "./ai-model-combobox";
+import { AIModelCombobox, AIModelModeSwitch } from "./ai-model-combobox";
 
 vi.mock("@/i18n/I18nProvider", () => ({
   useI18n: () => ({
@@ -70,13 +70,11 @@ function renderCombobox(props: Partial<ComponentProps<typeof AIModelCombobox>> =
     value: initialValue = "gpt-5.5",
     onValueChange = vi.fn(),
     mode: initialMode = "select",
-    onModeChange = vi.fn(),
     ...restProps
   } = props;
 
   function StatefulCombobox() {
     const [currentValue, setCurrentValue] = useState(initialValue);
-    const [currentMode, setCurrentMode] = useState(initialMode);
     return (
       <TooltipProvider delayDuration={0}>
         <AIModelCombobox
@@ -86,11 +84,7 @@ function renderCombobox(props: Partial<ComponentProps<typeof AIModelCombobox>> =
             setCurrentValue(nextValue);
             onValueChange(nextValue);
           }}
-          mode={currentMode}
-          onModeChange={(nextMode) => {
-            setCurrentMode(nextMode);
-            onModeChange(nextMode);
-          }}
+          mode={initialMode}
           models={models}
           status="success"
           error={null}
@@ -114,22 +108,6 @@ describe("AIModelCombobox", () => {
     expect(screen.queryByRole("button", { name: "刷新" })).not.toBeInTheDocument();
   });
 
-  it("requests models automatically when switching to select mode with credentials available", async () => {
-    const user = userEvent.setup();
-    const onRequestModels = vi.fn();
-    renderCombobox({
-      mode: "manual",
-      models: [],
-      status: "idle",
-      canAutoRefreshModels: true,
-      onRequestModels,
-    });
-
-    await user.click(screen.getByRole("button", { name: "选择模型" }));
-
-    expect(onRequestModels).toHaveBeenCalledTimes(1);
-  });
-
   it("requests models automatically when opening the default select dropdown", async () => {
     const user = userEvent.setup();
     const onRequestModels = vi.fn();
@@ -146,27 +124,10 @@ describe("AIModelCombobox", () => {
     expect(onRequestModels).toHaveBeenCalledTimes(1);
   });
 
-  it("does not auto request models when credentials are unavailable", async () => {
-    const user = userEvent.setup();
-    const onRequestModels = vi.fn();
-    renderCombobox({
-      mode: "manual",
-      models: [],
-      status: "idle",
-      canAutoRefreshModels: false,
-      onRequestModels,
-    });
-
-    await user.click(screen.getByRole("button", { name: "选择模型" }));
-
-    expect(onRequestModels).not.toHaveBeenCalled();
-  });
-
   it("defaults to select mode", () => {
     renderCombobox({ value: "" });
 
     expect(screen.getByRole("combobox", { name: "模型" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "选择模型" })).toHaveAttribute("aria-pressed", "true");
   });
 
   it("writes custom model ids directly in manual mode", async () => {
@@ -182,36 +143,23 @@ describe("AIModelCombobox", () => {
     expect(screen.queryByText(/使用自定义模型/)).not.toBeInTheDocument();
   });
 
-  it("keeps the mode switch in the label row without the old standalone segmented surface", () => {
-    renderCombobox();
+  it("renders the mode switch as a normal-flow segmented control", () => {
+    render(<AIModelModeSwitch mode="select" onModeChange={vi.fn()} />);
 
-    const labelRow = screen.getByTestId("ai-model-label-row");
-    const modeSwitch = screen.getByTestId("ai-model-mode-switch");
-
-    expect(labelRow).toContainElement(modeSwitch);
-    expect(labelRow).toHaveTextContent("模型");
-    expect(modeSwitch).toHaveClass("h-7");
-    expect(modeSwitch).toHaveClass("rounded-md");
-    expect(modeSwitch).toHaveClass("bg-secondary/30");
-    expect(modeSwitch).not.toHaveClass("border");
-    expect(modeSwitch).not.toHaveClass("bg-secondary/50");
-    expect(screen.queryByText("/")).not.toBeInTheDocument();
-  });
-
-  it("shows select mode before manual input in the mode switch", () => {
-    renderCombobox();
-
-    const modeButtons = within(screen.getByTestId("ai-model-mode-switch")).getAllByRole("button");
-
-    expect(modeButtons.map((button) => button.textContent)).toEqual(["选择模型", "手动输入"]);
-  });
-
-  it("uses neutral mode button states without underline or mouse focus rings", () => {
-    renderCombobox();
+    const modeSwitch = screen.getByRole("group", { name: "模型输入方式" });
+    const modeButtons = within(modeSwitch).getAllByRole("button");
 
     const manualButton = screen.getByRole("button", { name: "手动输入" });
     const selectButton = screen.getByRole("button", { name: "选择模型" });
 
+    expect(modeButtons.map((button) => button.textContent)).toEqual(["选择模型", "手动输入"]);
+    expect(modeSwitch).toHaveClass("h-7");
+    expect(modeSwitch).toHaveClass("rounded-md");
+    expect(modeSwitch).toHaveClass("bg-secondary/30");
+    expect(modeSwitch).not.toHaveClass("absolute");
+    expect(modeSwitch).not.toHaveClass("border");
+    expect(modeSwitch).not.toHaveClass("bg-secondary/50");
+    expect(screen.queryByText("/")).not.toBeInTheDocument();
     expect(selectButton).toHaveAttribute("aria-pressed", "true");
     expect(selectButton).toHaveClass("bg-secondary");
     expect(selectButton).toHaveClass("text-foreground");
@@ -226,11 +174,29 @@ describe("AIModelCombobox", () => {
     expect(manualButton).toHaveClass("hover:bg-secondary/60");
   });
 
-  it("switches to select mode and renders one-line model options", async () => {
+  it("calls mode changes from the mode switch", async () => {
     const user = userEvent.setup();
-    renderCombobox({ mode: "manual" });
+    const onModeChange = vi.fn();
+    render(<AIModelModeSwitch mode="manual" onModeChange={onModeChange} />);
 
     await user.click(screen.getByRole("button", { name: "选择模型" }));
+    await user.click(screen.getByRole("button", { name: "手动输入" }));
+
+    expect(onModeChange).toHaveBeenNthCalledWith(1, "select");
+    expect(onModeChange).toHaveBeenNthCalledWith(2, "manual");
+  });
+
+  it("renders disabled mode buttons", () => {
+    render(<AIModelModeSwitch mode="select" onModeChange={vi.fn()} disabled />);
+
+    expect(screen.getByRole("button", { name: "选择模型" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "手动输入" })).toBeDisabled();
+  });
+
+  it("renders one-line model options in select mode", async () => {
+    const user = userEvent.setup();
+    renderCombobox({ mode: "select" });
+
     await user.click(screen.getByRole("combobox", { name: "模型" }));
     const listbox = screen.getByRole("listbox");
 
@@ -301,29 +267,17 @@ describe("AIModelCombobox", () => {
     expect(screen.queryByText("当前模型")).not.toBeInTheDocument();
   });
 
-  it("keeps the model value when switching modes", async () => {
-    const user = userEvent.setup();
-    renderCombobox();
-
-    expect(screen.getByRole("combobox", { name: "模型" })).toHaveTextContent("GPT-5.5");
-
-    await user.click(screen.getByRole("button", { name: "手动输入" }));
-    expect(screen.getByRole("textbox", { name: "模型" })).toHaveValue("gpt-5.5");
-  });
-
-  it("enters select mode when an automatic model request finishes with returned models", async () => {
+  it("keeps select mode open when an automatic model request finishes with returned models", async () => {
     function RefreshingCombobox() {
       const [status, setStatus] = useState<"idle" | "loading" | "success">("idle");
       const [returnedModels, setReturnedModels] = useState<AiModelListItem[]>([]);
-      const [mode, setMode] = useState<"select" | "manual">("manual");
       return (
         <TooltipProvider delayDuration={0}>
           <AIModelCombobox
             id="ai-model"
             value=""
             onValueChange={vi.fn()}
-            mode={mode}
-            onModeChange={setMode}
+            mode="select"
             models={returnedModels}
             status={status}
             error={null}
@@ -345,7 +299,7 @@ describe("AIModelCombobox", () => {
     const user = userEvent.setup();
     render(<RefreshingCombobox />);
 
-    await user.click(screen.getByRole("button", { name: "选择模型" }));
+    await user.click(screen.getByRole("combobox", { name: "模型" }));
 
     expect(await screen.findByText("GPT-5.5")).toBeInTheDocument();
     expect(document.body).toHaveAttribute("data-scroll-locked", "1");
@@ -354,7 +308,7 @@ describe("AIModelCombobox", () => {
   it("keeps compact empty, error and truncated states visible", async () => {
     const user = userEvent.setup();
     renderCombobox({
-      mode: "manual",
+      mode: "select",
       value: "",
       models: [],
       status: "success",
@@ -362,7 +316,6 @@ describe("AIModelCombobox", () => {
       truncated: true,
     });
 
-    await user.click(screen.getByRole("button", { name: "选择模型" }));
     await user.click(screen.getByRole("combobox", { name: "模型" }));
 
     expect(screen.getByText("没有可选择的模型。请确认 Base URL / API Key 已填写，或切换到手动输入。")).toBeInTheDocument();
@@ -372,9 +325,8 @@ describe("AIModelCombobox", () => {
 
   it("shows a compact loading state in select mode", async () => {
     const user = userEvent.setup();
-    renderCombobox({ mode: "manual", value: "", status: "loading" });
+    renderCombobox({ mode: "select", value: "", status: "loading" });
 
-    await user.click(screen.getByRole("button", { name: "选择模型" }));
     await user.click(screen.getByRole("combobox", { name: "模型" }));
 
     expect(screen.getByText("正在获取模型列表...")).toBeInTheDocument();

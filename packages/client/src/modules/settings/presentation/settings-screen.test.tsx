@@ -334,6 +334,14 @@ describe("SettingsScreen SMTP email settings", () => {
     expect(phoneInput).toHaveAttribute("enterkeyhint", "done");
   });
 
+  it("keeps AI recognition provider and model controls in the shared field grid", () => {
+    renderSettingsScreen();
+
+    const providerModelGrid = screen.getByTestId("ai-provider-model-grid");
+    expect(providerModelGrid).toHaveClass("items-start");
+    expect(providerModelGrid).toHaveClass("md:gap-y-2");
+  });
+
   it("updates built-in icon source and variant settings without allowing all sources off", async () => {
     const user = userEvent.setup();
     const controller = createControllerState();

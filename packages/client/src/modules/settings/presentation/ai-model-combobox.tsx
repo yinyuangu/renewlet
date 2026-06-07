@@ -3,7 +3,6 @@ import { Command } from "cmdk";
 import { Check, ChevronsUpDown, Loader2, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { TruncatedTooltipText } from "@/components/ui/truncated-tooltip-text";
 import { useI18n } from "@/i18n/I18nProvider";
@@ -17,7 +16,6 @@ interface AIModelComboboxProps {
   value: string;
   onValueChange: (value: string) => void;
   mode: AiRecognitionModelInputMode;
-  onModeChange: (mode: AiRecognitionModelInputMode) => void;
   models: AiModelListItem[];
   status: AIModelComboboxStatus;
   error: string | null;
@@ -35,7 +33,6 @@ export function AIModelCombobox({
   value,
   onValueChange,
   mode,
-  onModeChange,
   models,
   status,
   error,
@@ -85,11 +82,6 @@ export function AIModelCombobox({
     if (status === "idle" || status === "error") onRequestModels();
   }, [canAutoRefreshModels, disabled, onRequestModels, status]);
 
-  const handleSelectMode = React.useCallback(() => {
-    onModeChange("select");
-    requestModelsIfNeeded();
-  }, [onModeChange, requestModelsIfNeeded]);
-
   const handleOpenChange = React.useCallback((nextOpen: boolean) => {
     setOpen(nextOpen);
     if (nextOpen) requestModelsIfNeeded();
@@ -97,34 +89,6 @@ export function AIModelCombobox({
 
   return (
     <div className="grid gap-2">
-      <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-1" data-testid="ai-model-label-row">
-        <Label htmlFor={id}>{t("aiRecognition.model")}</Label>
-        <div
-          className="inline-flex h-7 shrink-0 items-center gap-0.5 rounded-md bg-secondary/30 p-0.5 text-xs"
-          role="group"
-          aria-label={t("aiRecognition.modelMode")}
-          data-testid="ai-model-mode-switch"
-        >
-          <AIModelModeButton
-            active={mode === "select"}
-            disabled={disabled}
-            onClick={handleSelectMode}
-          >
-            {t("aiRecognition.modelModeSelect")}
-          </AIModelModeButton>
-          <AIModelModeButton
-            active={mode === "manual"}
-            disabled={disabled}
-            onClick={() => {
-              onModeChange("manual");
-              setOpen(false);
-            }}
-          >
-            {t("aiRecognition.modelModeManual")}
-          </AIModelModeButton>
-        </div>
-      </div>
-
       <div className="min-w-0">
         {mode === "manual" ? (
           <Input
@@ -215,6 +179,42 @@ export function AIModelCombobox({
       {status === "success" && truncated ? (
         <p className="text-xs leading-5 text-muted-foreground">{t("aiRecognition.modelListTruncated")}</p>
       ) : null}
+    </div>
+  );
+}
+
+export function AIModelModeSwitch({
+  disabled = false,
+  mode,
+  onModeChange,
+}: {
+  disabled?: boolean;
+  mode: AiRecognitionModelInputMode;
+  onModeChange: (mode: AiRecognitionModelInputMode) => void;
+}) {
+  const { t } = useI18n();
+
+  return (
+    <div
+      className="inline-flex h-7 shrink-0 items-center gap-0.5 rounded-md bg-secondary/30 p-0.5 text-xs"
+      role="group"
+      aria-label={t("aiRecognition.modelMode")}
+      data-testid="ai-model-mode-switch"
+    >
+      <AIModelModeButton
+        active={mode === "select"}
+        disabled={disabled}
+        onClick={() => onModeChange("select")}
+      >
+        {t("aiRecognition.modelModeSelect")}
+      </AIModelModeButton>
+      <AIModelModeButton
+        active={mode === "manual"}
+        disabled={disabled}
+        onClick={() => onModeChange("manual")}
+      >
+        {t("aiRecognition.modelModeManual")}
+      </AIModelModeButton>
     </div>
   );
 }
