@@ -83,7 +83,7 @@ function renderPanel(showImportOptions?: boolean) {
       conflictMode="skip"
       previewFilter="all"
       skippedIndexes={new Set<number>()}
-      showImportOptions={showImportOptions}
+      {...(showImportOptions === undefined ? {} : { showImportOptions })}
       onConflictModeChange={vi.fn()}
       onPreviewFilterChange={vi.fn()}
       onLogoChange={vi.fn()}

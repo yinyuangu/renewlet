@@ -34,7 +34,7 @@ function HeaderSkeleton({ showAddAction = false }: { showAddAction?: boolean }) 
             ))}
           </nav>
         </div>
-        <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           <SkeletonBox className="h-9 w-9 rounded-md" />
           {showAddAction ? <SkeletonBox className="h-9 w-9 rounded-md sm:w-28" /> : null}
           <SkeletonBox className="h-9 w-9 rounded-md" />

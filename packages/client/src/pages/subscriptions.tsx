@@ -26,6 +26,7 @@ import { VirtualizedList } from '@/components/ui/virtualized-list';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import type { Category, Subscription, SubscriptionStatus } from '@/types/subscription';
 import { DEFAULT_NOTIFICATION_REMINDER_DAYS, DEFAULT_SETTINGS } from '@/types/subscription';
 import { Search, Plus, Grid, List as ListIcon, Download, Upload, Sparkles } from 'lucide-react';
@@ -263,17 +264,23 @@ function SubscriptionGrid({
     handleEditSubscription(subscription.id);
   }, [handleEditSubscription]);
   const aiRecognitionAction = (
-    <Button
-      type="button"
-      variant="outline"
-      size="icon"
-      onClick={() => setAIRecognitionDialogOpen(true)}
-      className="h-9 w-9 border-border text-primary"
-      aria-label={t("subscriptions.aiRecognizeAdd")}
-      title={t("subscriptions.aiRecognizeAdd")}
-    >
-      <Sparkles className="h-4 w-4" />
-    </Button>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          type="button"
+          variant="secondary"
+          size="icon"
+          onClick={() => setAIRecognitionDialogOpen(true)}
+          className="h-12 w-12 shrink-0 text-primary sm:h-10 sm:w-10"
+          aria-label={t("subscriptions.aiRecognizeAdd")}
+        >
+          <Sparkles className="h-4 w-4" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="bottom" align="end" className="text-xs">
+        {t("subscriptions.aiRecognizeAdd")}
+      </TooltipContent>
+    </Tooltip>
   );
 
   // 首次加载订阅列表时展示骨架屏（筛选条 + 卡片网格占位）。

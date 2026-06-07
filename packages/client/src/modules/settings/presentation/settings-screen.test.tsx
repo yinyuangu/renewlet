@@ -35,9 +35,11 @@ describe("SettingsScreen SMTP email settings", () => {
 
   it("renders SMTP fields instead of Resend fields for email notifications", () => {
     renderSettingsScreen();
+    const notificationsSection = document.getElementById("settings-notifications");
 
     expect(screen.queryByText(/Resend/i)).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("API Key")).not.toBeInTheDocument();
+    expect(notificationsSection).not.toBeNull();
+    expect(within(notificationsSection as HTMLElement).queryByLabelText("API Key")).not.toBeInTheDocument();
     expect(screen.getByLabelText("SMTP 服务器")).toHaveValue("smtp.example.com");
     expect(screen.getByLabelText("SMTP 端口")).toHaveValue("587");
     expect(screen.getByLabelText("SMTP 用户名")).toHaveValue("smtp-user");

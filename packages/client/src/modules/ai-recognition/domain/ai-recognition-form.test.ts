@@ -3,6 +3,7 @@ import type { AiRecognizedSubscriptionDraft } from "@/lib/api/schemas/ai-recogni
 import { DEFAULT_CUSTOM_CONFIG } from "@/types/config";
 import { DEFAULT_SETTINGS } from "@/types/subscription";
 import { createSubscriptionFormState } from "@/types/subscription-form";
+import { assertDateOnly } from "@/lib/time/date-only";
 import {
   aiDraftToSubscriptionFormState,
   subscriptionFormStateToAIDraftPatch,
@@ -113,8 +114,8 @@ describe("AI recognition form mapping", () => {
       category: "Cloud lab",
       status: "active",
       paymentMethod: "Personal card",
-      startDate: "2026-01-01",
-      nextBillingDate: "2027-01-01",
+      startDate: assertDateOnly("2026-01-01"),
+      nextBillingDate: assertDateOnly("2027-01-01"),
       autoCalculate: true,
       reminderType: "preset",
       reminderDays: "14",
@@ -189,8 +190,8 @@ describe("AI recognition form mapping", () => {
       status: "trial",
       price: "10",
       currency: "USD",
-      startDate: "2026-01-01",
-      nextBillingDate: "2026-03-01",
+      startDate: assertDateOnly("2026-01-01"),
+      nextBillingDate: assertDateOnly("2026-03-01"),
     }), {
       website: null,
       notes: null,

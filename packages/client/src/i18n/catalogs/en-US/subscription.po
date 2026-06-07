@@ -1296,7 +1296,7 @@ msgstr "Supports Renewlet ZIP/JSON, Wallos JSON, backup.zip, and wallos.db."
 #. js-lingui-explicit-id
 #: src/i18n/descriptors/subscription.ts:373
 msgid "aiRecognition.inputHint"
-msgstr "Supports plain text, CSV/TSV, and copied table text. For .xlsx files, copy the content or upload images."
+msgstr "Supports plain text, CSV/TSV, and copied table text. For .xlsx files, copy the content first."
 
 #. js-lingui-explicit-id
 #: src/i18n/descriptors/subscription.ts:109
@@ -1906,7 +1906,7 @@ msgstr "Paste Renewlet or Wallos JSON..."
 #. js-lingui-explicit-id
 #: src/i18n/descriptors/subscription.ts:365
 msgid "aiRecognition.dialogDescription"
-msgstr "Paste notes or table text, or upload images, and let the configured AI model generate editable subscription drafts."
+msgstr "Use the configured AI model to generate editable subscription drafts, then review them before importing."
 
 #. js-lingui-explicit-id
 #: src/i18n/descriptors/subscription.ts:372

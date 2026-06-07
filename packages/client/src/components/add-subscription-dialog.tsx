@@ -28,7 +28,7 @@ export function AddSubscriptionDialog({ onAdd, availableTags, trigger }: AddSubs
   const { t } = useI18n();
 
   const defaultTrigger = (
-    <Button className="gap-2 bg-primary text-primary-foreground hover:bg-primary-glow">
+    <Button className="h-12 w-12 shrink-0 gap-2 bg-primary px-0 text-primary-foreground hover:bg-primary-glow sm:h-10 sm:w-auto sm:px-4">
       <Plus className="h-4 w-4" />
       <span className="hidden sm:inline">{t("subscription.add")}</span>
       <span className="sr-only sm:hidden">{t("subscription.add")}</span>

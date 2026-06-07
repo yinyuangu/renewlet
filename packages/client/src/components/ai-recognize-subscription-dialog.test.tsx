@@ -261,6 +261,10 @@ describe("AIRecognizeSubscriptionDialog", () => {
     const body = screen.getByTestId("ai-recognition-dialog-body");
 
     expect(screen.getByRole("tab", { name: "文本" })).toBeInTheDocument();
+    const dialogDescription = screen.getByText("使用已配置的 AI 模型生成可编辑订阅草稿，确认后再导入。");
+    expect(dialogDescription).not.toHaveTextContent("粘贴备忘录");
+    expect(dialogDescription).not.toHaveTextContent("上传图片");
+    expect(screen.getByText("支持纯文本、CSV/TSV 和表格复制文本；.xlsx 文件请先复制内容。")).toBeInTheDocument();
     expect(dialog).toHaveClass("h5-ai-recognition-input-dialog-frame");
     expect(dialog).not.toHaveClass("h-fit");
     expect(body).toHaveClass("overflow-hidden");
@@ -387,7 +391,7 @@ describe("AIRecognizeSubscriptionDialog", () => {
     const user = userEvent.setup();
     const firstImage = new File(["first"], "first.png", { type: "image/png" });
     const pastedImage = new File(["pasted"], "disabled.png", { type: "image/png" });
-    let resolveRecognition: ((response: AiRecognizeResponse) => void) | null = null;
+    let resolveRecognition: (response: AiRecognizeResponse) => void = () => undefined;
     mocks.recognizeSubscriptions.mockReturnValue(new Promise<AiRecognizeResponse>((resolve) => {
       resolveRecognition = resolve;
     }));
@@ -403,7 +407,7 @@ describe("AIRecognizeSubscriptionDialog", () => {
     expect(screen.queryByRole("button", { name: "预览图片 disabled.png" })).not.toBeInTheDocument();
     expect(mocks.createObjectURL).toHaveBeenCalledTimes(1);
 
-    resolveRecognition?.(makeResponse([makeDraft()]));
+    resolveRecognition(makeResponse([makeDraft()]));
   });
 
   it("草稿阶段由内部工作区滚动，外层弹窗 body 不滚动", async () => {

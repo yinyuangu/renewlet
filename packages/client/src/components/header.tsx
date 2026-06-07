@@ -131,7 +131,7 @@ export function Header({ onAddSubscription, availableTags, subscriptionActions }
           </nav>
         </div>
 
-        <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           {isAdmin ? <SystemUpdateDialog open={systemDialogOpen} onOpenChange={setSystemDialogOpen} /> : null}
 
           <Button

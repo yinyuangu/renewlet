@@ -1296,7 +1296,7 @@ msgstr "支持 Renewlet ZIP/JSON、Wallos JSON、backup.zip、wallos.db。"
 #. js-lingui-explicit-id
 #: src/i18n/descriptors/subscription.ts:373
 msgid "aiRecognition.inputHint"
-msgstr "支持纯文本、CSV/TSV 和表格复制文本；.xlsx 文件请先复制内容或上传图片。"
+msgstr "支持纯文本、CSV/TSV 和表格复制文本；.xlsx 文件请先复制内容。"
 
 #. js-lingui-explicit-id
 #: src/i18n/descriptors/subscription.ts:109
@@ -1906,7 +1906,7 @@ msgstr "粘贴 Renewlet 或 Wallos JSON..."
 #. js-lingui-explicit-id
 #: src/i18n/descriptors/subscription.ts:365
 msgid "aiRecognition.dialogDescription"
-msgstr "粘贴备忘录、表格文本，或上传图片，让已配置的 AI 模型生成可编辑订阅草稿。"
+msgstr "使用已配置的 AI 模型生成可编辑订阅草稿，确认后再导入。"
 
 #. js-lingui-explicit-id
 #: src/i18n/descriptors/subscription.ts:372

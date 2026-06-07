@@ -28,6 +28,7 @@ const mocks = vi.hoisted(() => ({
   exportToJSON: vi.fn(),
   exportToJSONWithSecrets: vi.fn(),
   exportToCSV: vi.fn(),
+  renderHeaderActions: false,
 }));
 
 vi.mock("@/hooks/use-subscriptions", () => ({
@@ -111,7 +112,19 @@ vi.mock("@/components/import-data-dialog", () => ({
 }));
 
 vi.mock("@/components/header", () => ({
-  Header: () => <header data-testid="header" />,
+  Header: ({ subscriptionActions }: { subscriptionActions?: ReactNode }) => (
+    <header data-testid="header">
+      {mocks.renderHeaderActions ? subscriptionActions : null}
+    </header>
+  ),
+}));
+
+vi.mock("@/components/ai-recognize-subscription-dialog", () => ({
+  AIRecognizeSubscriptionDialog: ({ open }: { open: boolean }) => (
+    <div role="dialog" aria-label="AI 识别订阅" data-testid="ai-recognition-dialog">
+      {String(open)}
+    </div>
+  ),
 }));
 
 vi.mock("@/components/subscription-card", () => ({
@@ -276,6 +289,10 @@ function manySubscriptions(count: number) {
   );
 }
 
+beforeEach(() => {
+  mocks.renderHeaderActions = false;
+});
+
 describe("Subscriptions page sorting", () => {
   beforeAll(() => {
     Element.prototype.hasPointerCapture ??= vi.fn(() => false);
@@ -402,6 +419,20 @@ describe("Subscriptions page sorting", () => {
     expect(searchInput).toHaveAttribute("name", "subscription-search");
     expect(searchInput).toHaveAttribute("enterkeyhint", "search");
     expect(screen.getByTestId("mobile-sort-tag-row")).toBeInTheDocument();
+  });
+
+  it("keeps the AI add shortcut accessible, compact, and wired to the recognition dialog", async () => {
+    mocks.renderHeaderActions = true;
+    const user = userEvent.setup();
+    renderSubscriptionsPage();
+
+    const aiButton = screen.getByRole("button", { name: "AI 识别添加" });
+    expect(aiButton).toHaveClass("h-12", "w-12", "sm:h-10", "sm:w-10", "text-primary");
+    expect(aiButton).not.toHaveAttribute("title");
+
+    await user.click(aiButton);
+
+    expect(await screen.findByRole("dialog", { name: "AI 识别订阅" })).toHaveTextContent("true");
   });
 
   it("keeps import as a dedicated action next to the export menu", async () => {
