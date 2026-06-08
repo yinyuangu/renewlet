@@ -2,6 +2,7 @@ import * as Dialog from '@radix-ui/react-dialog'
 import { ExternalLink, X } from 'lucide-react'
 
 import { deployOptions, localizedUrl, text, type DeployOption, type Locale } from '../../content/site'
+import { externalLinkProps } from '../../lib/external-link'
 
 type DeployDialogProps = {
   locale: Locale
@@ -16,8 +17,7 @@ function DeployOptionCard({ locale, option }: { locale: Locale; option: DeployOp
     <a
       className="group grid gap-3 rounded-xl border border-white/10 bg-zinc-900/60 p-4 text-left transition hover:border-emerald-300/40 hover:bg-zinc-900"
       href={localizedUrl(option.href, locale)}
-      rel="noopener noreferrer"
-      target="_blank"
+      {...externalLinkProps}
     >
       <span className="flex items-center justify-between gap-3">
         <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-emerald-300">

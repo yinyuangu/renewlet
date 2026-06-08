@@ -1,4 +1,6 @@
 import { links, locales, type Locale, copy, text } from '../content/site'
+import { externalLinkProps } from '../lib/external-link'
+import { websitePath } from '../lib/site-path'
 import { RenewletLogo } from './icons'
 
 type HeaderProps = {
@@ -15,7 +17,8 @@ export function Header({ locale, onLocaleChange }: HeaderProps) {
         <div className="mx-4 w-full max-w-7xl">
           <nav aria-label="Global" className="flex min-h-20 items-center justify-between px-4 py-3">
             <div className="flex lg:flex-1">
-              <a aria-label="Renewlet home" href="/">
+              {/* GitHub Pages 仓库页部署在 Vite base 下，品牌链接不能写死域名根路径。 */}
+              <a aria-label="Renewlet home" href={websitePath()}>
                 <RenewletLogo className="h-6 w-auto sm:h-7" />
               </a>
             </div>
@@ -25,6 +28,7 @@ export function Header({ locale, onLocaleChange }: HeaderProps) {
                 <a
                   className="transition hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/45"
                   href={links.docsZh}
+                  {...externalLinkProps}
                 >
                   {text(copy.nav.blog, locale)}
                 </a>
@@ -33,8 +37,7 @@ export function Header({ locale, onLocaleChange }: HeaderProps) {
                 <a
                   className="transition hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/45"
                   href={links.github}
-                  rel="noopener noreferrer"
-                  target="_blank"
+                  {...externalLinkProps}
                 >
                   {text(copy.nav.github, locale)}
                 </a>

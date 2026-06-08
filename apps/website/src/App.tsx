@@ -8,6 +8,7 @@ import { Hero } from './components/Hero'
 import { Intro } from './components/Intro'
 import { RuntimeSection } from './components/RuntimeSection'
 import { DeployDialog } from './features/deploy/DeployDialog'
+import { websitePath } from './lib/site-path'
 import type { Locale } from './content/site'
 
 // /en/ 是真实静态 HTML 入口，初始语言必须跟路径一致，避免英文 canonical 页首屏闪成中文。
@@ -27,9 +28,7 @@ function App() {
     setLocale(nextLocale)
     document.documentElement.lang = nextLocale === 'en' ? 'en' : 'zh-CN'
 
-    const base = import.meta.env.BASE_URL.replace(/\/$/, '')
-    const nextPath = nextLocale === 'en' ? `${base}/en/` : `${base}/`
-    window.history.replaceState({}, '', nextPath)
+    window.history.replaceState({}, '', websitePath(nextLocale === 'en' ? 'en/' : ''))
   }
 
   return (

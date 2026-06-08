@@ -2,6 +2,7 @@ import type { ComponentType, SVGProps } from 'react'
 import { Cloud, Container, ScrollText } from 'lucide-react'
 
 import { copy, links, localizedUrl, text, type Locale } from '../content/site'
+import { externalLinkProps } from '../lib/external-link'
 
 type FooterProps = {
   locale: Locale
@@ -32,8 +33,7 @@ function FooterLink({
       aria-label={label}
       className="group relative flex h-6 w-6 items-center justify-center text-zinc-400 transition hover:text-zinc-300"
       href={href}
-      rel="noopener noreferrer"
-      target="_blank"
+      {...externalLinkProps}
     >
       <Icon aria-hidden="true" className="h-5 w-5" strokeWidth={1.6} />
       {/* Tooltip 只给视觉用户确认 icon-only 入口；读屏继续依赖链接自身 aria-label。 */}

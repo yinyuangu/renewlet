@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import type { Page } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
 
 import {
   renewletImageManifest,
@@ -90,11 +90,17 @@ async function expectLocalizedScreenshots(page: Page, suffix: 'zh' | 'en') {
   )
 }
 
+async function expectExternalLink(link: Locator) {
+  await expect(link).toHaveAttribute('target', '_blank')
+  await expect(link).toHaveAttribute('rel', 'noopener noreferrer')
+}
+
 test('renders the Renewlet homepage and opens deployment dialog from both entry points', async ({ page }) => {
   await page.goto('/')
   const header = page.getByRole('banner')
 
   await expect(page.getByRole('heading', { name: /别再让续费悄悄扣走预算/i })).toBeVisible()
+  await expect(header.getByRole('link', { name: /Renewlet home/i })).toHaveAttribute('href', '/')
   await expect(header.getByRole('link', { name: /^文档$/i })).toBeVisible()
   await expect(header.getByRole('link', { name: /^GitHub$/i })).toBeVisible()
   await expect(header.getByRole('button', { name: /Switch to English/i })).toBeVisible()
@@ -107,6 +113,9 @@ test('renders the Renewlet homepage and opens deployment dialog from both entry 
     /docs\/cloudflare-workers-deploy\.zh-CN\.md/,
   )
   await expect(footer.getByRole('link', { name: /^License$/i })).toBeVisible()
+  for (const linkName of [/^GitHub$/i, /^Docker$/i, /^Cloudflare$/i, /^License$/i]) {
+    await expectExternalLink(footer.getByRole('link', { name: linkName }))
+  }
   await expect(footer.getByRole('link', { name: /中文 README|英文 README|MIT License/i })).toHaveCount(0)
 
   for (const card of ['subscriptions', 'reminders', 'calendar', 'statistics', 'hosting']) {
