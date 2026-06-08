@@ -15,6 +15,32 @@ https://<worker-name>.<workers-dev-subdomain>.workers.dev/setup
 
 Keep the generated deploy command as `pnpm deploy`. Renewlet's deploy script applies D1 migrations before publishing the Worker, so new tables are created before the updated API starts serving traffic.
 
+### Upgrade
+
+One-click deploy creates a repository in your GitHub/GitLab account. To upgrade later, update that repository. Do not click the one-click button again.
+
+Open the Renewlet Worker in the Cloudflare dashboard, go to `Settings` -> `Builds`, and find the connected repository. Then run:
+
+```bash
+git clone https://github.com/<your-account>/<cloudflare-generated-repo>.git
+cd <cloudflare-generated-repo>
+git remote add upstream https://github.com/zhiyingzzhou/renewlet.git
+git fetch upstream
+git checkout main
+git merge upstream/main
+git push origin main
+```
+
+If `upstream` already exists:
+
+```bash
+git remote set-url upstream https://github.com/zhiyingzzhou/renewlet.git
+```
+
+Then continue with `git fetch upstream`, `git merge upstream/main`, and `git push origin main` above.
+
+After push, Cloudflare redeploys automatically.
+
 If you prefer to create D1/R2, the Cloudflare API Token, and GitHub Secrets yourself, use the manual deploy flow below.
 
 ## Manual Deploy (GitHub Actions)
@@ -36,7 +62,7 @@ Add these 5 values to GitHub Secrets to enable remote deployment.
 
 Fork the current repository to your own account or organization.
 
-Repository name already exists: use the existing fork, or delete/rename the repository with the same name and fork again.
+Repository name already exists: use the existing fork, or choose another repository name.
 
 ### 2. Create Cloudflare Resources
 
@@ -191,21 +217,11 @@ Custom domain: after deployment, bind a Worker route or custom domain for the Wo
 
 ## Update Version
 
-Cloudflare Workers deployments can update with automatic sync or manual sync.
+One-click deploy users: follow the Upgrade steps above and sync the repository connected in Cloudflare Builds.
 
-### Automatic Update
+Manual deploy users: open your fork and click `Sync fork` / `Update branch`. If deployment does not start automatically, open `Actions` and run `Cloudflare Worker`.
 
-If your fork has automatic upstream sync enabled, upstream updates sync and redeploy automatically.
-
-### Manual Update
-
-1. Open your fork repository.
-2. Click `Sync fork`.
-3. If GitHub asks for confirmation, click `Update branch`.
-4. Wait for Cloudflare to redeploy.
-5. If deployment does not start automatically, open `Actions` and run `Cloudflare Worker` manually.
-
-Every Cloudflare update must run the same migration-before-deploy path. The GitHub Actions workflow does this automatically when all required secrets are configured.
+Every Cloudflare update must apply D1 migrations before publishing the Worker. `pnpm deploy` and GitHub Actions both keep this order.
 
 ## Optional: Wrangler CLI
 

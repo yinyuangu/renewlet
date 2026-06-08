@@ -55,6 +55,8 @@ Idle memory usage is around 20-30MiB in local testing, making it comfortable for
 
 Click the button and follow the Cloudflare wizard for the easiest deployment path.
 
+Do not click the one-click button again to upgrade. Use the Upgrade steps in [Cloudflare Workers deploy](docs/cloudflare-workers-deploy.md), sync the repository Cloudflare created, and push to redeploy.
+
 If the page says `Failed to get repository contents`, Cloudflare is usually being rate-limited while reading the public GitHub repository. Avoid repeated retries; try again later, or use [Cloudflare Workers manual deploy](docs/cloudflare-workers-deploy.md).
 
 ## Quick Deploy
@@ -112,7 +114,7 @@ docker compose logs -f
 
 Official Docker release images with the current binary layout can also update from the version badge at the top of Renewlet, which opens System Update. This in-app path downloads the GitHub Release binary, verifies `checksums.txt`, replaces the runtime binary, and then asks an administrator to click **Restart now**. Older images must run `docker compose pull && docker compose up -d` once before the in-app updater becomes available.
 
-Cloudflare deployments update from your fork: click `Sync fork` / `Update branch`, wait for redeploy, and run `Cloudflare Worker` manually only if it does not start automatically. The deploy path must keep D1 migrations before Worker deploy.
+Cloudflare deployments update from the repository connected in Cloudflare Builds. One-click deploy users sync the generated repository; manual deploy users sync their fork and run `Cloudflare Worker`. The deploy path must keep D1 migrations before Worker deploy.
 
 ### Common commands
 

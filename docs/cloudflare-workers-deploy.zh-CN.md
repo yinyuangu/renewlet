@@ -15,6 +15,32 @@ https://<worker-name>.<workers-dev-subdomain>.workers.dev/setup
 
 保持生成的部署命令为 `pnpm deploy`。Renewlet 的 deploy 脚本会先应用 D1 migrations，再发布 Worker，确保新表先创建好，更新后的 API 再开始对外服务。
 
+### 升级办法
+
+一键部署会在你的 GitHub/GitLab 账号下生成一个仓库。以后升级，更新这个仓库，不要重新点一键部署按钮。
+
+先在 Cloudflare Dashboard 打开 Renewlet Worker，进入 `Settings` -> `Builds`，找到连接的生成仓库。然后本地执行：
+
+```bash
+git clone https://github.com/<你的账号>/<Cloudflare生成的仓库>.git
+cd <Cloudflare生成的仓库>
+git remote add upstream https://github.com/zhiyingzzhou/renewlet.git
+git fetch upstream
+git checkout main
+git merge upstream/main
+git push origin main
+```
+
+如果已经有 `upstream`：
+
+```bash
+git remote set-url upstream https://github.com/zhiyingzzhou/renewlet.git
+```
+
+然后继续执行上面的 `git fetch upstream`、`git merge upstream/main` 和 `git push origin main`。
+
+push 后 Cloudflare 会自动重新部署。
+
 如果你想自己创建 D1/R2、Cloudflare API Token 和 GitHub Secrets，可以继续使用下面的手动部署流程。
 
 ## 手动部署（GitHub Actions）
@@ -36,7 +62,7 @@ https://<worker-name>.<workers-dev-subdomain>.workers.dev/setup
 
 把当前仓库 Fork 到自己的账号或组织。
 
-仓库名已存在：使用已有 fork；或删除/重命名同名仓库后重新 Fork。
+仓库名已存在：使用已有 fork，或换一个仓库名。
 
 ### 2. 创建 Cloudflare 资源
 
@@ -191,21 +217,11 @@ https://<WORKER_NAME>.<workers-dev-subdomain>.workers.dev/setup
 
 ## 更新版本
 
-Cloudflare Workers 部署可以用自动同步或手动同步更新。
+一键部署用户：按上面的“升级办法”，同步 Cloudflare Builds 连接的生成仓库。
 
-### 自动更新
+手动部署用户：打开 fork，点击 `Sync fork` / `Update branch`。如果没有自动部署，进入 `Actions` 手动运行 `Cloudflare Worker`。
 
-如果你的 fork 已启用自动同步，上游仓库有更新时会自动同步并触发部署。
-
-### 手动更新
-
-1. 打开你的 fork 仓库。
-2. 点击 `Sync fork`。
-3. 如果页面提示需要更新，点击 `Update branch`。
-4. 等待 Cloudflare 重新部署。
-5. 如果没有自动部署，进入 `Actions` 手动运行 `Cloudflare Worker`。
-
-每次 Cloudflare 升级都必须走同一条“先 D1 migration、再 deploy”的路径。GitHub Actions 在 5 个必需 secrets 都配置好时会自动执行。
+每次 Cloudflare 升级都必须先跑 D1 migrations，再发布 Worker。`pnpm deploy` 和 GitHub Actions 都会按这个顺序执行。
 
 ## 可选：Wrangler CLI
 

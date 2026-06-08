@@ -283,8 +283,8 @@ export const deployOptions: DeployOption[] = [
     icon: Cloud,
     title: { zh: 'Cloudflare Workers', en: 'Cloudflare Workers' },
     body: {
-      zh: '使用 Worker API、D1、R2 和 Cron Triggers 运行。',
-      en: 'Run with Worker API, D1, R2, and Cron Triggers.',
+      zh: '一键部署到 Cloudflare，升级按文档同步生成仓库。',
+      en: 'One-click deploy to Cloudflare; update by syncing the generated repo.',
     },
     href: links.cloudflare,
     action: { zh: '查看 Cloudflare 部署', en: 'Read Cloudflare deploy' },
