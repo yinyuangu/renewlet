@@ -1,13 +1,15 @@
 /**
  * Cloudflare AI 模型列表代理只服务“用户主动刷新”场景。
  *
- * 这里复用 shared provider endpoint 作为请求事实源，Worker 只负责认证、超时、响应限额和错误脱敏；
- * 模型候选不会入库，避免把第三方账号能力或 API key 变成 Renewlet 的持久化数据。
+ * 这里复用 shared provider endpoint 作为请求事实源，Worker 只负责认证、超时、响应限额和错误回显；
+ * 模型候选不会入库，避免把第三方账号能力或请求 API key 变成 Renewlet 的持久化数据。
  */
 import {
   AI_RECOGNITION_MAX_MODEL_LIST_MODELS,
+  aiModelListErrorDetailsSchema,
   aiModelListRequestSchema,
   aiModelListResponseSchema,
+  type AiProviderResponse,
   type AiModelListItem,
   type AiModelListRequest,
   type AiRecognitionTransportProtocol,
@@ -17,10 +19,10 @@ import { requireAuth } from "./auth";
 import { HttpError, json, readJson, requestLocale } from "./http";
 import { serverText, type AppLocale } from "./server-i18n";
 import type { Env } from "./types";
+import { providerResponseFromFetchResponse } from "./ai-provider-response";
 
 const AI_MODEL_LIST_TIMEOUT_MS = 15_000;
 const AI_MODEL_LIST_RESPONSE_BYTES = 1 << 20;
-const AI_MODEL_SECRET_PATTERN = /(sk-[A-Za-z0-9_-]{8,}|AIza[0-9A-Za-z_-]{8,}|sk-ant-[A-Za-z0-9_-]{8,}|Bearer\s+[A-Za-z0-9._-]{8,}|(?:api[_-]?key|authorization|cookie|set-cookie|access[_-]?token|refresh[_-]?token)["'\s:=]+[A-Za-z0-9._~+/=-]{8,})/gi;
 
 type ModelListEndpoint = {
   url: string;
@@ -38,7 +40,7 @@ type NormalizedModelList = {
 /**
  * listAIModels 是用户显式刷新模型列表的认证代理。
  *
- * API key 只在 Worker 内用于第三方 `/models` 请求，不入库、不返回给浏览器，也不由前端直连 provider。
+ * 请求 API key 只在 Worker 内用于第三方 `/models` 请求，不入库、不回显，也不由前端直连 provider。
  */
 export async function listAIModels(request: Request, env: Env): Promise<Response> {
   const locale = requestLocale(request);
@@ -107,7 +109,7 @@ async function fetchAIModelListJSON(endpoint: ModelListEndpoint, locale: AppLoca
   const timeout = setTimeout(() => controller.abort(), AI_MODEL_LIST_TIMEOUT_MS);
   let response: Response;
   try {
-    // 这是用户显式点击刷新后才触发的第三方请求；API Key 只在 Worker 侧使用，不返回、不持久化。
+    // 这是用户显式点击刷新后才触发的第三方请求；请求 API key 只在 Worker 侧使用，不回显、不持久化。
     response = await fetch(endpoint.url, {
       method: "GET",
       headers: endpoint.headers,
@@ -133,7 +135,7 @@ async function fetchAIModelListJSON(endpoint: ModelListEndpoint, locale: AppLoca
       response.status,
       serverText(locale, "aiRecognition.modelListFailed"),
       "AI_MODEL_LIST_FAILED",
-      aiModelListErrorDetails(`http_${response.status}`, text),
+      aiModelListErrorDetails(`http_${response.status}`, text, providerResponseFromFetchResponse(response, text)),
     );
   }
 
@@ -144,7 +146,7 @@ async function fetchAIModelListJSON(endpoint: ModelListEndpoint, locale: AppLoca
       400,
       serverText(locale, "aiRecognition.modelListFailed"),
       "AI_MODEL_LIST_INVALID_JSON",
-      aiModelListErrorDetails("invalid_json", text),
+      aiModelListErrorDetails("invalid_json", text, providerResponseFromFetchResponse(response, text)),
     );
   }
 }
@@ -325,20 +327,17 @@ function stripGeminiModelPrefix(value: string | null): string | null {
   return value.replace(/^models\//, "");
 }
 
-function aiModelListErrorDetails(reason: string, providerMessage: unknown) {
+function aiModelListErrorDetails(reason: string, providerMessage: unknown, providerResponse: AiProviderResponse | null = null) {
   const message = providerMessage instanceof Error
     ? providerMessage.message
     : typeof providerMessage === "string"
       ? providerMessage
       : null;
-  return {
+  return aiModelListErrorDetailsSchema.parse({
     reason,
-    providerMessage: message ? redactAIModelListSecrets(message).slice(0, 1000) : null,
-  };
-}
-
-function redactAIModelListSecrets(value: string): string {
-  return value.replace(AI_MODEL_SECRET_PATTERN, "[redacted]");
+    providerMessage: message || null,
+    providerResponse,
+  });
 }
 
 function isAbortError(error: unknown): boolean {

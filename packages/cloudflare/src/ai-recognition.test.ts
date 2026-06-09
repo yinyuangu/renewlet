@@ -22,6 +22,7 @@ const aiMocks = vi.hoisted(() => ({
   outputObject: vi.fn((options: unknown) => options),
   wrapLanguageModel: vi.fn(({ model }: { model: unknown }) => model),
   isNoObjectGeneratedError: vi.fn((error: unknown) => Boolean(error && typeof error === "object" && "__noObjectGenerated" in error)),
+  isAPICallError: vi.fn((error: unknown) => Boolean(error && typeof error === "object" && "__apiCallError" in error)),
 }));
 
 vi.mock("./auth", () => ({
@@ -44,6 +45,9 @@ vi.mock("ai", () => ({
   wrapLanguageModel: aiMocks.wrapLanguageModel,
   NoObjectGeneratedError: {
     isInstance: aiMocks.isNoObjectGeneratedError,
+  },
+  APICallError: {
+    isInstance: aiMocks.isAPICallError,
   },
 }));
 
@@ -163,6 +167,7 @@ describe("Cloudflare AI recognition", () => {
     aiMocks.outputObject.mockClear();
     aiMocks.wrapLanguageModel.mockClear();
     aiMocks.isNoObjectGeneratedError.mockClear();
+    aiMocks.isAPICallError.mockClear();
     authMocks.requireAuth.mockResolvedValue({ user: authUser, session: { id: "ses" }, token: "test" });
     dbMocks.getSettings.mockResolvedValue({
       aiRecognition: {
@@ -359,6 +364,36 @@ describe("Cloudflare AI recognition", () => {
     }));
     expect(aiMocks.generateObject).not.toHaveBeenCalled();
     expect(aiMocks.wrapLanguageModel).not.toHaveBeenCalled();
+  });
+
+  it("returns raw provider response details when connection test fails", async () => {
+    aiMocks.generateText.mockRejectedValue(Object.assign(new Error("invalid key sk-test-secret"), {
+      __apiCallError: true,
+      statusCode: 401,
+      responseHeaders: { "content-type": "application/json" },
+      responseBody: "{\"code\":\"INVALID_API_KEY\",\"message\":\"bad sk-test-secret\"}",
+    }));
+
+    await expect(testAIRecognitionConnection(testConnectionRequestFor({
+      providerType: "openai",
+      transportProtocol: "openai-chat",
+      model: "gpt-5.1",
+      modelInputMode: "select",
+      baseUrl: "",
+      apiKey: "sk-test",
+      defaultThinkingControl: null,
+    }), envFixture())).rejects.toMatchObject({
+      status: 400,
+      code: "AI_RECOGNITION_TEST_FAILED",
+      details: {
+        providerMessage: expect.stringContaining("[redacted]"),
+        providerResponse: {
+          status: 401,
+          headers: { "content-type": "application/json" },
+          body: "{\"code\":\"INVALID_API_KEY\",\"message\":\"bad sk-test-secret\"}",
+        },
+      },
+    });
   });
 
   it("canonicalizes mismatched compatible protocol to OpenAI chat runtime", async () => {
@@ -675,6 +710,29 @@ describe("Cloudflare AI recognition", () => {
           response: {
             finishReason: "stop",
           },
+        },
+      },
+    });
+  });
+
+  it("returns raw provider response details when non-stream recognition provider call fails", async () => {
+    aiMocks.generateObject.mockRejectedValue(Object.assign(new Error("provider rejected sk-test-secret"), {
+      __apiCallError: true,
+      statusCode: 403,
+      responseHeaders: { "content-type": "application/json" },
+      responseBody: "{\"error\":\"forbidden sk-test-secret\"}",
+    }));
+
+    await expect(recognizeSubscriptions(requestForText("dmit 15元 1个月"), envFixture())).rejects.toMatchObject({
+      status: 400,
+      code: "AI_RECOGNITION_FAILED",
+      details: {
+        providerMessage: expect.stringContaining("[redacted]"),
+        providerResponse: {
+          status: 403,
+          headers: { "content-type": "application/json" },
+          body: "{\"error\":\"forbidden sk-test-secret\"}",
+          bodyTruncated: false,
         },
       },
     });

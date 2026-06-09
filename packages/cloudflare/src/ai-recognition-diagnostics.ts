@@ -11,12 +11,14 @@ import {
   aiRecognitionErrorDetailsSchema,
   type AiRecognitionDiagnostics,
   type AiRecognitionSettings,
+  type AiProviderResponse,
   type AiThinkingControl,
 } from "@renewlet/shared/schemas/ai-recognition";
 import {
   AI_RECOGNITION_PROMPT_VERSION,
   AI_RECOGNITION_SCHEMA_NAME,
 } from "@renewlet/shared/ai-recognition-prompt";
+import { providerResponseFromError } from "./ai-provider-response";
 
 const AI_SECRET_PATTERN = /(sk-[A-Za-z0-9_-]{8,}|AIza[0-9A-Za-z_-]{8,}|sk-ant-[A-Za-z0-9_-]{8,}|Bearer\s+[A-Za-z0-9._-]{8,}|eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+|(?:api[_-]?key|authorization|cookie|set-cookie|access[_-]?token|refresh[_-]?token)["'\s:=]+[A-Za-z0-9._~+/=-]{8,})/gi;
 
@@ -85,10 +87,16 @@ export function safeAIRecognitionError(error: unknown): string {
   return redactAIRecognitionSecrets(error instanceof Error ? error.message : String(error)).slice(0, 500);
 }
 
-export function aiRecognitionErrorDetails(reason: string, error: unknown, diagnostics: AiRecognitionDiagnostics) {
+export function aiRecognitionErrorDetails(
+  reason: string,
+  error: unknown,
+  diagnostics: AiRecognitionDiagnostics,
+  providerResponse: AiProviderResponse | null = providerResponseFromError(error),
+) {
   return aiRecognitionErrorDetailsSchema.parse({
     reason,
     providerMessage: error === null ? null : safeAIRecognitionError(error),
+    providerResponse,
     diagnostics,
   });
 }

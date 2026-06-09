@@ -76,6 +76,33 @@ describe("api-client", () => {
     expect(mocks.clearAuthSession).toHaveBeenCalledTimes(1);
   });
 
+  it("does not clear auth session for AI model list provider failures", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({
+      message: "无法获取模型列表，请检查 Base URL 和 API Key，或手动输入模型 ID。",
+      code: "AI_MODEL_LIST_FAILED",
+      details: {
+        reason: "http_401",
+        providerMessage: "{\"code\":\"INVALID_API_KEY\",\"message\":\"Invalid API key\"}",
+        providerResponse: {
+          status: 401,
+          statusText: "Unauthorized",
+          headers: { "content-type": "application/json" },
+          body: "{\"code\":\"INVALID_API_KEY\",\"message\":\"Invalid API key\"}",
+          bodyTruncated: false,
+        },
+      },
+    }), { status: 401 }));
+
+    await expect(apiFetch("/api/app/ai/models/list", okResponseSchema)).rejects.toMatchObject({
+      name: "ApiError",
+      message: "无法获取模型列表，请检查 Base URL 和 API Key，或手动输入模型 ID。",
+      status: 401,
+      code: "AI_MODEL_LIST_FAILED",
+    });
+    expect(mocks.clearAuthSession).not.toHaveBeenCalled();
+  });
+
   it("turns legacy Zod field errors into a readable message", async () => {
     const fetchMock = vi.mocked(fetch);
     fetchMock.mockResolvedValue(new Response(JSON.stringify({

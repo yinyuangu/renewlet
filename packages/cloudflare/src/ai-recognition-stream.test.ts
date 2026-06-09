@@ -20,6 +20,7 @@ const aiMocks = vi.hoisted(() => ({
   outputObject: vi.fn((options: unknown) => options),
   wrapLanguageModel: vi.fn(({ model }: { model: unknown }) => model),
   isNoObjectGeneratedError: vi.fn((error: unknown) => Boolean(error && typeof error === "object" && "__noObjectGenerated" in error)),
+  isAPICallError: vi.fn((error: unknown) => Boolean(error && typeof error === "object" && "__apiCallError" in error)),
 }));
 
 vi.mock("./auth", () => ({
@@ -40,6 +41,9 @@ vi.mock("ai", () => ({
   wrapLanguageModel: aiMocks.wrapLanguageModel,
   NoObjectGeneratedError: {
     isInstance: aiMocks.isNoObjectGeneratedError,
+  },
+  APICallError: {
+    isInstance: aiMocks.isAPICallError,
   },
 }));
 
@@ -161,6 +165,7 @@ describe("Cloudflare AI recognition stream", () => {
     aiMocks.outputObject.mockClear();
     aiMocks.wrapLanguageModel.mockClear();
     aiMocks.isNoObjectGeneratedError.mockClear();
+    aiMocks.isAPICallError.mockClear();
     authMocks.requireAuth.mockResolvedValue({ user: authUser, session: { id: "ses" }, token: "test" });
     dbMocks.getSettings.mockResolvedValue({
       aiRecognition: {
@@ -321,9 +326,14 @@ describe("Cloudflare AI recognition stream", () => {
     expect(payload).not.toContain("sk-test");
   });
 
-  it("streams sanitized error events when provider streaming fails", async () => {
+  it("streams raw provider response details when provider streaming fails", async () => {
     aiMocks.streamText.mockReturnValue(streamTextResult({
-      outputError: new Error("provider failed sk-stream-secret123"),
+      outputError: Object.assign(new Error("provider failed sk-stream-secret123"), {
+        __apiCallError: true,
+        statusCode: 401,
+        responseHeaders: { "content-type": "application/json" },
+        responseBody: "{\"code\":\"INVALID_API_KEY\",\"message\":\"bad sk-stream-secret123\"}",
+      }),
       fullStream: [],
       partialOutputStream: [],
     }));
@@ -336,7 +346,56 @@ describe("Cloudflare AI recognition stream", () => {
     expect(response.status).toBe(200);
     expect(error?.code).toBe("AI_RECOGNITION_FAILED");
     expect(error?.details?.providerMessage).toContain("[redacted]");
+    expect(error?.details?.providerResponse).toMatchObject({
+      status: 401,
+      headers: { "content-type": "application/json" },
+      body: "{\"code\":\"INVALID_API_KEY\",\"message\":\"bad sk-stream-secret123\"}",
+      bodyTruncated: false,
+    });
     expect(payload).not.toContain("sk-test");
-    expect(payload).not.toContain("sk-stream-secret123");
+    expect(payload).toContain("sk-stream-secret123");
+  });
+
+  it("prefers full stream provider response body over structured output wrapper errors", async () => {
+    aiMocks.streamText.mockReturnValue(streamTextResult({
+      outputError: new Error("No object generated: response did not match schema."),
+      fullStream: [{
+        type: "error",
+        error: Object.assign(new Error("Invalid API key"), {
+          url: "https://sub-api.3623211.xyz/v1/messages",
+          requestBodyValues: {
+            model: "claude-sonnet-4-6",
+            stream: true,
+          },
+          statusCode: 401,
+          responseHeaders: {
+            "content-type": "application/json; charset=utf-8",
+            "x-request-id": "94e04705-c718-498c-ae12-bb9af83647bb",
+          },
+          responseBody: "{\"code\":\"INVALID_API_KEY\",\"message\":\"Invalid API key\"}",
+          isRetryable: false,
+        }),
+      }],
+      partialOutputStream: [],
+    }));
+
+    const response = await recognizeSubscriptionsStream(requestForText("dmit 15元 1个月"), envFixture());
+    const events = await readSSEEvents(response);
+    const error = events.find((event): event is Extract<AiRecognitionStreamEvent, { type: "recognition/error" }> => event.type === "recognition/error");
+    const payload = JSON.stringify(events);
+
+    expect(response.status).toBe(200);
+    expect(error?.code).toBe("AI_RECOGNITION_FAILED");
+    expect(error?.details?.providerResponse).toMatchObject({
+      status: 401,
+      headers: {
+        "content-type": "application/json; charset=utf-8",
+        "x-request-id": "94e04705-c718-498c-ae12-bb9af83647bb",
+      },
+      body: "{\"code\":\"INVALID_API_KEY\",\"message\":\"Invalid API key\"}",
+      bodyTruncated: false,
+    });
+    expect(payload).not.toContain("requestBodyValues");
+    expect(payload).not.toContain("claude-sonnet-4-6");
   });
 });

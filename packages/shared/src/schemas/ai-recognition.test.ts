@@ -8,9 +8,11 @@ import { aiRecognitionPromptSpec } from "../ai-recognition-prompt";
 import {
   AI_RECOGNITION_MAX_IMAGES,
   aiGeneratedRecognizeObjectSchema,
+  aiModelListErrorDetailsSchema,
   aiModelListRequestSchema,
   aiModelListResponseSchema,
   aiRecognitionDiagnosticsSchema,
+  aiRecognitionErrorDetailsSchema,
   aiRecognitionSettingsSchema,
   aiRecognitionStreamEventSchema,
   aiRecognizeResponseSchema,
@@ -161,6 +163,83 @@ describe("AI recognition diagnostics schema", () => {
         images: [...diagnostics.request.images, { mediaType: "image/png", sizeBytes: 4 }],
       },
     }).success).toBe(false);
+  });
+});
+
+describe("AI provider error response schema", () => {
+  it("keeps raw provider response body and accepts legacy details", () => {
+    const rawBody = "  {\"error\":\"invalid sk-test-secret\"}\n";
+    expect(aiModelListErrorDetailsSchema.parse({
+      reason: "http_401",
+      providerMessage: rawBody,
+      providerResponse: {
+        status: 401,
+        statusText: "Unauthorized",
+        headers: { "content-type": "application/json" },
+        body: rawBody,
+        bodyTruncated: false,
+      },
+    }).providerResponse?.body).toBe(rawBody);
+
+    expect(aiModelListErrorDetailsSchema.parse({
+      reason: "provider_failed",
+      providerMessage: "network error",
+      providerResponse: {
+        status: null,
+        statusText: null,
+        headers: null,
+        body: "network error",
+        bodyTruncated: false,
+      },
+    }).providerResponse?.headers).toBeNull();
+
+    expect(aiModelListErrorDetailsSchema.safeParse({
+      reason: "http_401",
+      providerMessage: "legacy provider message",
+    }).success).toBe(true);
+  });
+
+  it("allows AI recognition details with provider response and diagnostics", () => {
+    const diagnostics = {
+      schemaVersion: "1",
+      promptVersion: "test",
+      schemaName: "renewlet_ai_subscription_recognition",
+      prompt: {
+        system: { value: "system", truncated: false },
+        user: { value: "user", truncated: false },
+      },
+      output: {
+        rawModelText: null,
+        rawObjectJson: null,
+      },
+      request: {
+        providerType: "openai",
+        transportProtocol: "openai-chat",
+        model: "gpt-5.1",
+        thinkingControl: null,
+        maxOutputTokens: 12000,
+        textCharCount: 0,
+        images: [],
+      },
+      response: {
+        usage: null,
+        finishReason: null,
+        providerMetadata: null,
+      },
+    };
+
+    expect(aiRecognitionErrorDetailsSchema.safeParse({
+      reason: "provider_failed",
+      providerMessage: "invalid model",
+      providerResponse: {
+        status: 400,
+        statusText: "Bad Request",
+        headers: null,
+        body: "{\"error\":\"invalid model\"}",
+        bodyTruncated: false,
+      },
+      diagnostics,
+    }).success).toBe(true);
   });
 });
 

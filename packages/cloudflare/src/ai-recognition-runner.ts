@@ -42,6 +42,7 @@ import {
   todayDateOnly,
   type AIRecognitionCapture,
 } from "./ai-recognition-runtime";
+import { providerResponseFromError } from "./ai-provider-response";
 
 type AIRecognitionInput = {
   text: string;
@@ -516,12 +517,11 @@ async function generateAIRecognitionObjectStream({
       maxRetries: 1,
     });
     const outputPromise = Promise.resolve(result.output);
-    await Promise.all([
+    const object = await settleAIRecognitionStreamTasks([
       outputPromise,
       consumeAIRecognitionFullStream(result.fullStream, sink, capture),
       consumeAIRecognitionPartialStream(result.partialOutputStream, sink),
     ]);
-    const object = await outputPromise;
     return {
       object,
       rawModelText: capture.rawModelText,
@@ -532,6 +532,33 @@ async function generateAIRecognitionObjectStream({
   } catch (error) {
     throw new AIRecognitionGenerationError(error, capture);
   }
+}
+
+async function settleAIRecognitionStreamTasks(tasks: [
+  Promise<AiGeneratedRecognizeObject>,
+  Promise<void>,
+  Promise<void>,
+]): Promise<AiGeneratedRecognizeObject> {
+  // AI SDK 会在 output/fullStream 不同通道抛错；等待全部 settle 后优先保留带 HTTP body 的 provider 错误。
+  const results = await Promise.allSettled(tasks);
+  const errors = results
+    .filter((result): result is PromiseRejectedResult => result.status === "rejected")
+    .map((result) => result.reason);
+  if (errors.length > 0) throw selectAIRecognitionStreamError(errors);
+  const output = results[0];
+  if (output.status === "fulfilled") return output.value;
+  throw new Error("AI recognition stream output missing");
+}
+
+function selectAIRecognitionStreamError(errors: unknown[]): unknown {
+  let providerError: unknown | null = null;
+  for (const error of errors) {
+    const providerResponse = providerResponseFromError(error);
+    if (!providerResponse) continue;
+    if (providerResponse.body) return error;
+    providerError ??= error;
+  }
+  return providerError ?? errors[0];
 }
 
 async function consumeAIRecognitionFullStream(

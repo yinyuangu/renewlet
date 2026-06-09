@@ -25,6 +25,7 @@ import {
   aiRecognitionErrorDetails,
   safeAIRecognitionError,
 } from "./ai-recognition-diagnostics";
+import { providerResponseFromError } from "./ai-provider-response";
 import {
   runAIRecognitionConnectionTest,
   thinkingControlMatchesSettings,
@@ -251,7 +252,11 @@ export async function testAIRecognitionConnection(request: Request, env: Env): P
       400,
       serverText(locale, "aiRecognition.testFailed"),
       "AI_RECOGNITION_TEST_FAILED",
-      safeAIRecognitionError(error),
+      {
+        reason: "provider_failed",
+        providerMessage: safeAIRecognitionError(error),
+        providerResponse: providerResponseFromError(error),
+      },
     );
   }
 }

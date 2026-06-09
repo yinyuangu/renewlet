@@ -263,6 +263,13 @@ function getErrorCode(payload: unknown): string | undefined {
   return getStringField(payload, ["code"]);
 }
 
+function shouldClearAuthSession(status: number, payload: unknown): boolean {
+  if (status !== 401) return false;
+  const code = getErrorCode(payload);
+  // 模型列表代理会透传 provider 401；它是业务错误，只展示，不应清 Renewlet 登录态。
+  return code !== "AI_MODEL_LIST_FAILED";
+}
+
 function getClientTimeZoneHeader(): string | null {
   try {
     const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -342,7 +349,7 @@ export async function apiFetch<Schema extends z.ZodType>(
 
     if (!res.ok) {
       const message = getErrorMessage(json) || res.statusText || "Request failed";
-      if (res.status === 401) {
+      if (shouldClearAuthSession(res.status, json)) {
         clearAuthSession();
       }
       throw new ApiError(message, res.status, json, getErrorCode(json));
@@ -379,7 +386,7 @@ export async function apiFetchStream<T>(
     if (!response.ok) {
       const json = await parseJsonSafely(response);
       const message = getErrorMessage(json) || response.statusText || "Request failed";
-      if (response.status === 401) {
+      if (shouldClearAuthSession(response.status, json)) {
         clearAuthSession();
       }
       throw new ApiError(message, response.status, json, getErrorCode(json));

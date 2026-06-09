@@ -147,9 +147,10 @@ type aiRecognitionErrorResponse struct {
 }
 
 type aiRecognitionErrorDetails struct {
-	Reason          string                   `json:"reason"`
-	ProviderMessage *string                  `json:"providerMessage"`
-	Diagnostics     aiRecognitionDiagnostics `json:"diagnostics"`
+	Reason           string                   `json:"reason"`
+	ProviderMessage  *string                  `json:"providerMessage"`
+	ProviderResponse *aiProviderResponse      `json:"providerResponse,omitempty"`
+	Diagnostics      aiRecognitionDiagnostics `json:"diagnostics"`
 }
 
 type aiRecognitionRunner interface {
@@ -241,6 +242,9 @@ func handleAIRecognizeSubscriptions(app core.App, e *core.RequestEvent) error {
 		if isAIRecognitionSchemaMismatchError(err) {
 			return e.BadRequestError(serverText(runContext.Locale, "aiRecognition.schemaMismatch"), nil)
 		}
+		if providerResponse := aiProviderResponseFromError(err); providerResponse != nil {
+			return aiRecognitionProviderResponseJSONError(e, http.StatusBadRequest, serverText(runContext.Locale, "aiRecognition.failed"), "AI_RECOGNITION_FAILED", "provider_failed", err, providerResponse)
+		}
 		return e.BadRequestError(serverText(runContext.Locale, "aiRecognition.failed"), safeAIRecognitionError(err))
 	}
 	return e.JSON(http.StatusOK, response)
@@ -261,8 +265,8 @@ func handleAIRecognitionTestConnection(app core.App, e *core.RequestEvent) error
 	}
 	err = testAIRecognitionConnection(e.Request.Context(), settings)
 	if err != nil {
-		// 连接测试只做一次最小文本生成；不走完整订阅 schema/repair/诊断链路，避免把“测连通”变成慢识别。
-		return e.BadRequestError(serverText(locale, "aiRecognition.testFailed"), safeAIRecognitionError(err))
+		// 连接测试只做一次最小文本生成；没有订阅识别 diagnostics，但仍应把 SDK 暴露的 provider response 回显给当前用户排查。
+		return aiRecognitionProviderResponseJSONError(e, http.StatusBadRequest, serverText(locale, "aiRecognition.testFailed"), "AI_RECOGNITION_TEST_FAILED", "provider_failed", err, aiProviderResponseFromError(err))
 	}
 	return e.JSON(http.StatusOK, aiRecognitionTestResponse{OK: true, ProviderType: settings.ProviderType, TransportProtocol: settings.TransportProtocol, Model: settings.Model})
 }
@@ -353,14 +357,26 @@ func localizedAIRecognitionConfigLabel(labels customConfigLabels, locale appLoca
 }
 
 func aiRecognitionJSONError(e *core.RequestEvent, status int, message string, code string, reason string, err error, diagnostics *aiRecognitionDiagnostics) error {
-	// ProviderMessage 是用户排查第三方配置的唯一错误文本入口，必须先脱敏再截断。
 	return e.JSON(status, aiRecognitionErrorResponse{
 		Message: message,
 		Code:    code,
 		Details: aiRecognitionErrorDetails{
-			Reason:          reason,
-			ProviderMessage: safeAIRecognitionProviderMessage(err),
-			Diagnostics:     *diagnostics,
+			Reason:           reason,
+			ProviderMessage:  safeAIRecognitionProviderMessage(err),
+			ProviderResponse: aiProviderResponseFromError(err),
+			Diagnostics:      *diagnostics,
+		},
+	})
+}
+
+func aiRecognitionProviderResponseJSONError(e *core.RequestEvent, status int, message string, code string, reason string, err error, providerResponse *aiProviderResponse) error {
+	return e.JSON(status, map[string]interface{}{
+		"message": message,
+		"code":    code,
+		"details": map[string]interface{}{
+			"reason":           reason,
+			"providerMessage":  safeAIRecognitionProviderMessage(err),
+			"providerResponse": providerResponse,
 		},
 	})
 }

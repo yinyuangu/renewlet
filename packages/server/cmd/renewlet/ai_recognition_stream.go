@@ -188,10 +188,12 @@ func aiRecognitionStreamErrorForError(locale appLocale, err error) aiRecognition
 
 	var details *aiRecognitionErrorDetails
 	if diagnostics := aiRecognitionDiagnosticsFromError(err); diagnostics != nil {
+		cause := aiRecognitionCauseError(err)
 		details = &aiRecognitionErrorDetails{
-			Reason:          reason,
-			ProviderMessage: safeAIRecognitionProviderMessage(aiRecognitionCauseError(err)),
-			Diagnostics:     *diagnostics,
+			Reason:           reason,
+			ProviderMessage:  safeAIRecognitionProviderMessage(cause),
+			ProviderResponse: aiProviderResponseFromError(cause),
+			Diagnostics:      *diagnostics,
 		}
 	}
 	return aiRecognitionStreamErrorEvent{

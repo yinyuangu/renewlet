@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Brain, Sparkles, TestTube2 } from "lucide-react";
+import { AlertTriangle, Brain, Sparkles, TestTube2 } from "lucide-react";
+import { AIErrorDetailsDialog } from "@/components/ai-recognition/ai-error-details-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useI18n } from "@/i18n/I18nProvider";
-import { getDisplayErrorMessage } from "@/lib/display-error";
+import { createAIErrorDetails, type AIErrorDetails } from "@/lib/ai-error-details";
 import { cn } from "@/lib/utils";
 import {
   canonicalAIRecognitionTransportProtocol,
@@ -73,6 +74,8 @@ export function AIRecognitionSettingsSection({
   const { toast } = useToast();
   const [testing, setTesting] = useState(false);
   const [modelListState, setModelListState] = useState<AIModelListState>(EMPTY_MODEL_LIST_STATE);
+  const [aiErrorDetails, setAIErrorDetails] = useState<AIErrorDetails | null>(null);
+  const [aiErrorDetailsOpen, setAIErrorDetailsOpen] = useState(false);
   const modelListRequestRef = useRef(0);
   const canonicalSettings = useMemo(() => {
     const transportProtocol = canonicalAIRecognitionTransportProtocol(settings.providerType);
@@ -103,6 +106,8 @@ export function AIRecognitionSettingsSection({
     // 模型列表来自第三方 provider，必须随凭证/地址变化失效；旧请求返回较慢时也不能覆盖新配置。
     modelListRequestRef.current += 1;
     setModelListState(EMPTY_MODEL_LIST_STATE);
+    setAIErrorDetails(null);
+    setAIErrorDetailsOpen(false);
   }, [canonicalSettings.apiKey, canonicalSettings.baseUrl, canonicalSettings.providerType, canonicalSettings.transportProtocol]);
 
   const update = (patch: Partial<AiRecognitionSettings>) => {
@@ -158,10 +163,13 @@ export function AIRecognitionSettingsSection({
       });
     } catch (error) {
       if (modelListRequestRef.current !== requestId) return;
+      const details = createAIErrorDetails(error, t("aiRecognition.modelListFailedDescription"));
+      setAIErrorDetails(details);
+      setAIErrorDetailsOpen(true);
       setModelListState({
         ...EMPTY_MODEL_LIST_STATE,
         status: "error",
-        error: getDisplayErrorMessage(error, t("aiRecognition.modelListFailedDescription")),
+        error: null,
       });
     }
   };
@@ -190,16 +198,15 @@ export function AIRecognitionSettingsSection({
     setTesting(true);
     try {
       await aiRecognitionService.testConnection(canonicalSettings);
+      setAIErrorDetails(null);
       toast({
         title: t("aiRecognition.testSucceeded"),
         description: t("aiRecognition.testSucceededDescription"),
       });
     } catch (error) {
-      toast({
-        title: t("aiRecognition.testFailed"),
-        description: getDisplayErrorMessage(error, t("aiRecognition.testFailedDescription")),
-        variant: "destructive",
-      });
+      const details = createAIErrorDetails(error, t("aiRecognition.testFailedDescription"));
+      setAIErrorDetails(details);
+      setAIErrorDetailsOpen(true);
     } finally {
       setTesting(false);
     }
@@ -229,6 +236,21 @@ export function AIRecognitionSettingsSection({
           </LoadingButtonContent>
         </Button>
       </div>
+
+      {aiErrorDetails ? (
+        <div className="mb-5 flex justify-end">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="border-border"
+            onClick={() => setAIErrorDetailsOpen(true)}
+          >
+            <AlertTriangle className="h-4 w-4" />
+            {t("aiRecognition.errorDetailsOpenLast")}
+          </Button>
+        </div>
+      ) : null}
 
       <div className="grid gap-5">
         <div className="grid items-start gap-5 md:grid-cols-2 md:gap-x-5 md:gap-y-2" data-testid="ai-provider-model-grid">
@@ -330,6 +352,11 @@ export function AIRecognitionSettingsSection({
             : t(canonicalSettings.providerType === "openai-compatible" ? "aiRecognition.thinkingUnsupportedCompatible" : "aiRecognition.thinkingUnsupportedModel")}
         </p>
       </div>
+      <AIErrorDetailsDialog
+        open={aiErrorDetailsOpen}
+        details={aiErrorDetails}
+        onOpenChange={setAIErrorDetailsOpen}
+      />
     </section>
   );
 }
