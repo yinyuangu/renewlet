@@ -143,23 +143,37 @@ describe("subscription service API calls", () => {
   });
 
   it("stops aggregate listing when the backend repeats a subscription cursor", async () => {
-    mocks.apiFetch
-      .mockResolvedValueOnce({
-        subscriptions: [apiSubscription],
-        nextCursor: "repeat",
-        total: 2,
-      })
-      .mockResolvedValueOnce({
-        subscriptions: [{ ...apiSubscription, id: "sub_api_2", name: "Second API Subscription" }],
-        nextCursor: "repeat",
-        total: 2,
-      });
+    const firstPageUrl = "/api/app/subscriptions?limit=50";
+    const repeatedCursorUrl = "/api/app/subscriptions?limit=50&cursor=repeat";
+    mocks.apiFetch.mockImplementation(async (input: string) => {
+      if (input === firstPageUrl) {
+        return {
+          subscriptions: [apiSubscription],
+          nextCursor: "repeat",
+          total: 2,
+        };
+      }
+      if (input === repeatedCursorUrl) {
+        return {
+          subscriptions: [{ ...apiSubscription, id: "sub_api_2", name: "Second API Subscription" }],
+          nextCursor: "repeat",
+          total: 2,
+        };
+      }
+      throw new Error(`UNEXPECTED_SUBSCRIPTION_LIST_REQUEST:${input}`);
+    });
 
-    await expect(subscriptionService.list()).rejects.toThrow("SUBSCRIPTION_CURSOR_REPEATED");
+    try {
+      await subscriptionService.list();
+      throw new Error("Expected repeated cursor guard to reject");
+    } catch (error) {
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).toBe("SUBSCRIPTION_CURSOR_REPEATED");
+    }
 
     expect(mocks.apiFetch).toHaveBeenCalledTimes(2);
-    expect(mocks.apiFetch.mock.calls[0]?.[0]).toBe("/api/app/subscriptions?limit=50");
-    expect(mocks.apiFetch.mock.calls[1]?.[0]).toBe("/api/app/subscriptions?limit=50&cursor=repeat");
+    expect(mocks.apiFetch.mock.calls[0]?.[0]).toBe(firstPageUrl);
+    expect(mocks.apiFetch.mock.calls[1]?.[0]).toBe(repeatedCursorUrl);
   });
 
   it("creates and updates subscriptions through /api/app/subscriptions", async () => {
