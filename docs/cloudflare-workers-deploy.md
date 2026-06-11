@@ -15,8 +15,6 @@ https://<worker-name>.<workers-dev-subdomain>.workers.dev/setup
 
 Keep the generated deploy command as `pnpm deploy`. Renewlet's deploy script applies D1 migrations before publishing the Worker, so new tables are created before the updated API starts serving traffic.
 
-The version popover for one-click deploys shows the current stable `package.json` version. Only self-managed `Cloudflare Worker` branch deploy workflows show `version-dev+commit`.
-
 ### Failed To Get Repository Contents
 
 If the Cloudflare page says `Failed to get repository contents`, the deploy wizard is usually hitting a temporary rate limit or network-egress issue while reading the public GitHub repository. This does not mean the Renewlet server or Worker code failed to deploy.

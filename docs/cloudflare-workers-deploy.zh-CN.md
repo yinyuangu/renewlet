@@ -15,8 +15,6 @@ https://<worker-name>.<workers-dev-subdomain>.workers.dev/setup
 
 保持生成的部署命令为 `pnpm deploy`。Renewlet 的 deploy 脚本会先应用 D1 migrations，再发布 Worker，确保新表先创建好，更新后的 API 再开始对外服务。
 
-一键部署的版本弹窗会显示当前 `package.json` 稳定版本；只有你自己运行 `Cloudflare Worker` 分支部署 workflow 时，才会显示 `版本-dev+提交号`。
-
 ### 无法获取存储库内容
 
 如果 Cloudflare 页面提示 `Failed to get repository contents` / `无法获取存储库内容`，通常是部署向导读取 GitHub 公共仓库时遇到临时限流或网络出口问题，不代表 Renewlet 服务端或 Worker 代码部署失败。
