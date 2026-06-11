@@ -45,6 +45,7 @@ vi.mock("./db", async (importOriginal) => {
 });
 
 function envFixture() {
+  // apply 用例通过捕获 bind 顺序验证 D1 写入形状；preview 失败时 batch 必须完全不被触发。
   const statements: Array<{ sql: string; values: unknown[] }> = [];
   const db = {
     prepare: vi.fn((sql: string) => ({

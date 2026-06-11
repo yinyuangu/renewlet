@@ -1,3 +1,8 @@
+/**
+ * Server酱发送器封装 Cloudflare 通知链路中的特定第三方协议。
+ *
+ * SendKey 是用户账号级 secret，错误摘要必须脱敏；endpoint 只能由 SendKey 推导，不能让用户配置任意 URL。
+ */
 import type { NotificationEmailMessage } from "@renewlet/shared/email-template";
 import type { ApiAppSettings } from "@renewlet/shared/schemas/settings";
 import type { AppLocale } from "./http";

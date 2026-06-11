@@ -308,6 +308,45 @@ describe("SystemUpdateDialog", () => {
     expect(screen.queryByRole("button", { name: "立即更新" })).not.toBeInTheDocument();
   });
 
+  it("shows Cloudflare deploy button stable versions without a dev suffix", async () => {
+    mockVersionEndpoint({
+      currentVersion: "0.1.1",
+      latestVersion: "0.1.1",
+      hasUpdate: false,
+      checkSucceeded: true,
+      deployment: "cloudflare",
+      updateMode: "cloudflare-deploy",
+      updateSupported: false,
+      unsupportedReason: "Cloudflare 需要通过部署流程升级",
+      releaseInfo: {
+        tagName: "v0.1.1",
+        version: "0.1.1",
+        name: "Renewlet 0.1.1",
+        body: "",
+        publishedAt: "2026-06-09T00:00:00Z",
+        htmlUrl: "https://github.com/zhiyingzzhou/renewlet/releases/tag/v0.1.1",
+        assets: [],
+      },
+      build: {
+        version: "0.1.1",
+        commit: "",
+        buildTime: "",
+        buildType: "cloudflare",
+      },
+    });
+
+    const user = userEvent.setup();
+    renderWithQuery(<SystemUpdateHarness />);
+
+    await user.click(await screen.findByRole("button", { name: "打开系统更新" }));
+
+    expect(await screen.findByText("已是最新版本")).toBeInTheDocument();
+    expect(screen.getAllByText("v0.1.1").length).toBeGreaterThan(0);
+    expect(screen.queryByText("v0.1.1-dev")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "发布页" })).toHaveAttribute("href", "https://github.com/zhiyingzzhou/renewlet/releases/tag/v0.1.1");
+    expect(screen.queryByRole("button", { name: "立即更新" })).not.toBeInTheDocument();
+  });
+
   it("shows Cloudflare dev deploys as up to date with commit link", async () => {
     mockVersionEndpoint({
       currentVersion: "0.1.0-dev+504c168",

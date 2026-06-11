@@ -8,8 +8,14 @@ import {
   type SystemVersionResponse,
 } from "@/lib/api/schemas/app";
 
+/**
+ * systemService 只服务管理员版本弹窗和 Docker 页面内更新。
+ *
+ * Cloudflare 运行面会返回 unsupported；前端不在这里判断部署形态，只消费后端统一契约。
+ */
 export const systemService = {
   async version(force = false, signal?: AbortSignal): Promise<SystemVersionResponse> {
+    // force=true 只绕过后端版本检查缓存，不能绕过管理员守卫或 GitHub Release 可信资产校验。
     const params = new URLSearchParams({ force: force ? "true" : "false" });
     return await apiFetch(`/api/app/admin/system/version?${params.toString()}`, systemVersionResponseSchema, signal ? { signal } : undefined);
   },

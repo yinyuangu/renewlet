@@ -12,6 +12,7 @@ export interface AIThinkingOption {
   control: AiThinkingControl | null;
 }
 
+// 这些能力表跟第三方模型协议耦合；新增 provider/model 时只扩展这里，UI 继续消费统一的 thinking option。
 const OPENAI_REASONING_EFFORTS = ["none", "minimal", "low", "medium", "high", "xhigh"] as const;
 const ANTHROPIC_EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const;
 const GEMINI_LEVELS = ["minimal", "low", "medium", "high"] as const;
@@ -41,6 +42,7 @@ export function normalizeAIThinkingControl(
   model: string,
   control: AiThinkingControl | null,
 ): AiThinkingControl | null {
+  // 设置里保存的是上一次模型的 control；切换 provider/model 后必须在读取边界丢弃不兼容值。
   if (!control || !thinkingControlMatchesProvider(providerType, transportProtocol, control)) return null;
   const options = getAIThinkingOptions(providerType, transportProtocol, model);
   return options.some((option) => option.control && thinkingOptionId(option.control) === thinkingOptionId(control))
@@ -171,6 +173,7 @@ function claudeEffortsForModel(model: string): typeof ANTHROPIC_EFFORTS[number][
   if (!Number.isFinite(minor) || minor < 6) return [];
   const base: typeof ANTHROPIC_EFFORTS[number][] = ["low", "medium", "high", "max"];
   if (family === "opus" && minor >= 7) {
+    // xhigh 目前只对高阶 opus 4.7+ 暴露，避免给其它 Claude 4 模型展示 provider 会拒绝的选项。
     return ["low", "medium", "high", "xhigh", "max"];
   }
   return base;

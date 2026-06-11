@@ -48,11 +48,99 @@ describe("Cloudflare system update contract", () => {
     expect(body).not.toHaveProperty("runtime");
   });
 
-  it("treats branch deploys with the same base version as up to date", async () => {
+  it("treats deploy button builds without metadata as the package stable version", async () => {
+    mockLatestRelease(rootPackageJson.version);
+
+    const env = envFixture();
+    delete env.RENEWLET_VERSION;
+    delete env.RENEWLET_COMMIT;
+
+    const response = await systemVersion(new Request("https://renewlet.example/api/app/admin/system/version", {
+      headers: { "accept-language": "en-US" },
+    }), env);
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as Record<string, unknown>;
+    expect(body).toMatchObject({
+      currentVersion: rootPackageJson.version,
+      latestVersion: rootPackageJson.version,
+      checkSucceeded: true,
+      hasUpdate: false,
+      deployment: "cloudflare",
+      build: {
+        version: rootPackageJson.version,
+        commit: "",
+        buildType: "cloudflare",
+      },
+    });
+    expect(body["releaseInfo"]).toMatchObject({
+      tagName: `v${rootPackageJson.version}`,
+      version: rootPackageJson.version,
+    });
+  });
+
+  it("does not expose placeholder dev versions to deploy button users", async () => {
     mockLatestRelease(rootPackageJson.version);
 
     const env = envFixture({
       RENEWLET_VERSION: "0.0.0-dev",
+      RENEWLET_COMMIT: "504c1681822ac60f0caafdb0b1ba731853c9169d",
+    });
+
+    const response = await systemVersion(new Request("https://renewlet.example/api/app/admin/system/version", {
+      headers: { "accept-language": "en-US" },
+    }), env);
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as Record<string, unknown>;
+    expect(body).toMatchObject({
+      currentVersion: rootPackageJson.version,
+      latestVersion: rootPackageJson.version,
+      checkSucceeded: true,
+      hasUpdate: false,
+      deployment: "cloudflare",
+      build: {
+        version: rootPackageJson.version,
+        commit: "504c1681822ac60f0caafdb0b1ba731853c9169d",
+        buildType: "cloudflare",
+      },
+    });
+    expect(String(body["currentVersion"])).not.toContain("-dev");
+  });
+
+  it("falls back to the stable package version when dev suffixes lack commit metadata", async () => {
+    mockLatestRelease(rootPackageJson.version);
+
+    const env = envFixture({
+      RENEWLET_VERSION: `${rootPackageJson.version}-dev`,
+      RENEWLET_COMMIT: "",
+    });
+
+    const response = await systemVersion(new Request("https://renewlet.example/api/app/admin/system/version", {
+      headers: { "accept-language": "en-US" },
+    }), env);
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as Record<string, unknown>;
+    expect(body).toMatchObject({
+      currentVersion: rootPackageJson.version,
+      latestVersion: rootPackageJson.version,
+      checkSucceeded: true,
+      hasUpdate: false,
+      deployment: "cloudflare",
+      build: {
+        version: rootPackageJson.version,
+        commit: "",
+        buildType: "cloudflare",
+      },
+    });
+  });
+
+  it("keeps explicit branch deploy versions with commit metadata", async () => {
+    mockLatestRelease(rootPackageJson.version);
+
+    const env = envFixture({
+      RENEWLET_VERSION: `${rootPackageJson.version}-dev+504c168`,
       RENEWLET_COMMIT: "504c1681822ac60f0caafdb0b1ba731853c9169d",
     });
 
@@ -119,17 +207,16 @@ describe("Cloudflare system update contract", () => {
 
     expect(response.status).toBe(200);
     const body = await response.json() as Record<string, unknown>;
-    const expectedVersion = `${rootPackageJson.version}-dev`;
     expect(body).toMatchObject({
-      currentVersion: expectedVersion,
-      latestVersion: expectedVersion,
+      currentVersion: rootPackageJson.version,
+      latestVersion: rootPackageJson.version,
       checkSucceeded: false,
       hasUpdate: false,
       deployment: "cloudflare",
       releaseInfo: null,
       warning: "GitHub Releases cannot be fetched right now. Try again later.",
       build: {
-        version: expectedVersion,
+        version: rootPackageJson.version,
         commit: "",
         buildType: "cloudflare",
       },

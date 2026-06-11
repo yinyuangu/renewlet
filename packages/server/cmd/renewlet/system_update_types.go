@@ -1,5 +1,9 @@
 package main
 
+// system_update_types.go 定义 Docker 页面内自更新的状态与 GitHub Release 数据形状。
+//
+// 这里的锁、缓存和 pending restart 是进程内状态；真正持久化边界仍是 /opt/renewlet/current/renewlet
+// 与备份目录，不能把 Cloudflare/source 部署也纳入可执行更新。
 import (
 	"context"
 	"errors"
@@ -50,6 +54,7 @@ func (e systemUpdateError) Is(target error) bool {
 }
 
 type systemReleaseClient interface {
+	// Release client 是系统更新测试的隔离点；生产实现负责 GitHub API header、token 和下载限额。
 	FetchLatestRelease(ctx context.Context) (*githubRelease, error)
 	FetchReleases(ctx context.Context, page int, perPage int) ([]githubRelease, error)
 	DownloadFile(ctx context.Context, sourceURL string, targetPath string, maxBytes int64) error

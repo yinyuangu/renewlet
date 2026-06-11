@@ -44,6 +44,7 @@ type builtInIconVariant struct {
 type builtInResolverIcon struct {
 	icon          builtInIcon
 	providerRank  int
+	cdnBase       string
 	terms         []string
 	compactTerms  []string
 	canonicalKeys []string
@@ -83,7 +84,8 @@ type builtInIconSourceSettingPatch struct {
 	VariantsEnabled *bool `json:"variantsEnabled"`
 }
 
-var builtInResolver = buildBuiltInResolverIndex(loadBuiltInIconIndex())
+var embeddedBuiltInIcons = loadBuiltInIconIndex()
+var embeddedBuiltInResolver = buildBuiltInResolverIndex(embeddedBuiltInIcons)
 
 func loadBuiltInIconIndex() []builtInIcon {
 	var icons []builtInIcon
@@ -95,6 +97,10 @@ func loadBuiltInIconIndex() []builtInIcon {
 }
 
 func buildBuiltInResolverIndex(icons []builtInIcon) builtInResolverIndex {
+	return buildBuiltInResolverIndexWithProviderBases(icons, nil)
+}
+
+func buildBuiltInResolverIndexWithProviderBases(icons []builtInIcon, providerBases map[string]string) builtInResolverIndex {
 	rankByProvider := mediaResolverBuiltInProviderRank()
 	resolver := builtInResolverIndex{
 		icons:          make([]builtInResolverIcon, 0, len(icons)),
@@ -109,6 +115,7 @@ func buildBuiltInResolverIndex(icons []builtInIcon) builtInResolverIndex {
 		entry := builtInResolverIcon{
 			icon:          icon,
 			providerRank:  providerRank,
+			cdnBase:       builtInResolverProviderBase(icon.Provider, providerBases),
 			terms:         normalizedTerms(builtInIconTermValues(icon)),
 			compactTerms:  compactTerms([]string{icon.Slug, icon.Title}),
 			canonicalKeys: normalizedTerms(append([]string{icon.Slug, icon.Title}, icon.Aliases...)),
@@ -139,6 +146,13 @@ func buildBuiltInResolverIndex(icons []builtInIcon) builtInResolverIndex {
 	return resolver
 }
 
+func builtInResolverProviderBase(provider string, providerBases map[string]string) string {
+	if providerBases != nil && providerBases[provider] != "" {
+		return providerBases[provider]
+	}
+	return mediaResolverBuiltInProviderBase(provider)
+}
+
 func builtInIconTermValues(icon builtInIcon) []string {
 	values := []string{icon.Slug, icon.Title, icon.URL, icon.Guidelines}
 	values = append(values, icon.Aliases...)
@@ -154,10 +168,10 @@ func defaultBuiltInIconSourceSettings() builtInIconSourceSettings {
 	}
 }
 
-func resolveBuiltInAutoCandidate(kind string, name string, sources builtInIconSourceSettings) *mediaCandidate {
+func resolveBuiltInAutoCandidate(resolver builtInResolverIndex, kind string, name string, sources builtInIconSourceSettings) *mediaCandidate {
 	queries := reducedMediaQueries(name)
 	for queryIndex, query := range queries {
-		if candidates := builtInResolver.exactCandidates(kind, query, queryIndex, "auto", sources); len(candidates) > 0 {
+		if candidates := resolver.exactCandidates(kind, query, queryIndex, "auto", sources); len(candidates) > 0 {
 			return &candidates[0]
 		}
 	}
@@ -224,14 +238,14 @@ func (resolver builtInResolverIndex) candidatesForExactMatches(kind string, matc
 	return enabled[0].entry.toCandidates(kind, confidence, true, matchedQuery, 0, mode, sources)
 }
 
-func searchBuiltInCandidates(kind string, query string, limit int, sources builtInIconSourceSettings) builtInSearchResult {
+func searchBuiltInCandidates(resolver builtInResolverIndex, kind string, query string, limit int, sources builtInIconSourceSettings) builtInSearchResult {
 	for queryIndex, normalized := range reducedMediaQueries(query) {
-		preferred := builtInResolver.exactCandidates(kind, normalized, queryIndex, "search", sources)
+		preferred := resolver.exactCandidates(kind, normalized, queryIndex, "search", sources)
 		// 用户主动搜索允许降词后继续 fuzzy，但过短尾词会把 No/AI 之类泛词搜成噪声候选。
 		if queryIndex > 0 && len([]rune(compactMediaTerm(normalized))) < mediaResolverCfg.Search.MinReducedQueryLength {
 			break
 		}
-		candidates := searchBuiltInCandidatesForQuery(kind, normalized, limit, preferred, sources)
+		candidates := searchBuiltInCandidatesForQuery(resolver, kind, normalized, limit, preferred, sources)
 		if len(candidates) > 0 {
 			return builtInSearchResult{candidates: candidates, matchedQuery: normalized}
 		}
@@ -239,7 +253,7 @@ func searchBuiltInCandidates(kind string, query string, limit int, sources built
 	return builtInSearchResult{candidates: []mediaCandidate{}}
 }
 
-func searchBuiltInCandidatesForQuery(kind string, normalized string, limit int, preferred []mediaCandidate, sources builtInIconSourceSettings) []mediaCandidate {
+func searchBuiltInCandidatesForQuery(resolver builtInResolverIndex, kind string, normalized string, limit int, preferred []mediaCandidate, sources builtInIconSourceSettings) []mediaCandidate {
 	if normalized == "" || limit <= 0 {
 		return []mediaCandidate{}
 	}
@@ -256,8 +270,8 @@ func searchBuiltInCandidatesForQuery(kind string, normalized string, limit int, 
 	for _, candidate := range preferred {
 		pushCandidate(candidate)
 	}
-	scored := make([]builtInScoredIcon, 0, len(builtInResolver.icons))
-	for index, entry := range builtInResolver.icons {
+	scored := make([]builtInScoredIcon, 0, len(resolver.icons))
+	for index, entry := range resolver.icons {
 		if !builtInProviderEnabled(sources, entry.icon.Provider) {
 			continue
 		}
@@ -268,8 +282,8 @@ func searchBuiltInCandidatesForQuery(kind string, normalized string, limit int, 
 		scored = append(scored, builtInScoredIcon{index: index, score: score})
 	}
 	sort.SliceStable(scored, func(i, j int) bool {
-		leftEntry := builtInResolver.icons[scored[i].index]
-		rightEntry := builtInResolver.icons[scored[j].index]
+		leftEntry := resolver.icons[scored[i].index]
+		rightEntry := resolver.icons[scored[j].index]
 		if leftEntry.providerRank != rightEntry.providerRank {
 			return leftEntry.providerRank < rightEntry.providerRank
 		}
@@ -280,7 +294,7 @@ func searchBuiltInCandidatesForQuery(kind string, normalized string, limit int, 
 	})
 	for _, item := range scored {
 		confidence := confidenceFromScore(item.score)
-		for _, candidate := range builtInResolver.icons[item.index].toCandidates(kind, confidence, confidence == "exact" || confidence == "strong", normalized, len(candidates), "search", sources) {
+		for _, candidate := range resolver.icons[item.index].toCandidates(kind, confidence, confidence == "exact" || confidence == "strong", normalized, len(candidates), "search", sources) {
 			pushCandidate(candidate)
 			if len(candidates) >= limit {
 				break
@@ -311,7 +325,7 @@ func (entry builtInResolverIcon) toCandidates(kind string, confidence string, au
 			Provider:       icon.Provider,
 			Label:          icon.Title,
 			Variant:        &variantName,
-			URL:            mediaResolverBuiltInProviderBase(icon.Provider) + variant.Path,
+			URL:            entry.cdnBase + variant.Path,
 			Confidence:     confidence,
 			AutoAssignable: autoAssignable,
 			MatchedQuery:   matchedQuery,

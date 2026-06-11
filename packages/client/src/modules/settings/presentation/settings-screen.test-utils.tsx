@@ -1,16 +1,20 @@
 // SettingsScreen 测试夹具集中托管，避免页面主体测试和目录状态机测试再次长成单文件门禁问题。
 import { act, render } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { vi } from "vitest";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { DEFAULT_CUSTOM_CONFIG } from "@/types/config";
 import type { ExchangeRates } from "@/lib/api/schemas/exchange-rates";
+import type { BuiltInIconIndexStatus } from "@/lib/api/schemas/media";
 import { DEFAULT_SETTINGS, type AppSettings, type NotificationChannel } from "@/types/subscription";
 import type { ThemeMode } from "@/types/theme";
+import { BUILT_IN_ICON_PROVIDERS, type BuiltInIconProvider } from "@renewlet/shared/built-in-icons";
 import { SettingsScreen } from "./settings-screen";
 
 const mocks = vi.hoisted(() => ({
   useSettingsFormController: vi.fn(),
+  useCloudBackupController: vi.fn(),
 }));
 
 export { mocks };
@@ -23,6 +27,7 @@ export const SETTINGS_SECTION_IDS = [
   "settings-ai-recognition",
   "settings-budget",
   "settings-data-config",
+  "settings-cloud-backup",
   "settings-exchange",
   "settings-calendar-feed",
   "settings-public-status",
@@ -33,6 +38,23 @@ export const SETTINGS_SECTION_IDS = [
 export const TEST_MOBILE_ANCHOR_LINE_PX = 208;
 export const TEST_ACTIVE_SECTION_TOP_PX = TEST_MOBILE_ANCHOR_LINE_PX - 24;
 export const TEST_NEXT_SECTION_TOP_PX = TEST_MOBILE_ANCHOR_LINE_PX + 160;
+
+function iconProviderVersion(provider: BuiltInIconProvider) {
+  const commitSha = provider === "thesvg"
+    ? "aaa111122223333444455556666777788889999"
+    : provider === "selfhst"
+      ? "bbb111122223333444455556666777788889999"
+      : "ccc111122223333444455556666777788889999";
+  return {
+    sourceRef: commitSha,
+    displayVersion: commitSha.slice(0, 7),
+    commitSha,
+    commitShortSha: commitSha.slice(0, 7),
+    commitDate: "2026-06-11T00:00:00.000Z",
+    releaseTag: null,
+    releasePublishedAt: null,
+  };
+}
 
 type TestSettingsSectionId = typeof SETTINGS_SECTION_IDS[number];
 
@@ -169,6 +191,80 @@ vi.mock("../application/use-settings-form-controller", () => ({
   useSettingsFormController: mocks.useSettingsFormController,
 }));
 
+vi.mock("../application/use-cloud-backup-controller", () => ({
+  useCloudBackupController: mocks.useCloudBackupController,
+}));
+
+export function createCloudBackupControllerState() {
+  const fn = vi.fn();
+  const defaultPolicy = {
+    scheduleEnabled: false,
+    scheduleFrequency: "daily" as const,
+    scheduleTime: "03:00",
+    scheduleWeekday: "monday" as const,
+    retention: 7,
+  };
+  const defaultStatus = {
+    lastBackupAt: null,
+    lastStatus: "idle" as const,
+    lastError: null,
+    updatedAt: null,
+  };
+  return {
+    config: {
+      provider: "webdav" as const,
+      credentialSet: false,
+      credentialSetByProvider: { webdav: false, s3: false },
+      policyByProvider: { webdav: defaultPolicy, s3: defaultPolicy },
+      statusByProvider: { webdav: defaultStatus, s3: defaultStatus },
+      updatedAt: null,
+    },
+    snapshots: [],
+    form: {
+      provider: "webdav" as const,
+      webdavUrl: "",
+      webdavUsername: "",
+      webdavPassword: "",
+      webdavPath: "renewlet",
+      s3Endpoint: "",
+      s3Region: "",
+      s3Bucket: "",
+      s3Prefix: "renewlet",
+      s3AccessKeyId: "",
+      s3SecretAccessKey: "",
+      scheduleEnabled: false,
+      scheduleFrequency: "daily" as const,
+      scheduleTime: "03:00",
+      scheduleWeekday: "monday" as const,
+      retention: "7",
+    },
+    credentialSet: false,
+    canCreateSnapshot: false,
+    isLoading: false,
+    isSaving: false,
+    isTesting: false,
+    isCreating: false,
+    isDownloading: false,
+    isDeleting: false,
+    isRefreshingSnapshots: false,
+    restoringSnapshotKey: null,
+    deletingSnapshotKey: null,
+    hasUnsavedChanges: false,
+    snapshotsErrorMessage: null,
+    cloudBackupErrorDetails: null,
+    cloudBackupErrorDetailsOpen: false,
+    setCloudBackupErrorDetailsOpen: fn,
+    openSnapshotsErrorDetails: fn,
+    updateForm: fn,
+    saveConfig: fn,
+    testConfig: fn,
+    createSnapshot: fn,
+    restoreSnapshot: fn,
+    deleteSnapshot: fn,
+    refreshSnapshots: fn,
+  };
+}
+
 export function createControllerState(overrides: {
   settings?: Partial<AppSettings>;
   effectiveThemeMode?: ThemeMode;
@@ -179,6 +275,13 @@ export function createControllerState(overrides: {
   calendarFeed?: {
     enabled?: boolean;
     feedUrl?: string | null;
+  };
+  builtInIconIndex?: {
+    canManage?: boolean;
+    status?: BuiltInIconIndexStatus;
+    isLoading?: boolean;
+    checkingProvider?: BuiltInIconProvider | null;
+    refreshingProvider?: BuiltInIconProvider | null;
   };
   publicStatusPage?: {
     enabled?: boolean;
@@ -227,6 +330,7 @@ export function createControllerState(overrides: {
     updateStatuses: fn,
     updatePaymentMethods: fn,
     updateSetting: fn,
+    monthlyBudgetInput: String(overrides.settings?.monthlyBudget ?? DEFAULT_SETTINGS.monthlyBudget),
     monthlyBudgetError: null,
     handleMonthlyBudgetInputChange: fn,
     toggleChannel: fn,
@@ -264,6 +368,35 @@ export function createControllerState(overrides: {
       openSystem: fn,
       regenerate: fn,
       revoke: fn,
+    },
+    builtInIconIndex: {
+      canManage: overrides.builtInIconIndex?.canManage ?? true,
+      status: overrides.builtInIconIndex?.status ?? {
+        source: "embedded",
+        hash: "embedded-hash",
+        iconCount: 10249,
+        providerCounts: { thesvg: 6047, selfhst: 2346, dashboardIcons: 1856 },
+        checkedAt: null,
+        updatedAt: null,
+        refreshing: false,
+        providers: BUILT_IN_ICON_PROVIDERS.map((provider) => ({
+          provider,
+          current: iconProviderVersion(provider),
+          latest: null,
+          iconCount: provider === "thesvg" ? 6047 : provider === "selfhst" ? 2346 : 1856,
+          checkedAt: null,
+          refreshedAt: null,
+          lastError: null,
+          refreshing: false,
+          updateAvailable: false,
+        })),
+      },
+      isLoading: overrides.builtInIconIndex?.isLoading ?? false,
+      checkingProvider: overrides.builtInIconIndex?.checkingProvider ?? null,
+      refreshingProvider: overrides.builtInIconIndex?.refreshingProvider ?? null,
+      checkAllProviders: fn,
+      checkProvider: fn,
+      refreshProvider: fn,
     },
     publicStatusPage: {
       enabled: overrides.publicStatusPage?.enabled ?? false,
@@ -305,14 +438,23 @@ function RouteProbe() {
 }
 
 export function renderSettingsScreen(initialEntries = ["/settings"]) {
+  mocks.useCloudBackupController.mockReturnValue(createCloudBackupControllerState());
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
   return render(
     <div id="root">
-      <MemoryRouter initialEntries={initialEntries}>
-        <TooltipProvider delayDuration={0}>
-          <SettingsScreen />
-        </TooltipProvider>
-        <RouteProbe />
-      </MemoryRouter>
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={initialEntries}>
+          <TooltipProvider delayDuration={0}>
+            <SettingsScreen />
+          </TooltipProvider>
+          <RouteProbe />
+        </MemoryRouter>
+      </QueryClientProvider>
     </div>,
   );
 }

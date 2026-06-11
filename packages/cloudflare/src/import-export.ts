@@ -124,6 +124,7 @@ export async function applyImport(request: Request, env: Env): Promise<Response>
   if (body.payload.settings) {
     const current = await getSettings(env, auth.user.id);
     const next = mergeSettingsPatch(current, body.payload.settings);
+    // settings merge 先套默认值和清洗规则，再写 JSON；导入文件不能绕过设置页契约塞入未知字段。
     statements.push(env.DB.prepare(`
       INSERT INTO settings (user_id, settings_json, created_at, updated_at)
       VALUES (?, ?, ?, ?)
@@ -132,6 +133,7 @@ export async function applyImport(request: Request, env: Env): Promise<Response>
   }
   if (body.payload.customConfig) {
     const nextConfig = customConfigSchema.parse(body.payload.customConfig);
+    // custom config 是 shared schema 事实源；Worker 不在 D1 层复制字段级兼容逻辑。
     statements.push(env.DB.prepare(`
       INSERT INTO custom_configs (user_id, config_json, created_at, updated_at)
       VALUES (?, ?, ?, ?)

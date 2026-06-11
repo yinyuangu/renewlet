@@ -1,5 +1,11 @@
 package main
 
+// system_update.go 实现 Docker 页面内自更新。
+//
+// 状态流：版本检查 -> 选择可信 Release 资产 -> 下载 checksum 和 tar.gz -> 校验 -> 替换真实二进制
+// -> 标记 restart pending -> 管理员确认后异步退出，让 Docker restart policy 拉起新进程。
+//
+// 注意：这里永远不替换 /renewlet 稳定入口；只替换 /opt/renewlet/current/renewlet，并保留备份用于失败恢复。
 import (
 	"archive/tar"
 	"bufio"
@@ -18,6 +24,7 @@ import (
 	"time"
 )
 
+// newSystemUpdateService 注入 release client 和时钟/退出函数，便于测试覆盖下载、锁和延迟退出状态。
 func newSystemUpdateService(client systemReleaseClient) *systemUpdateService {
 	return &systemUpdateService{
 		client:      client,
@@ -27,6 +34,8 @@ func newSystemUpdateService(client systemReleaseClient) *systemUpdateService {
 	}
 }
 
+// CheckVersion 返回当前部署形态和最新可信 Release。
+// GitHub 失败时只返回 warning/cached，不把“没拿到结果”伪装成“已是最新”。
 func (service *systemUpdateService) CheckVersion(ctx context.Context, locale appLocale, force bool) (*systemVersionResponse, error) {
 	if !force {
 		if cached := service.cachedVersion(); cached != nil {

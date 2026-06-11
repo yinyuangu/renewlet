@@ -1,6 +1,6 @@
 package main
 
-// 本文件测试静态资源 CSP 和代理协议识别，保护 Docker/反代部署下的前端安全头与外部 URL 判断。
+// 静态入口测试保护反代协议识别和 CSP img-src 分流；Docker/反代部署下 HTTP 与 HTTPS 的 Logo 加载策略不能混用。
 
 import (
 	"net/http"

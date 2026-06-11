@@ -12,13 +12,18 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/i18n/I18nProvider';
+import { useAppRootScrollLock } from '@/hooks/use-app-root-scroll-lock';
 
 interface TimePickerProps {
+  id?: string;
   /** `HH:mm` 本地墙钟时间；必须与 settings.timeZone 一起解释为 UTC instant。 */
   value: string;
   /** 输出仍为 `HH:mm`，组件不做时区换算。 */
   onChange: (value: string) => void;
   className?: string;
+  disabled?: boolean;
+  ariaLabel?: string;
+  density?: 'default' | 'compact';
 }
 
 const ITEM_HEIGHT = 40;
@@ -340,7 +345,15 @@ function WheelColumn({
   );
 }
 
-export function TimePicker({ value, onChange, className }: TimePickerProps) {
+export function TimePicker({
+  id,
+  value,
+  onChange,
+  className,
+  disabled = false,
+  ariaLabel,
+  density = 'default',
+}: TimePickerProps) {
   const { t } = useI18n();
   const [isOpen, setIsOpen] = useState(false);
   const [hours, setHours] = useState(() => {
@@ -358,12 +371,22 @@ export function TimePicker({ value, onChange, className }: TimePickerProps) {
     setMinutes(parseTimePart(m, 59));
   }, [value]);
 
+  useEffect(() => {
+    if (disabled) {
+      setIsOpen(false);
+    }
+  }, [disabled]);
+
   const handleTimeChange = useCallback((newHours: number, newMinutes: number) => {
     setHours(newHours);
     setMinutes(newMinutes);
     const formatted = `${formatTimePart(newHours)}:${formatTimePart(newMinutes)}`;
     onChange(formatted);
   }, [onChange]);
+
+  const handleOpenChange = useCallback((open: boolean) => {
+    setIsOpen(disabled ? false : open);
+  }, [disabled]);
 
   const formatDisplayTime = () => {
     return `${formatTimePart(hours)}:${formatTimePart(minutes)}`;
@@ -375,30 +398,48 @@ export function TimePicker({ value, onChange, className }: TimePickerProps) {
     { label: '18:00', desc: t("time.evening") },
     { label: '21:00', desc: t("time.night") },
   ];
+  const isCompact = density === 'compact';
+  const displayTime = formatDisplayTime();
+  const buttonAriaLabel = ariaLabel ? `${ariaLabel} ${displayTime}` : t("time.notificationAria", { time: displayTime });
+  useAppRootScrollLock(isOpen);
 
   return (
-    <Popover open={isOpen} onOpenChange={setIsOpen}>
+    <Popover open={isOpen} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <Button
+          id={id}
           variant="outline"
-          aria-label={t("time.notificationAria", { time: formatDisplayTime() })}
+          disabled={disabled}
+          aria-label={buttonAriaLabel}
           className={cn(
-            "h-auto py-3 px-4 justify-start text-left font-normal border-border bg-secondary hover:bg-secondary/80 group",
-            className
+            isCompact
+              ? "h-9 w-full justify-start border-border bg-background px-3 py-2 text-left font-medium tabular-nums hover:bg-accent hover:text-accent-foreground group"
+              : "h-auto py-3 px-4 justify-start text-left font-normal border-border bg-secondary hover:bg-secondary/80 group",
+            className,
           )}
         >
-          <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-primary/10 group-hover:bg-primary/20 transition-colors">
-              <Clock className="h-5 w-5 text-primary" />
+          {isCompact ? (
+            <div className="flex min-w-0 items-center gap-2">
+              <Clock className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <span className="truncate text-sm font-medium tabular-nums">{displayTime}</span>
             </div>
-            <span className="text-2xl font-bold tracking-wider tabular-nums">{formatDisplayTime()}</span>
-          </div>
+          ) : (
+            <div className="flex items-center gap-3">
+              <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                <Clock className="h-5 w-5 text-primary" />
+              </div>
+              <span className="text-2xl font-bold tracking-wider tabular-nums">{displayTime}</span>
+            </div>
+          )}
         </Button>
       </PopoverTrigger>
       <PopoverContent 
-        className="w-auto p-0 border-border bg-card pointer-events-auto shadow-xl" 
+        className={cn(
+          "w-auto p-0 border-border bg-card pointer-events-auto",
+          isCompact ? "shadow-lg" : "shadow-xl",
+        )}
         align="start"
-        sideOffset={8}
+        sideOffset={isCompact ? 6 : 8}
       >
         <div className="flex items-center justify-center gap-2 p-4 pb-2">
           <WheelColumn
@@ -422,28 +463,30 @@ export function TimePicker({ value, onChange, className }: TimePickerProps) {
           />
         </div>
 
-        <div className="border-t border-border p-3">
-          <div className="grid grid-cols-4 gap-2">
-            {quickTimes.map(({ label, desc }) => (
-              <button
-                key={label}
-                onClick={() => {
-                  const [h, m] = label.split(':');
-                  handleTimeChange(parseTimePart(h, 23), parseTimePart(m, 59));
-                }}
-                className={cn(
-                  "flex flex-col items-center py-2 px-1 rounded-lg text-xs font-medium transition-all",
-                  value === label 
-                    ? "bg-primary text-primary-foreground" 
-                    : "bg-secondary/50 hover:bg-secondary text-foreground"
-                )}
-              >
-                <span className="font-bold">{label}</span>
-                <span className="text-[10px] opacity-70">{desc}</span>
-              </button>
-            ))}
+        {!isCompact ? (
+          <div className="border-t border-border p-3">
+            <div className="grid grid-cols-4 gap-2">
+              {quickTimes.map(({ label, desc }) => (
+                <button
+                  key={label}
+                  onClick={() => {
+                    const [h, m] = label.split(':');
+                    handleTimeChange(parseTimePart(h, 23), parseTimePart(m, 59));
+                  }}
+                  className={cn(
+                    "flex flex-col items-center py-2 px-1 rounded-lg text-xs font-medium transition-all",
+                    value === label
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-secondary/50 hover:bg-secondary text-foreground",
+                  )}
+                >
+                  <span className="font-bold">{label}</span>
+                  <span className="text-[10px] opacity-70">{desc}</span>
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        ) : null}
       </PopoverContent>
     </Popover>
   );

@@ -57,6 +57,10 @@ import {
   type SettingsPublicStatusPageController,
 } from "./use-public-status-page-settings-controller";
 import {
+  useSettingsBuiltInIconIndexController,
+  type SettingsBuiltInIconIndexController,
+} from "./use-built-in-icon-index-controller";
+import {
   useNotificationHistory,
   type NotificationHistoryResponse,
   type NotificationHistoryStatusFilter,
@@ -195,6 +199,7 @@ export interface SettingsFormController {
   updatePaymentMethods: (items: ConfigItem[]) => void;
   updateCurrencies: (items: ConfigItem[]) => void;
   updateSetting: UpdateSetting;
+  monthlyBudgetInput: string;
   monthlyBudgetError: string | null;
   handleMonthlyBudgetInputChange: (rawValue: string) => void;
   toggleChannel: (channel: NotificationChannel) => void;
@@ -213,6 +218,7 @@ export interface SettingsFormController {
   handleTestConnection: (channel: NotificationChannel) => void | Promise<void>;
   notificationHistory: SettingsNotificationHistoryController;
   calendarFeed: SettingsCalendarFeedController;
+  builtInIconIndex: SettingsBuiltInIconIndexController;
   publicStatusPage: SettingsPublicStatusPageController;
   password: PasswordChangeController;
   passwordResetEnabled: boolean;
@@ -230,6 +236,7 @@ export function useSettingsFormController(): SettingsFormController {
   const [customConfig, setCustomConfig] = useState<CustomConfig>(() => normalizeCustomConfig(null));
   const [savedCustomConfig, setSavedCustomConfig] = useState<CustomConfig>(() => normalizeCustomConfig(null));
   const [hasInitializedCustomConfig, setHasInitializedCustomConfig] = useState(false);
+  const [monthlyBudgetInput, setMonthlyBudgetInput] = useState(String(DEFAULT_SETTINGS.monthlyBudget));
   const [monthlyBudgetError, setMonthlyBudgetError] = useState<string | null>(null);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const accountIdentity = useAccountIdentity();
@@ -257,6 +264,8 @@ export function useSettingsFormController(): SettingsFormController {
   const calendarFeedStatus = useCalendarFeedStatus();
   const createCalendarFeed = useCreateCalendarFeed();
   const deleteCalendarFeed = useDeleteCalendarFeed();
+  const canRefreshBuiltInIconIndex = accountIdentity.role === "admin";
+  const builtInIconIndex = useSettingsBuiltInIconIndexController(canRefreshBuiltInIconIndex);
   const { refetch: refetchNotificationHistory } = notificationHistory;
   const hasInitializedFromRemoteRef = useRef(false);
   const hasResolvedDefaultRecipientEmailRef = useRef(false);
@@ -269,21 +278,23 @@ export function useSettingsFormController(): SettingsFormController {
   );
   const publicStatusPage = usePublicStatusPageSettingsController(subscriptionsQuery.data);
 
+  const monthlyBudgetInputDirty = monthlyBudgetInput !== String(settings.monthlyBudget);
   const settingsDirty = useMemo(
     () => !areJsonSnapshotsEqual(settings, savedSettings),
     [settings, savedSettings],
   );
+  const settingsInputDirty = settingsDirty || monthlyBudgetInputDirty;
   const customConfigDirty = useMemo(
     () => !areJsonSnapshotsEqual(customConfig, savedCustomConfig),
     [customConfig, savedCustomConfig],
   );
-  const hasUnsavedChanges = settingsDirty || customConfigDirty;
+  const hasUnsavedChanges = settingsInputDirty || customConfigDirty;
   const effectiveThemeMode: ThemeMode = theme;
 
   useEffect(() => {
     // effect 读取 ref 而不是把 draft 放入依赖，是为了在远端刷新时判断“当前是否仍可安全覆盖本地草稿”。
-    settingsDirtyRef.current = settingsDirty;
-  }, [settingsDirty]);
+    settingsDirtyRef.current = settingsInputDirty;
+  }, [settingsInputDirty]);
 
   useEffect(() => {
     // 自定义配置可能由独立 Provider 防抖保存回流；dirty ref 防止回流覆盖用户正在编辑的草稿。
@@ -303,6 +314,7 @@ export function useSettingsFormController(): SettingsFormController {
     if (!hasInitializedFromRemoteRef.current) {
       setSavedSettings(nextSavedSettings);
       setSettings(nextDraft);
+      setMonthlyBudgetInput(String(nextDraft.monthlyBudget));
       if (hasResolvedRecipientEmail) hasResolvedDefaultRecipientEmailRef.current = true;
       hasInitializedFromRemoteRef.current = true;
       return;
@@ -312,6 +324,7 @@ export function useSettingsFormController(): SettingsFormController {
     if (!settingsDirtyRef.current) {
       setSavedSettings(nextSavedSettings);
       setSettings(nextDraft);
+      setMonthlyBudgetInput(String(nextDraft.monthlyBudget));
       if (hasResolvedRecipientEmail) hasResolvedDefaultRecipientEmailRef.current = true;
     } else if (remoteSettings.recipientEmail.trim()) {
       hasResolvedDefaultRecipientEmailRef.current = true;
@@ -340,9 +353,9 @@ export function useSettingsFormController(): SettingsFormController {
 
   const handleMonthlyBudgetInputChange = useCallback(
     (rawValue: string) => {
+      setMonthlyBudgetInput(rawValue);
       if (rawValue.trim() === "") {
-        setMonthlyBudgetError(null);
-        updateSetting("monthlyBudget", 0);
+        setMonthlyBudgetError(t("settings.budgetInvalid"));
         return;
       }
 
@@ -470,6 +483,8 @@ export function useSettingsFormController(): SettingsFormController {
         const saved = settingsResult.value;
         setSavedSettings(saved);
         setSettings(saved);
+        setMonthlyBudgetInput(String(saved.monthlyBudget));
+        setMonthlyBudgetError(null);
         syncSavedPreviewState(saved, { syncAppearance: appearanceChanged });
         void refetchNotificationHistory();
         if (providerChanged) {
@@ -494,6 +509,11 @@ export function useSettingsFormController(): SettingsFormController {
       }
 
       if (failedScopes.length === 0) {
+        const committedSettings = settingsResult.status === "fulfilled" && settingsResult.value
+          ? settingsResult.value
+          : settings;
+        setMonthlyBudgetInput(String(committedSettings.monthlyBudget));
+        setMonthlyBudgetError(null);
         toast({
           title: t("settings.saved"),
           description: t("settings.savedDescription"),
@@ -537,6 +557,7 @@ export function useSettingsFormController(): SettingsFormController {
 
   const handleDiscardChanges = useCallback(() => {
     setSettings(savedSettings);
+    setMonthlyBudgetInput(String(savedSettings.monthlyBudget));
     setCustomConfig(savedCustomConfig);
     setMonthlyBudgetError(null);
     syncSavedPreviewState(savedSettings, { syncAppearance: true });
@@ -709,6 +730,7 @@ export function useSettingsFormController(): SettingsFormController {
     updatePaymentMethods,
     updateCurrencies,
     updateSetting,
+    monthlyBudgetInput,
     monthlyBudgetError,
     handleMonthlyBudgetInputChange,
     toggleChannel,
@@ -738,6 +760,7 @@ export function useSettingsFormController(): SettingsFormController {
       regenerate: handleRegenerateCalendarFeed,
       revoke: handleRevokeCalendarFeed,
     },
+    builtInIconIndex,
     publicStatusPage,
     password,
     passwordResetEnabled,

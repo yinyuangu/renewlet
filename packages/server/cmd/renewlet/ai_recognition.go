@@ -1,5 +1,9 @@
 package main
 
+// ai_recognition.go 定义 Docker/Go 运行面的 AI 识别 API 边界。
+//
+// 路由只返回结构化草稿和脱敏 diagnostics，不直接写 subscriptions；前端必须继续走 import preview/apply，
+// 让冲突处理、Logo 分配和服务端持久层校验复用同一条导入链路。
 import (
 	"context"
 	"database/sql"
@@ -143,9 +147,10 @@ type aiRecognitionErrorResponse struct {
 }
 
 type aiRecognitionErrorDetails struct {
-	Reason          string                   `json:"reason"`
-	ProviderMessage *string                  `json:"providerMessage"`
-	Diagnostics     aiRecognitionDiagnostics `json:"diagnostics"`
+	Reason           string                   `json:"reason"`
+	ProviderMessage  *string                  `json:"providerMessage"`
+	ProviderResponse *aiProviderResponse      `json:"providerResponse,omitempty"`
+	Diagnostics      aiRecognitionDiagnostics `json:"diagnostics"`
 }
 
 type aiRecognitionRunner interface {
@@ -192,6 +197,7 @@ func prepareAIRecognitionRunContext(app core.App, e *core.RequestEvent) (aiRecog
 	}
 	aiSettings := sanitizeAIRecognitionSettings(settings.AIRecognition)
 	if input.ThinkingControl != nil && !aiThinkingControlMatchesSettings(aiSettings, input.ThinkingControl) {
+		// thinking control 绑定 provider；切换模型后旧 control 不能继续沿用，否则第三方会拒绝请求。
 		return aiRecognitionRunContext{}, e.BadRequestError(serverText(locale, "aiRecognition.thinkingProviderMismatch"), nil)
 	}
 	if err := validateAIRecognitionSettings(aiSettings, locale); err != nil {
@@ -221,6 +227,7 @@ func handleAIRecognizeSubscriptions(app core.App, e *core.RequestEvent) error {
 	)
 	if err != nil {
 		if diagnostics := aiRecognitionDiagnosticsFromError(err); diagnostics != nil {
+			// diagnostics 只随本次认证响应返回；不入库、不进导出，且构造阶段已脱敏 prompt/raw/provider metadata。
 			if errors.Is(err, errAIRecognitionNoSubscriptions) {
 				return aiRecognitionJSONError(e, http.StatusBadRequest, serverText(runContext.Locale, "aiRecognition.noSubscriptions"), "AI_RECOGNITION_EMPTY", "empty", nil, diagnostics)
 			}
@@ -234,6 +241,9 @@ func handleAIRecognizeSubscriptions(app core.App, e *core.RequestEvent) error {
 		}
 		if isAIRecognitionSchemaMismatchError(err) {
 			return e.BadRequestError(serverText(runContext.Locale, "aiRecognition.schemaMismatch"), nil)
+		}
+		if providerResponse := aiProviderResponseFromError(err); providerResponse != nil {
+			return aiRecognitionProviderResponseJSONError(e, http.StatusBadRequest, serverText(runContext.Locale, "aiRecognition.failed"), "AI_RECOGNITION_FAILED", "provider_failed", err, providerResponse)
 		}
 		return e.BadRequestError(serverText(runContext.Locale, "aiRecognition.failed"), safeAIRecognitionError(err))
 	}
@@ -255,8 +265,8 @@ func handleAIRecognitionTestConnection(app core.App, e *core.RequestEvent) error
 	}
 	err = testAIRecognitionConnection(e.Request.Context(), settings)
 	if err != nil {
-		// 连接测试只做一次最小文本生成；不走完整订阅 schema/repair/诊断链路，避免把“测连通”变成慢识别。
-		return e.BadRequestError(serverText(locale, "aiRecognition.testFailed"), safeAIRecognitionError(err))
+		// 连接测试只做一次最小文本生成；没有订阅识别 diagnostics，但仍应把 SDK 暴露的 provider response 回显给当前用户排查。
+		return aiRecognitionProviderResponseJSONError(e, http.StatusBadRequest, serverText(locale, "aiRecognition.testFailed"), "AI_RECOGNITION_TEST_FAILED", "provider_failed", err, aiProviderResponseFromError(err))
 	}
 	return e.JSON(http.StatusOK, aiRecognitionTestResponse{OK: true, ProviderType: settings.ProviderType, TransportProtocol: settings.TransportProtocol, Model: settings.Model})
 }
@@ -351,9 +361,22 @@ func aiRecognitionJSONError(e *core.RequestEvent, status int, message string, co
 		Message: message,
 		Code:    code,
 		Details: aiRecognitionErrorDetails{
-			Reason:          reason,
-			ProviderMessage: safeAIRecognitionProviderMessage(err),
-			Diagnostics:     *diagnostics,
+			Reason:           reason,
+			ProviderMessage:  safeAIRecognitionProviderMessage(err),
+			ProviderResponse: aiProviderResponseFromError(err),
+			Diagnostics:      *diagnostics,
+		},
+	})
+}
+
+func aiRecognitionProviderResponseJSONError(e *core.RequestEvent, status int, message string, code string, reason string, err error, providerResponse *aiProviderResponse) error {
+	return e.JSON(status, map[string]interface{}{
+		"message": message,
+		"code":    code,
+		"details": map[string]interface{}{
+			"reason":           reason,
+			"providerMessage":  safeAIRecognitionProviderMessage(err),
+			"providerResponse": providerResponse,
 		},
 	})
 }

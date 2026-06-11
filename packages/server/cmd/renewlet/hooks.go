@@ -95,9 +95,104 @@ func registerRecordHooks(app core.App) {
 			if err := normalizePublicStatusPageRecord(e.Record); err != nil {
 				return err
 			}
+		case "cloud_backup_targets":
+			if err := normalizeCloudBackupTargetRecord(e.Record); err != nil {
+				return err
+			}
 		}
 		return e.Next()
 	})
+}
+
+func normalizeCloudBackupTargetRecord(record *core.Record) error {
+	provider := strings.TrimSpace(record.GetString("provider"))
+	if provider != cloudBackupProviderWebDAV && provider != cloudBackupProviderS3 {
+		return errors.New("CLOUD_BACKUP_PROVIDER_INVALID")
+	}
+	record.Set("provider", provider)
+	var stored cloudBackupStoredConfig
+	if data, err := jsonBytesFromValue(record.Get("config")); err == nil && len(bytes.TrimSpace(data)) > 0 {
+		if err := json.Unmarshal(data, &stored); err != nil {
+			return err
+		}
+	}
+	if provider == cloudBackupProviderWebDAV && stored.S3 != nil {
+		stored.S3 = nil
+	}
+	if provider == cloudBackupProviderS3 && stored.WebDAV != nil {
+		stored.WebDAV = nil
+	}
+	if stored.WebDAV != nil {
+		if err := stored.WebDAV.NormalizeAndValidate(); err != nil {
+			return err
+		}
+	}
+	if stored.S3 != nil {
+		if err := stored.S3.NormalizeAndValidate(); err != nil {
+			return err
+		}
+	}
+	record.Set("config", stored)
+	var credential cloudBackupStoredCredential
+	if data, err := jsonBytesFromValue(record.Get("credential")); err == nil && len(bytes.TrimSpace(data)) > 0 {
+		if err := json.Unmarshal(data, &credential); err != nil {
+			return err
+		}
+	}
+	if provider == cloudBackupProviderWebDAV {
+		credential.S3SecretAccessKey = ""
+	} else {
+		credential.WebDAVPassword = ""
+	}
+	// credential 永远作为独立 JSON 保存；出站 DTO 只回 credentialSet，防止管理后台之外的 API 明文回显。
+	record.Set("credential", credential)
+	frequency := strings.TrimSpace(record.GetString("scheduleFrequency"))
+	if frequency == "" {
+		frequency = "daily"
+	}
+	if frequency != "daily" && frequency != "weekly" {
+		return errors.New("CLOUD_BACKUP_SCHEDULE_INVALID")
+	}
+	record.Set("scheduleFrequency", frequency)
+	scheduleTime := strings.TrimSpace(record.GetString("scheduleTime"))
+	if scheduleTime == "" {
+		scheduleTime = cloudBackupDefaultScheduleTime
+	}
+	if !localTimeRe.MatchString(scheduleTime) || !isValidLocalTime(scheduleTime) {
+		return errors.New("CLOUD_BACKUP_SCHEDULE_TIME_INVALID")
+	}
+	record.Set("scheduleTime", scheduleTime)
+	scheduleWeekday := strings.TrimSpace(record.GetString("scheduleWeekday"))
+	if scheduleWeekday == "" {
+		scheduleWeekday = cloudBackupDefaultScheduleWeekday
+	}
+	if !validCloudBackupWeekday(scheduleWeekday) {
+		return errors.New("CLOUD_BACKUP_SCHEDULE_WEEKDAY_INVALID")
+	}
+	record.Set("scheduleWeekday", scheduleWeekday)
+	retention := record.GetInt("retention")
+	if retention <= 0 {
+		record.Set("retention", cloudBackupDefaultRetention)
+	} else if retention > cloudBackupMaxRetention {
+		return errors.New("CLOUD_BACKUP_RETENTION_INVALID")
+	}
+	status := strings.TrimSpace(record.GetString("lastStatus"))
+	if status == "" {
+		record.Set("lastStatus", cloudBackupStatusIdle)
+	} else if status != cloudBackupStatusIdle && status != cloudBackupStatusSuccess && status != cloudBackupStatusFailed {
+		return errors.New("CLOUD_BACKUP_STATUS_INVALID")
+	}
+	for _, field := range []string{"lastBackupAt", "lockedUntil"} {
+		value := strings.TrimSpace(record.GetString(field))
+		if value != "" {
+			if _, err := time.Parse(time.RFC3339Nano, value); err != nil {
+				return errors.New("CLOUD_BACKUP_TIME_INVALID")
+			}
+		}
+		record.Set(field, value)
+	}
+	record.Set("lastError", strings.TrimSpace(record.GetString("lastError")))
+	return nil
 }
 
 func normalizePublicStatusPageRecord(record *core.Record) error {

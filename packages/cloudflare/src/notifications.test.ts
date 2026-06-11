@@ -5,7 +5,7 @@ import type { ApiAppSettings } from "@renewlet/shared/schemas/settings";
 import type { ApiSubscription } from "@renewlet/shared/schemas/subscriptions";
 import { collectNotificationItemsForLocalDate, runScheduledNotifications } from "./notifications";
 import { sendServerChan, serverChanEndpoint } from "./notification-serverchan";
-import type { Env, SubscriptionRow } from "./types";
+import type { Env, NotificationJobRow, SubscriptionRow } from "./types";
 
 vi.mock("./smtp", () => ({
   notificationSmtpConfig: () => {
@@ -20,6 +20,7 @@ type FakeD1Query = {
   method: "all" | "first" | "run";
 };
 
+// 这个 D1 mock 保留 prepare/bind/all/first/run 形状，让用例能验证 SQL 阶段和参数边界，而不是只测纯函数。
 function fakeEnv(handler: (query: FakeD1Query) => unknown | Promise<unknown>): Env {
   return {
     DB: {
@@ -117,6 +118,24 @@ function subscriptionRow(overrides: Partial<SubscriptionRow> = {}): Subscription
   };
 }
 
+function notificationJobRow(overrides: Partial<NotificationJobRow> = {}): NotificationJobRow {
+  return {
+    id: "job_due",
+    user_id: "usr_due",
+    scheduled_local_date: "2026-01-09",
+    scheduled_local_time: "08:00",
+    time_zone: "UTC",
+    scheduled_instant_utc: "2026-01-09T08:00:00Z",
+    status: "pending",
+    attempts: 0,
+    last_error: null,
+    result_json: "{}",
+    created_at: "2026-01-09T08:00:00.000Z",
+    updated_at: "2026-01-09T08:00:00.000Z",
+    ...overrides,
+  };
+}
+
 afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
@@ -158,6 +177,7 @@ describe("Cloudflare notifications", () => {
     vi.setSystemTime(new Date("2026-01-09T08:00:00.000Z"));
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const seenSettingsUsers: string[] = [];
+    // Cron 顶层按用户隔离失败；坏用户只写脱敏日志，不能阻断后续用户的通知窗口。
     const env = fakeEnv(({ sql, params, method }) => {
       if (method === "all" && sql.includes("SELECT id FROM users WHERE banned = 0")) {
         return d1All([{ id: "usr_bad" }, { id: "usr_ok" }]);
@@ -167,6 +187,12 @@ describe("Cloudflare notifications", () => {
         seenSettingsUsers.push(userId);
         if (userId === "usr_bad") throw new Error("settings broken SCTsecret");
         return { settings_json: JSON.stringify(settings({ notificationTimeLocal: "09:59" as ApiAppSettings["notificationTimeLocal"] })) };
+      }
+      if (method === "all" && sql.includes("auto_renew = 1")) {
+        return d1All([]);
+      }
+      if (method === "all" && sql.includes("FROM subscriptions")) {
+        return d1All([]);
       }
       throw new Error(`unexpected ${method} query: ${sql}`);
     });
@@ -195,6 +221,7 @@ describe("Cloudflare notifications", () => {
     }));
     vi.stubGlobal("fetch", fetchMock);
     let finalizeParams: unknown[] | null = null;
+    // 渠道业务失败属于单个 notification_jobs 结果，不能升级成顶层 scheduled failure 或泄露 sendkey。
     const env = fakeEnv(({ sql, params, method }) => {
       if (method === "all" && sql.includes("SELECT id FROM users WHERE banned = 0")) {
         return d1All([{ id: "usr_due" }]);
@@ -204,6 +231,9 @@ describe("Cloudflare notifications", () => {
       }
       if (method === "all" && sql.includes("FROM subscriptions")) {
         return d1All([subscriptionRow()]);
+      }
+      if (method === "first" && sql.includes("FROM notification_jobs")) {
+        return null;
       }
       if (method === "run" && sql.includes("INSERT OR IGNORE INTO notification_jobs")) {
         return d1Run(1);
@@ -265,6 +295,12 @@ describe("Cloudflare notifications", () => {
           auto_renew: 1,
         })]);
       }
+      if (method === "first" && sql.includes("FROM notification_jobs")) {
+        return null;
+      }
+      if (method === "run" && sql.includes("INSERT OR IGNORE INTO notification_jobs")) {
+        return d1Run(1);
+      }
       if (method === "run" && sql.includes("UPDATE notification_jobs SET status")) {
         finalizeParams = params;
         return d1Run(1);
@@ -277,6 +313,158 @@ describe("Cloudflare notifications", () => {
     expect(events).toEqual(["renewal-maintenance", "notification-content"]);
     expect(renewalUpdateParams?.[0]).toBe("2026-02-08");
     expect(finalizeParams?.[0]).toBe("skipped");
+  });
+
+  it("marks partial channel failures as failed cron jobs", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-01-09T08:00:00.000Z"));
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ code: 0, message: "ok" }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    let finalizeParams: unknown[] | null = null;
+    const env = fakeEnv(({ sql, params, method }) => {
+      if (method === "all" && sql.includes("SELECT id FROM users WHERE banned = 0")) {
+        return d1All([{ id: "usr_due" }]);
+      }
+      if (method === "first" && sql.includes("SELECT settings_json FROM settings")) {
+        return { settings_json: JSON.stringify(settings({ enabledChannels: ["serverchan", "telegram"], serverchanSendKey: "SCT123456" })) };
+      }
+      if (method === "all" && sql.includes("auto_renew = 1")) return d1All([]);
+      if (method === "all" && sql.includes("FROM subscriptions")) return d1All([subscriptionRow()]);
+      if (method === "first" && sql.includes("FROM notification_jobs")) return null;
+      if (method === "run" && sql.includes("INSERT OR IGNORE INTO notification_jobs")) return d1Run(1);
+      if (method === "run" && sql.includes("UPDATE notification_jobs SET status")) {
+        finalizeParams = params;
+        return d1Run(1);
+      }
+      throw new Error(`unexpected ${method} query: ${sql}`);
+    });
+
+    await expect(runScheduledNotifications(env)).resolves.toBeUndefined();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(finalizeParams?.[0]).toBe("failed");
+    const result = JSON.parse(String(finalizeParams?.[3])) as { channels: { succeeded: string[]; failed: Array<{ channel: string }> } };
+    expect(result.channels.succeeded).toEqual(["serverchan"]);
+    expect(result.channels.failed.map((failure) => failure.channel)).toEqual(["telegram"]);
+  });
+
+  it("retries only failed channels for failed cron jobs", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-01-09T08:01:00.000Z"));
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ code: 0 }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    let markSendingParams: unknown[] | null = null;
+    let finalizeParams: unknown[] | null = null;
+    const existing = notificationJobRow({
+      status: "failed",
+      attempts: 1,
+      result_json: JSON.stringify({
+        source: "cron",
+        channels: {
+          attempted: ["serverchan", "telegram"],
+          succeeded: ["serverchan"],
+          failed: [{ channel: "telegram", error: "old telegram failure" }],
+        },
+      }),
+      updated_at: "2026-01-09T08:00:00.000Z",
+    });
+    const env = fakeEnv(({ sql, params, method }) => {
+      if (method === "all" && sql.includes("SELECT id FROM users WHERE banned = 0")) return d1All([{ id: "usr_due" }]);
+      if (method === "first" && sql.includes("SELECT settings_json FROM settings")) {
+        return { settings_json: JSON.stringify(settings({ enabledChannels: ["serverchan", "telegram"], serverchanSendKey: "SCT123456" })) };
+      }
+      if (method === "all" && sql.includes("auto_renew = 1")) return d1All([]);
+      if (method === "all" && sql.includes("FROM subscriptions")) return d1All([subscriptionRow()]);
+      if (method === "first" && sql.includes("FROM notification_jobs")) return existing;
+      if (method === "run" && sql.includes("SET status = 'sending'")) {
+        markSendingParams = params;
+        return d1Run(1);
+      }
+      if (method === "run" && sql.includes("UPDATE notification_jobs SET status")) {
+        finalizeParams = params;
+        return d1Run(1);
+      }
+      throw new Error(`unexpected ${method} query: ${sql}`);
+    });
+
+    await expect(runScheduledNotifications(env)).resolves.toBeUndefined();
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(markSendingParams?.[0]).toBe(2);
+    expect(finalizeParams?.[0]).toBe("failed");
+    expect(finalizeParams?.[1]).toBe(2);
+    const result = JSON.parse(String(finalizeParams?.[3])) as { channels: { succeeded: string[]; failed: Array<{ channel: string }> } };
+    expect(result.channels.succeeded).toEqual(["serverchan"]);
+    expect(result.channels.failed.map((failure) => failure.channel)).toEqual(["telegram"]);
+  });
+
+  it("does not take over fresh sending cron jobs", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-01-09T08:02:00.000Z"));
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const writes: string[] = [];
+    const env = fakeEnv(({ sql, method }) => {
+      if (method === "all" && sql.includes("SELECT id FROM users WHERE banned = 0")) return d1All([{ id: "usr_due" }]);
+      if (method === "first" && sql.includes("SELECT settings_json FROM settings")) {
+        return { settings_json: JSON.stringify(settings({ enabledChannels: ["serverchan"], serverchanSendKey: "SCT123456" })) };
+      }
+      if (method === "all" && sql.includes("auto_renew = 1")) return d1All([]);
+      if (method === "all" && sql.includes("FROM subscriptions")) return d1All([subscriptionRow()]);
+      if (method === "first" && sql.includes("FROM notification_jobs")) {
+        return notificationJobRow({ status: "sending", attempts: 1, updated_at: "2026-01-09T07:58:00.000Z" });
+      }
+      if (method === "run") {
+        writes.push(sql);
+        return d1Run(1);
+      }
+      throw new Error(`unexpected ${method} query: ${sql}`);
+    });
+
+    await expect(runScheduledNotifications(env)).resolves.toBeUndefined();
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(writes).toEqual([]);
+  });
+
+  it("takes over stale sending cron jobs", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-01-09T08:02:00.000Z"));
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ code: 0 }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    })));
+    let markSendingParams: unknown[] | null = null;
+    let finalizeParams: unknown[] | null = null;
+    const env = fakeEnv(({ sql, params, method }) => {
+      if (method === "all" && sql.includes("SELECT id FROM users WHERE banned = 0")) return d1All([{ id: "usr_due" }]);
+      if (method === "first" && sql.includes("SELECT settings_json FROM settings")) {
+        return { settings_json: JSON.stringify(settings({ enabledChannels: ["serverchan"], serverchanSendKey: "SCT123456" })) };
+      }
+      if (method === "all" && sql.includes("auto_renew = 1")) return d1All([]);
+      if (method === "all" && sql.includes("FROM subscriptions")) return d1All([subscriptionRow()]);
+      if (method === "first" && sql.includes("FROM notification_jobs")) {
+        return notificationJobRow({ status: "sending", attempts: 1, updated_at: "2026-01-09T07:40:00.000Z" });
+      }
+      if (method === "run" && sql.includes("SET status = 'sending'")) {
+        markSendingParams = params;
+        return d1Run(1);
+      }
+      if (method === "run" && sql.includes("UPDATE notification_jobs SET status")) {
+        finalizeParams = params;
+        return d1Run(1);
+      }
+      throw new Error(`unexpected ${method} query: ${sql}`);
+    });
+
+    await expect(runScheduledNotifications(env)).resolves.toBeUndefined();
+
+    expect(markSendingParams?.[0]).toBe(2);
+    expect(finalizeParams?.[0]).toBe("sent");
+    expect(finalizeParams?.[1]).toBe(2);
   });
 
   it("builds ServerChan endpoints for Turbo and ServerChan 3 SendKeys", () => {

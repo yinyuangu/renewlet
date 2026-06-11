@@ -1,5 +1,9 @@
 package main
 
+// subscription_renewal_maintenance.go 注册 Docker/Go 自动续订维护任务。
+//
+// 维护任务按用户时区计算 today，并在通知生成前幂等推进 autoRenew 订阅，
+// 避免已自动续订的记录仍用旧账单日进入 expired/renewal 通知。
 import (
 	"log/slog"
 	"sync"
@@ -25,6 +29,7 @@ func registerSubscriptionRenewalCron(app core.App) error {
 	expr := envString("SUBSCRIPTION_RENEWAL_SCHEDULER_CRON", "* * * * *")
 	return app.Cron().Add("renewlet_subscription_renewals", expr, func() {
 		if !subscriptionRenewalCronMu.TryLock() {
+			// Cron tick 可能因慢数据库或大量用户重叠；跳过重入比并发推进同一订阅更安全。
 			slog.Info("subscription renewal maintenance skipped overlapping tick")
 			return
 		}
@@ -54,6 +59,7 @@ func renewAutoSubscriptionsForAllUsers(app core.App, now time.Time) (subscriptio
 		for _, user := range users {
 			settings, err := currentUserSettings(app, user, nil)
 			if err != nil {
+				// settings 损坏不能让该用户永久跳过自动续订；回落默认时区后仍按持久层校验保存。
 				settings = defaultAppSettings()
 			}
 			updated, err := renewAutoSubscriptionsForUser(app, user.Id, settings.Timezone, now)
@@ -76,6 +82,7 @@ func renewAutoSubscriptionsForUser(app core.App, userID string, timezone string,
 	today := todayDateOnly(now, timezone)
 	updated := 0
 	for {
+		// 每轮都从第 0 页按 nextBillingDate 重新查；更新后记录会离开条件，避免 offset 跳过跨多期过期项。
 		rows, err := app.FindRecordsByFilter(
 			"subscriptions",
 			"user = {:user} && autoRenew = true && billingCycle != 'one-time' && nextBillingDate < {:today} && (status = 'active' || status = 'trial')",

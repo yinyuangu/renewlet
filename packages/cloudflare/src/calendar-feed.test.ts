@@ -393,6 +393,7 @@ async function createCalendarFeedTestEnv(options: CalendarFeedTestOptions = {}):
     timezone: "UTC",
     notificationReminderDays: 5,
   };
+  // 这份状态同时模拟正常表、旧 hash-only 表和缺表，用来锁住 Worker 的自修复与 migration-required 分支。
   const state: CalendarFeedTestState = {
     sessionHash: await sha256(SESSION_TOKEN),
     user: {
@@ -520,6 +521,7 @@ function calendarFeedRow(overrides: Partial<CalendarFeedRow> = {}): CalendarFeed
 }
 
 class CalendarFeedTestDB {
+  // 日历 Feed 公开路由只靠 token 读取，登录态管理路由才查 session；mock 保持这两个入口的隔离。
   constructor(private readonly state: CalendarFeedTestState) {}
 
   prepare(sql: string) {

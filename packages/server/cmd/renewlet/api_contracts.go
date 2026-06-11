@@ -27,8 +27,10 @@ import (
 )
 
 const maxJSONBodyBytes = 1 << 20
+const maxEmptyRequestBodyBytes = 1024
 
 var errEmptyJSONBody = errors.New("empty JSON body")
+var errNonEmptyRequestBody = errors.New("request body must be empty")
 
 // localizedValidator 是请求体的本地化校验约定。
 // Validate 在 JSON 结构通过后执行，用于枚举、邮箱、密码长度等产品语义校验。
@@ -225,6 +227,55 @@ type systemUpdateResponse struct {
 	Message        string `json:"message"`
 }
 
+type builtInIconProviderCountsResponse struct {
+	TheSVG         int `json:"thesvg"`
+	Selfhst        int `json:"selfhst"`
+	DashboardIcons int `json:"dashboardIcons"`
+}
+
+type builtInIconProviderVersionResponse struct {
+	SourceRef          string  `json:"sourceRef"`
+	DisplayVersion     string  `json:"displayVersion"`
+	CommitSHA          *string `json:"commitSha"`
+	CommitShortSHA     *string `json:"commitShortSha"`
+	CommitDate         *string `json:"commitDate"`
+	ReleaseTag         *string `json:"releaseTag"`
+	ReleasePublishedAt *string `json:"releasePublishedAt"`
+}
+
+type builtInIconIndexProviderStatusResponse struct {
+	Provider        string                              `json:"provider"`
+	Current         *builtInIconProviderVersionResponse `json:"current"`
+	Latest          *builtInIconProviderVersionResponse `json:"latest"`
+	IconCount       int                                 `json:"iconCount"`
+	CheckedAt       *string                             `json:"checkedAt"`
+	RefreshedAt     *string                             `json:"refreshedAt"`
+	LastError       *string                             `json:"lastError"`
+	Refreshing      bool                                `json:"refreshing"`
+	UpdateAvailable bool                                `json:"updateAvailable"`
+}
+
+type builtInIconIndexStatusResponse struct {
+	Source         string                                   `json:"source"`
+	Hash           *string                                  `json:"hash"`
+	IconCount      int                                      `json:"iconCount"`
+	ProviderCounts builtInIconProviderCountsResponse        `json:"providerCounts"`
+	CheckedAt      *string                                  `json:"checkedAt"`
+	UpdatedAt      *string                                  `json:"updatedAt"`
+	Refreshing     bool                                     `json:"refreshing"`
+	Providers      []builtInIconIndexProviderStatusResponse `json:"providers"`
+}
+
+type builtInIconIndexProviderCheckResponse struct {
+	Status   builtInIconIndexStatusResponse         `json:"status"`
+	Provider builtInIconIndexProviderStatusResponse `json:"provider"`
+}
+
+type builtInIconIndexProviderRefreshResponse struct {
+	Status   builtInIconIndexStatusResponse         `json:"status"`
+	Provider builtInIconIndexProviderStatusResponse `json:"provider"`
+}
+
 // rateLimitedResponse 是简单限流响应。
 type rateLimitedResponse struct {
 	Code    string `json:"code"`
@@ -323,6 +374,24 @@ func decodeStrictJSONWithLimit[T interface{}](request *http.Request, locale appL
 // 手动通知运行允许空 body，因此这里把“空 body”与“非法 JSON”区分开。
 func decodeOptionalStrictJSON[T interface{}](request *http.Request, locale appLocale) (T, error) {
 	return decodeStrictJSONFromReaderWithLimit[T](request.Body, locale, true, maxJSONBodyBytes)
+}
+
+// requireEmptyRequestBody 用于显式无参数动作，避免 `{}` 这种旧 JSON 习惯继续扩大 API 契约面。
+func requireEmptyRequestBody(request *http.Request) error {
+	if request.Body == nil {
+		return nil
+	}
+	data, err := io.ReadAll(io.LimitReader(request.Body, maxEmptyRequestBodyBytes+1))
+	if err != nil {
+		return err
+	}
+	if len(data) > maxEmptyRequestBodyBytes {
+		return errors.New("request body too large")
+	}
+	if len(data) > 0 {
+		return errNonEmptyRequestBody
+	}
+	return nil
 }
 
 // decodeStrictJSONFromReader 限制请求体大小后再进入 JSON decoder。

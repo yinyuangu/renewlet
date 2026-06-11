@@ -1,3 +1,8 @@
+/**
+ * Cloudflare 订阅 handler 是 shared schema 与 D1 row 之间的写入收敛层。
+ *
+ * Worker 没有 PocketBase hook，因此 create/update/import/renew 都必须在这里复用同一套字段归一和 owner 过滤。
+ */
 import { subscriptionCreateBodySchema, subscriptionsListQuerySchema, subscriptionUpdateBodySchema } from "@renewlet/shared/schemas/subscriptions";
 import { boolToInt, countSubscriptions, getSettings, getSubscription, listSubscriptionsPage, newId, nowIso, parseJsonObject, parseSubscriptionCursor, subscriptionCursor, toApiSubscription } from "./db";
 import { advanceSubscriptionRenewal, dateOnlyInZone } from "./subscription-renewal";

@@ -103,17 +103,18 @@ export function CalendarFeedSection({
             variant={feedUrl ? "outline" : "default"}
             onClick={feedUrl ? () => setConfirmRegenerateOpen(true) : onCreate}
             disabled={busy}
+            aria-busy={isCreating ? true : undefined}
             className="justify-center gap-2 border-border"
           >
-            <RefreshCw className="h-4 w-4" />
             <LoadingButtonContent loading={isCreating} loadingLabel={t("common.saving")}>
+              <RefreshCw className="h-4 w-4" />
               {enabled ? t("settings.calendarFeedRegenerate") : t("settings.calendarFeedGenerate")}
             </LoadingButtonContent>
           </Button>
           {enabled ? (
-            <Button type="button" variant="ghost" size="sm" onClick={onDelete} disabled={busy} className="justify-center gap-2 text-destructive hover:text-destructive">
-              <Trash2 className="h-4 w-4" />
+            <Button type="button" variant="ghost" size="sm" onClick={onDelete} disabled={busy} aria-busy={isDeleting ? true : undefined} className="justify-center gap-2 text-destructive hover:text-destructive">
               <LoadingButtonContent loading={isDeleting} loadingLabel={t("common.saving")}>
+                <Trash2 className="h-4 w-4" />
                 {t("settings.calendarFeedRevoke")}
               </LoadingButtonContent>
             </Button>

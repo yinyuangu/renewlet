@@ -25,6 +25,7 @@ function requestFixture(body?: unknown): Request {
 }
 
 function envFixture(row: SubscriptionRow | null) {
+  // 捕获 lookup/update 参数，确保手动续订在 SQL 层按 owner 过滤，不能先读全局记录再在内存判断。
   let subscriptionLookupParams: unknown[] | null = null;
   let updateParams: unknown[] | null = null;
   const env = {

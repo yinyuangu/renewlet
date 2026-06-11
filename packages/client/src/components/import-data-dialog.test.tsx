@@ -106,7 +106,10 @@ const faviconCandidate = {
   autoAssignable: true,
 };
 
-function renderImportDialog() {
+function renderImportDialog(props: {
+  initialFile?: File | null;
+  onInitialFileConsumed?: () => void;
+} = {}) {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
@@ -121,6 +124,8 @@ function renderImportDialog() {
         onOpenChange={vi.fn()}
         settings={DEFAULT_SETTINGS}
         config={DEFAULT_CUSTOM_CONFIG}
+        {...("initialFile" in props ? { initialFile: props.initialFile } : {})}
+        {...(props.onInitialFileConsumed ? { onInitialFileConsumed: props.onInitialFileConsumed } : {})}
       />
     </QueryClientProvider>,
   );
@@ -315,5 +320,25 @@ describe("ImportDataDialog", () => {
     await user.click(screen.getByRole("button", { name: "执行导入" }));
 
     expect(await screen.findByText("到期日期不能早于开始日期")).toBeInTheDocument();
+  });
+
+  it("loads an initial cloud restore file through the existing preview flow", async () => {
+    const onConsumed = vi.fn();
+    const initialFile = new File([JSON.stringify([{
+      Name: "Cloud Restore App",
+      "Payment Cycle": "Monthly",
+      "Next Payment": "2026-06-01",
+      Price: "$10",
+      Category: "Software",
+      "Payment Method": "Visa",
+    }])], "renewlet-export-v1-cloud.json", { type: "application/json" });
+
+    renderImportDialog({ initialFile, onInitialFileConsumed: onConsumed });
+
+    await waitFor(() => {
+      expect(mocks.preview).toHaveBeenCalledTimes(1);
+    });
+    expect(onConsumed).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText("Cloud Restore App")).toBeInTheDocument();
   });
 });

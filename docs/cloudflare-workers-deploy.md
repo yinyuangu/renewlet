@@ -15,6 +15,12 @@ https://<worker-name>.<workers-dev-subdomain>.workers.dev/setup
 
 Keep the generated deploy command as `pnpm deploy`. Renewlet's deploy script applies D1 migrations before publishing the Worker, so new tables are created before the updated API starts serving traffic.
 
+### Failed To Get Repository Contents
+
+If the Cloudflare page says `Failed to get repository contents`, the deploy wizard is usually hitting a temporary rate limit or network-egress issue while reading the public GitHub repository. This does not mean the Renewlet server or Worker code failed to deploy.
+
+If you are using a proxy/VPN node, a corporate or school network, or another shared network egress, the current egress IP may also be temporarily rate-limited by GitHub or Cloudflare. Avoid repeated retries; try again later, switch to a more reliable proxy node or network egress; if it still fails, use the manual deploy flow below.
+
 ### Upgrade
 
 One-click deploy creates a repository in your GitHub/GitLab account. To upgrade later, update that repository. Do not click the one-click button again.
@@ -166,7 +172,7 @@ Permissions: `Edit Cloudflare Workers` + `Account` -> `D1` -> `Edit`. Scope reso
 
 ### 5. Configure GitHub Secrets
 
-In your fork repository, open `Settings` -> `Secrets and variables` -> `Actions` -> `New repository secret`, then add these 5 repository secrets:
+In your fork repository, open `Settings` -> `Secrets and variables` -> `Actions` -> `New repository secret`, then add these 5 required repository secrets:
 
 | Secret | Value |
 | --- | --- |
@@ -175,6 +181,22 @@ In your fork repository, open `Settings` -> `Secrets and variables` -> `Actions`
 | `WORKER_NAME` | Worker name, for example `renewlet` or `renewlet-prod` |
 | `D1_DATABASE_ID` | D1 database ID copied from the Cloudflare dashboard |
 | `R2_BUCKET_NAME` | R2 bucket name, for example `renewlet-assets` |
+
+Optional: Renewlet checks GitHub Releases for the version popover and GitHub repository commits for the built-in icon library status. Anonymous checks work for most deployments; if the version or icon library status shows GitHub `403` / rate-limit errors, add this extra repository secret:
+
+| Secret | Value |
+| --- | --- |
+| `RENEWLET_GITHUB_TOKEN` | Read-only GitHub token; the workflow uploads it as a Worker secret through a temporary `--secrets-file` during Worker deploy |
+
+One-click deploy users do not use this GitHub Actions secrets table. If needed, open the Renewlet Worker in the Cloudflare Dashboard, go to `Settings` -> `Variables and Secrets`, add the same `RENEWLET_GITHUB_TOKEN` Secret, then redeploy.
+
+For local `pnpm dev:cloudflare`, put the same value in ignored `.dev.vars`:
+
+```env
+RENEWLET_GITHUB_TOKEN="github_pat_..."
+```
+
+Do not put this token in `wrangler.jsonc` `vars`, `wrangler.generated.jsonc`, or front-end code.
 
 <img src="./screenshots/cloudflare/github-actions-secrets.jpg" alt="New repository secret" width="720">
 
@@ -188,7 +210,7 @@ The workflow file is `.github/workflows/cloudflare-worker.yml`.
 
 For the first deployment, run it manually from GitHub Actions. Later, when you sync upstream changes into your fork, Actions can redeploy automatically if enabled. You can also run it manually at any time:
 
-The workflow needs all 5 repository secrets to deploy to Cloudflare. Without them, it only verifies the Cloudflare build path and does not change any remote D1 database or Worker.
+The workflow needs the 5 required repository secrets above to deploy to Cloudflare. Without them, it only verifies the Cloudflare build path and does not change any remote D1 database or Worker.
 
 1. Open your fork repository.
 2. Go to `Actions`.
@@ -252,12 +274,23 @@ pnpm exec wrangler d1 migrations apply DB --remote --config wrangler.generated.j
 pnpm exec wrangler deploy --config wrangler.generated.jsonc
 ```
 
+If your local CLI deployment also needs `RENEWLET_GITHUB_TOKEN`, create an uncommitted secrets file first, then keep deploying with the same generated config:
+
+```bash
+cat > cloudflare-worker-secrets.local <<'EOF'
+RENEWLET_GITHUB_TOKEN="github_pat_..."
+EOF
+
+pnpm exec wrangler deploy --config wrangler.generated.jsonc --secrets-file cloudflare-worker-secrets.local
+```
+
 ## Other Configuration
 
 | Name | Type | Purpose |
 | --- | --- | --- |
 | `SETUP_ENABLED` | Worker var | `/setup` switch, defaults to `true` |
 | `SESSION_TTL_DAYS` | Worker var | Login validity period, defaults to 30 days |
+| `RENEWLET_GITHUB_TOKEN` | Worker secret | Optional; raises GitHub Release and built-in icon library version check limits |
 | `VITE_RENEWLET_RUNTIME=cloudflare` | Build variable | Frontend uses the Worker API |
 
 ## Common Cases

@@ -21,7 +21,7 @@ export interface LoadingButtonContentProps {
  */
 export function LoadingButtonContent({ loading, loadingLabel, children }: LoadingButtonContentProps) {
   return (
-    <>
+    <span className="relative inline-flex items-center justify-center">
       <span
         aria-hidden={loading ? true : undefined}
         className={cn("inline-flex items-center justify-center gap-2", loading && "invisible")}
@@ -29,12 +29,12 @@ export function LoadingButtonContent({ loading, loadingLabel, children }: Loadin
         {children}
       </span>
       {loading ? (
-        <span className="absolute inset-0 inline-flex items-center justify-center gap-2">
+        <span className="absolute inset-0 inline-flex items-center justify-center gap-2" aria-live="polite">
           <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
           {loadingLabel}
         </span>
       ) : null}
-    </>
+    </span>
   );
 }
 

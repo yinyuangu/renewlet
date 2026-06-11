@@ -118,7 +118,7 @@ git push origin v0.1.0
 - `/api/app/admin/system/version` 使用 `deployment` 表达 `docker`、`cloudflare` 或 `source` 部署形态，使用 `updateMode` 表达 `in-app-binary`、`docker-compose`、`cloudflare-deploy` 或 `source-manual` 升级路径。`updateSupported` 只表示管理员弹窗能否执行页面内二进制更新。
 - 自更新通道由当前运行版本号决定：稳定版只检查 stable Release，`x.y.z-rc.N` 只检查合法 prerelease RC，并允许从较低 RC 更新到更高 RC。当前通道没有更高合法目标时，版本检查仍视为成功，并展示已是最新版本。
 - 新布局的 Docker release 镜像返回 `deployment=docker`、`updateMode=in-app-binary`、`updateSupported=true`。禁用自更新、旧 bridge 布局和非 release 构建必须返回对应手动模式，并只给出一条明确不支持原因。
-- Cloudflare 构建返回 `deployment=cloudflare`、`updateMode=cloudflare-deploy`、`updateSupported=false`；`checkSucceeded=true` 只表示 Worker 已读到构建元数据和部署升级能力，不代表做过 GitHub latest Release 检查。自管分支部署显示 `packageVersion-dev+shortSha` 和提交链接，官方稳定生产部署显示 tag 版本和发布页信息，不允许暴露可执行更新路径。
+- Cloudflare 构建返回 `deployment=cloudflare`、`updateMode=cloudflare-deploy`、`updateSupported=false`；`checkSucceeded=true` 表示 Worker 已拿到可信 GitHub stable Release 检查结果，但 Cloudflare 仍只能提示部署流程升级，不能执行页面内更新。一键部署/Workers Builds 未注入版本变量时显示 `package.json` 稳定版本，`0.0.0-dev` 只作为占位值不对用户外露；自管分支部署显示 `packageVersion-dev+shortSha` 和提交链接，官方稳定生产部署显示 tag 版本和发布页信息，不允许暴露可执行更新路径。
 
 ## 热修复
 

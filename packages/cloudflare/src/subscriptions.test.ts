@@ -2,6 +2,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { subscriptionNormalizationFixtures } from "@renewlet/shared/contract-fixtures";
 import { toApiSubscription } from "./db";
 import { toSubscriptionRow, type SubscriptionBody } from "./subscriptions";
 
@@ -39,6 +40,19 @@ function subscriptionBody(overrides: Partial<SubscriptionBody> = {}): Subscripti
 }
 
 describe("Cloudflare subscription mapper", () => {
+  it.each(subscriptionNormalizationFixtures)("matches shared normalization fixture $name", (fixture) => {
+    const body = subscriptionBody(fixture.input);
+    const row = toSubscriptionRow("sub_fixture", "usr_fixture", body, "2026-06-05T00:00:00.000Z", "2026-06-05T00:00:00.000Z");
+    const apiSubscription = toApiSubscription(row);
+
+    expect(row.custom_days).toBe(fixture.expected.customDays);
+    expect(row.custom_cycle_unit).toBe(fixture.expected.customCycleUnit);
+    expect(row.one_time_term_count).toBe(fixture.expected.oneTimeTermCount);
+    expect(row.one_time_term_unit).toBe(fixture.expected.oneTimeTermUnit);
+    expect(apiSubscription.autoRenew).toBe(fixture.expected.autoRenew);
+    expect(apiSubscription.autoCalculateNextBillingDate).toBe(fixture.expected.autoCalculateNextBillingDate);
+  });
+
   it("persists and exposes custom cycle units", () => {
     const row = toSubscriptionRow("sub_custom", "usr_custom", subscriptionBody({
       billingCycle: "custom",
@@ -149,6 +163,7 @@ describe("Cloudflare subscription mapper", () => {
   });
 
   it("adds custom_cycle_unit through the standalone migration only", () => {
+    // D1 migration 必须保持增量拆分；一键部署和本地 migration 都依赖旧库逐步补列，而不是重建初始表。
     const initialMigration = readFileSync(resolve("migrations/0001_initial.sql"), "utf8");
     const customUnitMigration = readFileSync(resolve("migrations/0007_subscription_custom_cycle_unit.sql"), "utf8");
     const oneTimeTermMigration = readFileSync(resolve("migrations/0008_subscription_one_time_term.sql"), "utf8");

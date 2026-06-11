@@ -25,8 +25,19 @@ import {
 import { readCustomConfig, readSettings, updateCustomConfig, updateSettings } from "./settings";
 import { createSubscription, deleteSubscription, readSubscriptions, renewSubscription, updateSubscription } from "./subscriptions";
 import { applyImport, previewImport } from "./import-export";
+import {
+  createCloudBackup,
+  deleteCloudBackup,
+  downloadCloudBackup,
+  listCloudBackups,
+  readCloudBackupConfig,
+  runDueCloudBackups,
+  testCloudBackupConfig,
+  updateCloudBackupConfig,
+} from "./cloud-backup";
 import { recognizeSubscriptions, recognizeSubscriptionsStream, testAIRecognitionConnection } from "./ai-recognition";
 import { listAIModels } from "./ai-models";
+import { builtInIconIndexStatus, checkBuiltInIconIndexProvider, refreshBuiltInIconIndexProvider } from "./media-icon-index";
 import { mediaCandidates } from "./search";
 import { notificationHistory, notificationRun, notificationTest, runScheduledNotifications } from "./notifications";
 import { renewAutoSubscriptionsForAllUsers } from "./subscription-renewal";
@@ -63,6 +74,8 @@ const worker: ExportedHandler<Env> = {
     await renewAutoSubscriptionsForAllUsers(env);
     // Cron 顶层失败必须交回平台记录；本地调试通过 `--test-scheduled` 的 `/__scheduled` 绕过 Wrangler Static Assets bug。
     await runScheduledNotifications(env);
+    // 云备份是可恢复快照，不参与通知窗口；放在通知之后，避免慢远端存储拖慢本轮续费提醒。
+    await runDueCloudBackups(env);
   },
 };
 
@@ -104,7 +117,7 @@ async function routePublic(request: Request, env: Env, url: URL): Promise<Respon
 
 async function routeApp(request: Request, env: Env, url: URL): Promise<Response> {
   const segments = pathSegments(url);
-  const [head, second, third, fourth, fifth] = segments;
+  const [head, second, third, fourth, fifth, sixth, seventh] = segments;
 
   // Worker 只实现 Renewlet 产品 API，不模拟 PocketBase REST；路由表越显式，运行面漂移越早暴露。
   if (head === "auth" && second === "login") return routeMethods(request, { POST: () => login(request, env) });
@@ -137,6 +150,21 @@ async function routeApp(request: Request, env: Env, url: URL): Promise<Response>
   if (head === "admin" && second === "system" && third === "restart") {
     return routeMethods(request, { POST: () => systemRestart(request, env) });
   }
+  if (head === "admin" && second === "media" && third === "icon-index" && !fourth) {
+    return routeMethods(request, {
+      GET: () => builtInIconIndexStatus(request, env),
+    });
+  }
+  if (head === "admin" && second === "media" && third === "icon-index" && fourth === "providers" && fifth && sixth === "check" && !seventh) {
+    return routeMethods(request, {
+      POST: () => checkBuiltInIconIndexProvider(request, env, fifth),
+    });
+  }
+  if (head === "admin" && second === "media" && third === "icon-index" && fourth === "providers" && fifth && sixth === "refresh" && !seventh) {
+    return routeMethods(request, {
+      POST: () => refreshBuiltInIconIndexProvider(request, env, fifth),
+    });
+  }
 
   if (head === "settings") return routeMethods(request, {
     GET: () => readSettings(request, env),
@@ -168,6 +196,25 @@ async function routeApp(request: Request, env: Env, url: URL): Promise<Response>
 
   if (head === "import" && second === "preview") return routeMethods(request, { POST: () => previewImport(request, env) });
   if (head === "import" && second === "apply") return routeMethods(request, { POST: () => applyImport(request, env) });
+
+  if (head === "cloud-backup" && second === "config" && !third) return routeMethods(request, {
+    GET: () => readCloudBackupConfig(request, env),
+    PUT: () => updateCloudBackupConfig(request, env),
+  });
+  if (head === "cloud-backup" && second === "test" && !third) {
+    return routeMethods(request, { POST: () => testCloudBackupConfig(request, env) });
+  }
+  if (head === "cloud-backups" && !second) return routeMethods(request, {
+    GET: () => listCloudBackups(request, env),
+    POST: () => createCloudBackup(request, env),
+  });
+  if (head === "cloud-backups" && second && third === "download" && !fourth) {
+    return routeMethods(request, { GET: () => downloadCloudBackup(request, env, second) });
+  }
+  if (head === "cloud-backups" && second && !third) {
+    return routeMethods(request, { DELETE: () => deleteCloudBackup(request, env, second) });
+  }
+
   if (head === "ai" && second === "subscriptions" && third === "recognize" && fourth === "stream" && !fifth) {
     return routeMethods(request, { POST: () => recognizeSubscriptionsStream(request, env) });
   }
@@ -227,6 +274,7 @@ function health(): Response {
 }
 
 async function ready(env: Env): Promise<Response> {
+  // ready 只验证 D1 binding 可用；R2/第三方 provider 不应拖慢平台健康检查。
   await env.DB.prepare("SELECT 1").first();
   return health();
 }

@@ -13,10 +13,16 @@ import "embed"
 var Files embed.FS
 
 // BuiltInIconsIndex 是内置图标离线索引。
-// 该文件由脚本从 packages/client/src/lib/thesvg-index.json 同步生成，不应手写修改。
+// 该文件由 scripts/update-built-in-icons-index.mjs 同步生成，不应手写修改。
 //
 //go:embed data/built-in-icons-index.json
 var BuiltInIconsIndex []byte
+
+// BuiltInIconsIndexMetadata 是内置图标 seed 的 provider 级真实 GitHub 版本。
+// 当前版本展示依赖这里的 commit 元数据，不能退回到 embedded/runtime 这类索引来源词。
+//
+//go:embed data/built-in-icons-index-metadata.json
+var BuiltInIconsIndexMetadata []byte
 
 // MediaResolverConfig 是 Logo/Icon 候选解析的共享配置快照。
 // Go 后端与 shared 包必须使用同一份 JSON，避免 Docker 与 Cloudflare 候选排序和预算漂移。

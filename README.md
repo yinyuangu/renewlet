@@ -57,7 +57,7 @@ Click the button and follow the Cloudflare wizard for the easiest deployment pat
 
 Do not click the one-click button again to upgrade. Use the Upgrade steps in [Cloudflare Workers deploy](docs/cloudflare-workers-deploy.md), sync the repository Cloudflare created, and push to redeploy.
 
-If the page says `Failed to get repository contents`, Cloudflare is usually being rate-limited while reading the public GitHub repository. Avoid repeated retries; try again later, or use [Cloudflare Workers manual deploy](docs/cloudflare-workers-deploy.md).
+If the page says `Failed to get repository contents`, Cloudflare is usually being rate-limited while reading the public GitHub repository. If you are using a proxy/VPN node, a corporate or school network, or another shared network egress, the current egress IP may also be temporarily rate-limited by GitHub or Cloudflare. Avoid repeated retries; try again later, switch to a more reliable proxy node or network egress, or use [Cloudflare Workers manual deploy](docs/cloudflare-workers-deploy.md).
 
 ## Quick Deploy
 

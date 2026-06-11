@@ -1,6 +1,6 @@
 package main
 
-// 本文件测试通知内容、重复提醒、时区调度和外发 URL 防护的核心业务口径。
+// 通知测试保护 due item 分类、reminderDays 哨兵、IANA timezone/HH:mm 本地墙钟和 HTTPS-only 外发边界。
 
 import (
 	"encoding/json"

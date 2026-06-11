@@ -9,6 +9,7 @@ import { ExternalLink, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { NumericInput } from '@/components/ui/numeric-input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useI18n } from '@/i18n/I18nProvider';
@@ -33,6 +34,21 @@ const NOTIFICATION_TEST_LABEL_KEYS: Record<NotificationChannel, MessageKey> = {
   bark: "settings.testChannel.bark",
   serverchan: "settings.testChannel.serverchan",
 };
+
+const SMTP_PORT_MAX = 65_535;
+
+type NumericAllowedValues = {
+  floatValue: number | undefined;
+  value: string;
+};
+
+function isAllowedSmtpPortValue(values: NumericAllowedValues) {
+  return values.value === "" || (
+    /^[1-9]\d{0,4}$/.test(values.value)
+    && values.floatValue !== undefined
+    && values.floatValue <= SMTP_PORT_MAX
+  );
+}
 
 function NotificationTestButton({
   channel,
@@ -355,14 +371,17 @@ export function NotificationChannelConfigPanel({
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="smtpPort">{t("settings.smtpPort")}</Label>
-                <Input
+                <NumericInput
                   id="smtpPort"
                   name="smtpPort"
                   inputMode="numeric"
                   enterKeyHint="next"
                   placeholder="587"
                   value={settings.smtpPort}
-                  onChange={(e) => updateSetting('smtpPort', e.target.value)}
+                  allowNegative={false}
+                  decimalScale={0}
+                  isAllowed={isAllowedSmtpPortValue}
+                  onRawValueChange={(value) => updateSetting('smtpPort', value)}
                   className="border-border bg-secondary"
                 />
               </div>

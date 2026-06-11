@@ -25,6 +25,7 @@ import {
   aiRecognitionErrorDetails,
   safeAIRecognitionError,
 } from "./ai-recognition-diagnostics";
+import { providerResponseFromError } from "./ai-provider-response";
 import {
   runAIRecognitionConnectionTest,
   thinkingControlMatchesSettings,
@@ -180,6 +181,7 @@ function createAIRecognitionStreamAbortSignal(externalSignal: AbortSignal, timeo
 } {
   const controller = new AbortController();
   let timedOut = false;
+  // Worker 没有 Go context deadline；用 AbortController 同时收拢浏览器断连和 provider 超时。
   const timeout = setTimeout(() => {
     timedOut = true;
     controller.abort(new DOMException("AI recognition timed out", "TimeoutError"));
@@ -209,6 +211,7 @@ async function prepareAIRecognitionRun(request: Request, env: Env): Promise<AIRe
   const input = await readAIRecognitionInput(request, locale);
   const thinkingControl = input.thinkingControl;
   if (thinkingControl && !thinkingControlMatchesSettings(aiSettings, thinkingControl)) {
+    // thinking control 来自 multipart 临时输入，必须绑定当前 provider，不能让旧设置跨模型复用。
     throw new HttpError(400, serverText(locale, "aiRecognition.thinkingProviderMismatch"), "AI_THINKING_PROVIDER_MISMATCH");
   }
   assertAIRecognitionSettings(aiSettings, locale);
@@ -249,7 +252,11 @@ export async function testAIRecognitionConnection(request: Request, env: Env): P
       400,
       serverText(locale, "aiRecognition.testFailed"),
       "AI_RECOGNITION_TEST_FAILED",
-      safeAIRecognitionError(error),
+      {
+        reason: "provider_failed",
+        providerMessage: safeAIRecognitionError(error),
+        providerResponse: providerResponseFromError(error),
+      },
     );
   }
 }

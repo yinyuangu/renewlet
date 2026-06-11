@@ -8,6 +8,9 @@ package main
 //
 // 注意： 字段重命名、索引唯一性和枚举收窄都会影响既有数据，必须按破坏性迁移处理。
 import (
+	"database/sql"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"net/mail"
 	"os"
@@ -78,7 +81,16 @@ func ensureSchema(app core.App) error {
 	if err := ensurePublicStatusPagesCollection(app, users); err != nil {
 		return err
 	}
-	if err := backfillAutodates(app, "subscriptions", "settings", "custom_configs", "assets", "notification_jobs", "calendar_feeds", "public_status_pages"); err != nil {
+	if err := ensureCloudBackupTargetsCollection(app, users); err != nil {
+		return err
+	}
+	if err := ensureMediaIconIndexesCollection(app); err != nil {
+		return err
+	}
+	if err := migrateLegacyCloudBackupConfigs(app); err != nil {
+		return err
+	}
+	if err := backfillAutodates(app, "subscriptions", "settings", "custom_configs", "assets", "notification_jobs", "calendar_feeds", "public_status_pages", "cloud_backup_targets", "media_icon_indexes"); err != nil {
 		return err
 	}
 	if err := deleteLegacyHashOnlyCalendarFeeds(app); err != nil {
@@ -354,6 +366,32 @@ func ensureCustomConfigsCollection(app core.App, users *core.Collection) error {
 	})
 }
 
+func ensureMediaIconIndexesCollection(app core.App) error {
+	return ensureCollection(app, "media_icon_indexes", func(c *core.Collection) error {
+		fields := []core.Field{
+			&core.TextField{Name: "key", Required: true, Max: 40, Pattern: `^[a-z_]+$`},
+			&core.TextField{Name: "hash", Max: 128},
+			&core.NumberField{Name: "iconCount", OnlyInt: true, Min: types.Pointer(0.0)},
+			&core.JSONField{Name: "providerCounts", MaxSize: 4096},
+			&core.JSONField{Name: "providerStatus", MaxSize: builtInIconProviderStatusMaxBytes},
+			&core.TextField{Name: "checkedAt", Max: 40},
+			&core.TextField{Name: "indexUpdatedAt", Max: 40},
+			&core.TextField{Name: "indexGzipBase64", Max: 2_000_000},
+		}
+		for _, field := range fields {
+			if err := upsertField(c, field); err != nil {
+				return err
+			}
+		}
+		if err := ensureAutodates(c); err != nil {
+			return err
+		}
+		// 系统级索引不挂 user relation；只有管理员自定义 API 能读写，避免普通 collection API 暴露索引维护面。
+		c.AddIndex("idx_media_icon_indexes_key_unique", true, "`key`", "")
+		return nil
+	})
+}
+
 func ensureAssetsCollection(app core.App, users *core.Collection) error {
 	return ensureCollection(app, "assets", func(c *core.Collection) error {
 		ownerRules(c)
@@ -459,6 +497,129 @@ func ensurePublicStatusPagesCollection(app core.App, users *core.Collection) err
 		c.AddIndex("idx_public_status_pages_token_unique", true, "token", "")
 		return nil
 	})
+}
+
+func ensureCloudBackupTargetsCollection(app core.App, users *core.Collection) error {
+	return ensureCollection(app, "cloud_backup_targets", func(c *core.Collection) error {
+		// credential 字段含云存储 secret；该 collection 只能经自定义 route 脱敏读写，不能开放 PocketBase REST owner 读规则。
+		c.ListRule = nil
+		c.ViewRule = nil
+		c.CreateRule = nil
+		c.UpdateRule = nil
+		c.DeleteRule = nil
+		fields := []core.Field{
+			userRelation(users),
+			&core.SelectField{Name: "provider", Required: true, Values: []string{"webdav", "s3"}},
+			&core.JSONField{Name: "config", MaxSize: 65536},
+			// 云存储 credential 只允许 route 层写入和脱敏响应；普通导出/云备份都不会读取后再打包。
+			&core.JSONField{Name: "credential", MaxSize: 65536},
+			&core.BoolField{Name: "scheduleEnabled"},
+			&core.SelectField{Name: "scheduleFrequency", Values: []string{"daily", "weekly"}},
+			&core.TextField{Name: "scheduleTime", Max: 5, Pattern: `^\d{2}:\d{2}$`},
+			&core.SelectField{Name: "scheduleWeekday", Values: []string{"monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"}},
+			&core.NumberField{Name: "retention", OnlyInt: true, Min: types.Pointer(1.0), Max: types.Pointer(float64(cloudBackupMaxRetention))},
+			&core.TextField{Name: "lastBackupAt", Max: 40},
+			&core.SelectField{Name: "lastStatus", Values: []string{"idle", "success", "failed"}},
+			&core.TextField{Name: "lastError", Max: 2000},
+			&core.TextField{Name: "lockedUntil", Max: 40},
+		}
+		for _, field := range fields {
+			if err := upsertField(c, field); err != nil {
+				return err
+			}
+		}
+		if err := ensureAutodates(c); err != nil {
+			return err
+		}
+		// 每个 provider 一行；唯一索引同时保护 WebDAV/S3 独立策略和并发保存。
+		c.AddIndex("idx_cloud_backup_targets_user_provider_unique", true, "user, provider", "")
+		c.AddIndex("idx_cloud_backup_targets_schedule", false, "scheduleEnabled, updated", "")
+		return nil
+	})
+}
+
+func migrateLegacyCloudBackupConfigs(app core.App) error {
+	if _, err := app.FindCollectionByNameOrId("cloud_backup_configs"); err != nil {
+		return nil
+	}
+	targetCollection, err := app.FindCollectionByNameOrId("cloud_backup_targets")
+	if err != nil {
+		return err
+	}
+	for offset := 0; ; offset += subscriptionCleanupPageSize {
+		rows, err := app.FindRecordsByFilter("cloud_backup_configs", "id != ''", "created", subscriptionCleanupPageSize, offset)
+		if err != nil {
+			return err
+		}
+		for _, row := range rows {
+			if err := migrateLegacyCloudBackupConfigRow(app, targetCollection, row); err != nil {
+				return err
+			}
+		}
+		if len(rows) < subscriptionCleanupPageSize {
+			return nil
+		}
+	}
+}
+
+func migrateLegacyCloudBackupConfigRow(app core.App, targetCollection *core.Collection, row *core.Record) error {
+	userID := row.GetString("user")
+	if userID == "" {
+		return nil
+	}
+	var stored cloudBackupStoredConfig
+	if data, err := jsonBytesFromValue(row.Get("config")); err == nil && strings.TrimSpace(string(data)) != "" {
+		_ = json.Unmarshal(data, &stored)
+	}
+	var credential cloudBackupStoredCredential
+	if data, err := jsonBytesFromValue(row.Get("credential")); err == nil && strings.TrimSpace(string(data)) != "" {
+		_ = json.Unmarshal(data, &credential)
+	}
+	policy := cloudBackupPolicy{
+		ScheduleEnabled:   row.GetBool("scheduleEnabled"),
+		ScheduleFrequency: row.GetString("scheduleFrequency"),
+		ScheduleTime:      row.GetString("scheduleTime"),
+		ScheduleWeekday:   row.GetString("scheduleWeekday"),
+		Retention:         row.GetInt("retention"),
+	}
+	_ = policy.NormalizeAndValidate("zh-CN")
+	status := nonEmptyCloudBackupStatus(row.GetString("lastStatus"))
+	for _, provider := range []string{cloudBackupProviderWebDAV, cloudBackupProviderS3} {
+		if provider == cloudBackupProviderWebDAV && stored.WebDAV == nil && strings.TrimSpace(credential.WebDAVPassword) == "" {
+			continue
+		}
+		if provider == cloudBackupProviderS3 && stored.S3 == nil && strings.TrimSpace(credential.S3SecretAccessKey) == "" {
+			continue
+		}
+		if _, err := app.FindFirstRecordByFilter("cloud_backup_targets", "user = {:user} && provider = {:provider}", dbx.Params{"user": userID, "provider": provider}); err == nil {
+			continue
+		} else if !errors.Is(err, sql.ErrNoRows) {
+			return err
+		}
+		target := core.NewRecord(targetCollection)
+		target.Set("user", userID)
+		target.Set("provider", provider)
+		if provider == cloudBackupProviderWebDAV {
+			target.Set("config", cloudBackupStoredConfig{WebDAV: stored.WebDAV})
+			target.Set("credential", cloudBackupStoredCredential{WebDAVPassword: credential.WebDAVPassword})
+		} else {
+			target.Set("config", cloudBackupStoredConfig{S3: stored.S3})
+			target.Set("credential", cloudBackupStoredCredential{S3SecretAccessKey: credential.S3SecretAccessKey})
+		}
+		target.Set("scheduleEnabled", policy.ScheduleEnabled)
+		target.Set("scheduleFrequency", policy.ScheduleFrequency)
+		target.Set("scheduleTime", policy.ScheduleTime)
+		target.Set("scheduleWeekday", policy.ScheduleWeekday)
+		target.Set("retention", policy.Retention)
+		target.Set("lastBackupAt", strings.TrimSpace(row.GetString("lastBackupAt")))
+		target.Set("lastStatus", status)
+		target.Set("lastError", strings.TrimSpace(row.GetString("lastError")))
+		target.Set("lockedUntil", "")
+		if err := app.Save(target); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func removeIndex(collection *core.Collection, name string) {

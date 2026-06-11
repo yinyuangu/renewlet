@@ -1,9 +1,8 @@
 import { apiFetch } from "@/lib/api-client";
-import { withPocketBaseAuthGuard } from "@/lib/auth-session";
 import { assertDateOnly } from "@/lib/time/date-only";
 import { getApiLocale } from "@/i18n/api-locale";
 import { translate } from "@/i18n/messages";
-import { getCurrentUserId, pb, type RecordModel } from "@/lib/pocketbase";
+import { getCurrentUserId } from "@/lib/pocketbase";
 import {
   apiSubscriptionSchema,
   subscriptionsListResponseSchema,
@@ -11,7 +10,6 @@ import {
   subscriptionDeleteResponseSchema,
   type ApiSubscription,
 } from "@renewlet/shared/schemas/subscriptions";
-import { isCloudflareRuntime } from "./runtime";
 import {
   REPEAT_REMINDER_INTERVALS,
   REPEAT_REMINDER_WINDOWS,
@@ -51,6 +49,7 @@ type SubscriptionBaseForService = Pick<
   | "repeatReminderWindow"
   | "extra"
 >;
+type LegacySubscriptionRecord = Record<string, unknown> & { id: string };
 
 export interface SubscriptionPage {
   subscriptions: Subscription[];
@@ -91,7 +90,7 @@ function normalizeCustomCycleUnit(value: unknown): CustomCycleUnit {
 
 function normalizeSubscriptionRecord(row: unknown): unknown {
   if (!isRecord(row)) return row;
-  // PocketBase SDK record 与 Worker API row 不完全同形；这里先收敛字段，再交给 shared schema。
+  // 旧 PocketBase record 与产品 API row 不完全同形；历史输入先收敛字段，再交给 shared schema。
   const normalized: Record<string, unknown> = {
     id: row["id"],
     name: row["name"],
@@ -144,7 +143,7 @@ function normalizeSubscriptionRecord(row: unknown): unknown {
  * PocketBase 原生 record 与 Cloudflare API response 都必须先通过 shared schema；
  * React 层只看到 `Subscription` union，避免表单和统计逻辑按运行面分叉。
  */
-export function fromApiSubscription(row: ApiSubscription | RecordModel): Subscription {
+export function fromApiSubscription(row: ApiSubscription | LegacySubscriptionRecord): Subscription {
   const parsedRow: ApiSubscription = apiSubscriptionSchema.parse(normalizeSubscriptionRecord(row));
   const startDate = assertDateOnly(parsedRow.startDate);
   const nextBillingDate = assertDateOnly(parsedRow.nextBillingDate);
@@ -252,36 +251,31 @@ export const subscriptionService = {
     const userId = getCurrentUserId();
     if (!userId) return { subscriptions: [], nextCursor: null, total: 0 };
     const pageSize = normalizeSubscriptionPageLimit(limit);
-    if (isCloudflareRuntime) {
-      const params = new URLSearchParams({ limit: String(pageSize) });
-      if (cursor) params.set("cursor", cursor);
-      const data = await apiFetch(`/api/app/subscriptions?${params.toString()}`, subscriptionsListResponseSchema);
-      return {
-        subscriptions: data.subscriptions.map(fromApiSubscription),
-        nextCursor: data.nextCursor,
-        total: data.total,
-      };
-    }
-    const page = Math.max(1, cursor ? Number.parseInt(cursor, 10) : 1);
-    const result = await withPocketBaseAuthGuard(pb.collection("subscriptions").getList<ApiSubscription>(page, pageSize, {
-      filter: `user = "${userId}"`,
-      sort: "-created",
-    }));
+    const params = new URLSearchParams({ limit: String(pageSize) });
+    if (cursor) params.set("cursor", cursor);
+    const data = await apiFetch(`/api/app/subscriptions?${params.toString()}`, subscriptionsListResponseSchema);
     return {
-      subscriptions: result.items.map(fromApiSubscription),
-      nextCursor: page < result.totalPages ? String(page + 1) : null,
-      total: result.totalItems,
+      subscriptions: data.subscriptions.map(fromApiSubscription),
+      nextCursor: data.nextCursor,
+      total: data.total,
     };
   },
 
   async list(): Promise<Subscription[]> {
     const out: Subscription[] = [];
     let cursor: string | null | undefined = null;
+    const seenCursors = new Set<string>();
     for (;;) {
       const page = await this.listPage(cursor, SUBSCRIPTION_PAGE_SIZE);
       out.push(...page.subscriptions);
+      if (!page.nextCursor) return out.slice(0, SUBSCRIPTION_AGGREGATE_LIMIT);
+      if (seenCursors.has(page.nextCursor)) {
+        // 后端 cursor 应单调推进；重复 cursor 说明分页没有前进，必须熔断以免首页/统计页请求风暴。
+        throw new Error("SUBSCRIPTION_CURSOR_REPEATED");
+      }
       // 聚合列表主要给统计/导出使用；上限避免异常数据量让单页 UI 拉取变成无界循环。
-      if (!page.nextCursor || out.length >= SUBSCRIPTION_AGGREGATE_LIMIT) return out.slice(0, SUBSCRIPTION_AGGREGATE_LIMIT);
+      if (out.length >= SUBSCRIPTION_AGGREGATE_LIMIT) return out.slice(0, SUBSCRIPTION_AGGREGATE_LIMIT);
+      seenCursors.add(page.nextCursor);
       cursor = page.nextCursor;
     }
   },
@@ -290,42 +284,31 @@ export const subscriptionService = {
     const userId = getCurrentUserId();
     if (!userId) throw new Error(translate(getApiLocale(), "auth.loginRequired"));
     const payload = toSubscriptionWritePayload(sub);
-    if (isCloudflareRuntime) {
-      const data = await apiFetch("/api/app/subscriptions", subscriptionResponseSchema, {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
-      return fromApiSubscription(data.subscription);
-    }
-    const row = await withPocketBaseAuthGuard(pb.collection("subscriptions").create<ApiSubscription>({ ...payload, user: userId }));
-    return fromApiSubscription(row);
+    const data = await apiFetch("/api/app/subscriptions", subscriptionResponseSchema, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    return fromApiSubscription(data.subscription);
   },
 
   async update(sub: Subscription): Promise<Subscription> {
     const payload = toSubscriptionWritePayload(sub);
-    if (isCloudflareRuntime) {
-      const data = await apiFetch(`/api/app/subscriptions/${sub.id}`, subscriptionResponseSchema, {
-        method: "PATCH",
-        body: JSON.stringify(payload),
-      });
-      return fromApiSubscription(data.subscription);
-    }
-    const row = await withPocketBaseAuthGuard(pb.collection("subscriptions").update<ApiSubscription>(sub.id, payload));
-    return fromApiSubscription(row);
+    const data = await apiFetch(`/api/app/subscriptions/${sub.id}`, subscriptionResponseSchema, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    });
+    return fromApiSubscription(data.subscription);
   },
 
   async renew(id: string): Promise<Subscription> {
     const data = await apiFetch(`/api/app/subscriptions/${id}/renew`, subscriptionResponseSchema, {
       method: "POST",
+      body: JSON.stringify({}),
     });
     return fromApiSubscription(data.subscription);
   },
 
   async delete(id: string): Promise<void> {
-    if (isCloudflareRuntime) {
-      await apiFetch(`/api/app/subscriptions/${id}`, subscriptionDeleteResponseSchema, { method: "DELETE" });
-      return;
-    }
-    await withPocketBaseAuthGuard(pb.collection("subscriptions").delete(id));
+    await apiFetch(`/api/app/subscriptions/${id}`, subscriptionDeleteResponseSchema, { method: "DELETE" });
   },
 };

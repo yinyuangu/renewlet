@@ -77,6 +77,7 @@ export default defineConfig({
       "/calendar/renewals.ics": devProxyTarget,
       "/_": devProxyTarget,
     },
+    allowedHosts: ['sh.cfhd.de']
   },
   build: {
     rolldownOptions: {

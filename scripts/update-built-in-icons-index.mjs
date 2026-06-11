@@ -4,78 +4,36 @@
  * 图标索引生成脚本（内置多 provider）。
  *
  * 触发时机：维护者手动运行 `pnpm update:built-in-icons-index`，上游 registry 更新后再提交生成结果。
- * 前置依赖：Node.js fetch、可访问 theSVG/selfh.st/dashboard-icons 的网络，以及 shared media resolver 配置。
- * 副作用：重写前端运行时索引和 Go embedded static 索引。
- *
- * 架构位置：把上游 registry/metadata 收敛成前端搜索和后端 embedded static 共用的窄 JSON，
- * 避免客户端运行时拉取完整上游数据。
- *
- * 注意： 生成结果是仓库内静态数据；上游字段或 CDN 路径变化时必须先保证前后端解析仍兼容。
+ * 前置依赖：Node.js fetch、可访问 TheSVG/selfh.st/Dashboard Icons 的网络，以及 shared media resolver 配置。
+ * 副作用：重写前端运行时 seed 索引、Go embedded static seed 索引，以及 provider 级 GitHub 版本 metadata。
  */
 import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  buildBuiltInIconIndex,
+  canonicalBuiltInIconSeedMetadataJson,
+  canonicalBuiltInIconIndexJson,
+  countBuiltInIconProviders,
+  createBuiltInIconSeedMetadata,
+} from "../packages/shared/src/built-in-icon-index-builder.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const configPath = path.resolve(__dirname, "../packages/shared/data/media-resolver-config.json");
 const mediaResolverConfig = JSON.parse(await readFile(configPath, "utf8"));
-const PROVIDERS = Object.fromEntries(mediaResolverConfig.builtInProviders.map((item) => [item.provider, item]));
-const PLAN_SUFFIX_WORDS = new Set(mediaResolverConfig.auto.planSuffixWords);
 
 const outputPaths = [
   path.resolve(__dirname, "../packages/client/src/lib/built-in-icons-index.json"),
   path.resolve(__dirname, "../packages/server/internal/static/data/built-in-icons-index.json"),
 ];
+const metadataOutputPaths = [
+  path.resolve(__dirname, "../packages/client/src/lib/built-in-icons-index-metadata.json"),
+  path.resolve(__dirname, "../packages/server/internal/static/data/built-in-icons-index-metadata.json"),
+];
 const FETCH_TIMEOUT_MS = 15_000;
-
-function isRecord(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function asString(value) {
-  return typeof value === "string" && value.trim() ? value.trim() : undefined;
-}
-
-function asStringArray(value) {
-  if (!Array.isArray(value)) return [];
-  return value.filter((item) => typeof item === "string").map((item) => item.trim()).filter(Boolean);
-}
-
-function isSafePathPart(value) {
-  // slug/variant 会拼进 CDN 路径，只允许单段安全字符，防止上游数据把 `../` 注入生成索引。
-  return /^[a-z0-9][a-z0-9._-]*$/i.test(value);
-}
-
-function normalizeTerm(value) {
-  return String(value ?? "")
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}]+/gu, " ")
-    .trim()
-    .replace(/\s+/g, " ");
-}
-
-function compactTerm(value) {
-  return normalizeTerm(value).replace(/\s+/g, "");
-}
-
-function uniqueTerms(values) {
-  return [...new Set(values.map(normalizeTerm).filter(Boolean))];
-}
-
-function exactKeysForIcon(icon) {
-  const canonical = uniqueTerms([icon.slug, icon.title, ...icon.aliases]);
-  const compact = canonical.map(compactTerm).filter(Boolean);
-  return [...new Set([...canonical, ...compact])];
-}
-
-function tokenKeysForIcon(icon) {
-  const canonical = uniqueTerms([icon.slug, icon.title, ...icon.aliases]);
-  return [...new Set(canonical
-    .flatMap((term) => term.split(/\s+/))
-    .filter((term) => term.length >= 3 && !PLAN_SUFFIX_WORDS.has(term)))];
-}
+const GITHUB_API_BASE = "https://api.github.com";
+const GITHUB_API_VERSION = "2022-11-28";
 
 async function fetchJson(url, label) {
   const controller = new AbortController();
@@ -92,178 +50,90 @@ async function fetchJson(url, label) {
   }
 }
 
-async function fetchJsonAny(urls, label) {
-  const errors = [];
-  for (const url of urls) {
-    try {
-      return await fetchJson(url, label);
-    } catch (error) {
-      errors.push(error instanceof Error ? error.message : String(error));
+async function fetchGitHubJson(url, label) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const headers = {
+      accept: "application/vnd.github+json",
+      "user-agent": "Renewlet-built-in-icon-index-generator",
+      "x-github-api-version": GITHUB_API_VERSION,
+    };
+    const token = process.env.RENEWLET_GITHUB_TOKEN?.trim();
+    if (token) headers.authorization = `Bearer ${token}`;
+    const response = await fetch(url, { headers, signal: controller.signal });
+    if (!response.ok) {
+      throw new Error(`${label} HTTP ${response.status}`);
     }
+    return await response.json();
+  } finally {
+    clearTimeout(timeout);
   }
-  // 多 CDN fallback 都失败时保留旧索引更安全；脚本失败会让维护者重新确认上游变更。
-  throw new Error(`${label} failed: ${errors.join("; ")}`);
 }
 
-function iconRecord(input) {
+async function fetchLatestRelease(owner, repo) {
+  try {
+    const release = await fetchGitHubJson(`${GITHUB_API_BASE}/repos/${owner}/${repo}/releases/latest`, `${owner}/${repo} latest release`);
+    return {
+      tagName: typeof release.tag_name === "string" && release.tag_name.trim() ? release.tag_name.trim() : null,
+      publishedAt: typeof release.published_at === "string" && release.published_at.trim() ? release.published_at.trim() : null,
+    };
+  } catch {
+    return { tagName: null, publishedAt: null };
+  }
+}
+
+async function fetchProviderVersion(providerConfig) {
+  const { owner, repo, branch, latestRelease } = providerConfig.github;
+  const commit = await fetchGitHubJson(`${GITHUB_API_BASE}/repos/${owner}/${repo}/commits/${branch}`, `${owner}/${repo} commit`);
+  if (typeof commit.sha !== "string" || !commit.sha.trim()) {
+    throw new Error(`${owner}/${repo} commit response missing sha`);
+  }
+  const commitSha = commit.sha.trim();
+  const commitShortSha = commitSha.slice(0, 7);
+  const commitDate = typeof commit.commit?.committer?.date === "string" && commit.commit.committer.date.trim()
+    ? commit.commit.committer.date.trim()
+    : null;
+  const release = latestRelease ? await fetchLatestRelease(owner, repo) : { tagName: null, publishedAt: null };
   return {
-    ...input,
-    terms: uniqueTerms([input.slug, input.title, ...input.aliases, ...input.categories]),
-    compactTerms: uniqueTerms([input.slug, input.title, ...input.aliases]).map(compactTerm).filter(Boolean),
-    exactKeys: exactKeysForIcon(input),
-    tokenKeys: tokenKeysForIcon(input),
+    sourceRef: commitSha,
+    displayVersion: commitShortSha,
+    commitSha,
+    commitShortSha,
+    commitDate,
+    releaseTag: release.tagName,
+    releasePublishedAt: release.publishedAt,
   };
 }
 
-function parseTheSvgVariants(slug, value) {
-  if (!isRecord(value)) return [];
-  const variants = [];
-  for (const [variant, pathValue] of Object.entries(value)) {
-    if (!isSafePathPart(variant)) continue;
-    if (typeof pathValue !== "string") continue;
-    const normalizedPath = pathValue.trim();
-    if (!normalizedPath.endsWith(".svg")) continue;
-    // 上游 registry 是 CDN 路径事实源，但路径仍必须锁在当前 slug 下，避免跨目录引用污染候选 URL。
-    if (!normalizedPath.startsWith(`/icons/${slug}/`)) continue;
-    variants.push({ name: variant, path: `/public${normalizedPath}` });
-  }
-  return variants;
+async function fetchProviderVersions(config) {
+  const entries = await Promise.all(config.builtInProviders.map(async (providerConfig) => [
+    providerConfig.provider,
+    await fetchProviderVersion(providerConfig),
+  ]));
+  return Object.fromEntries(entries);
 }
 
-async function loadTheSvgIcons() {
-  const registry = await fetchJson(`${PROVIDERS.thesvg.cdnBase}/src/data/icons.json`, "theSVG registry");
-  if (!Array.isArray(registry)) return [];
-  const icons = [];
-  const seen = new Set();
-  for (const item of registry) {
-    if (!isRecord(item)) continue;
-    const slug = asString(item.slug);
-    const title = asString(item.title);
-    if (!slug || !title || !isSafePathPart(slug) || seen.has(slug)) continue;
-    const variants = parseTheSvgVariants(slug, item.variants);
-    if (variants.length === 0) continue;
-    const aliases = asStringArray(item.aliases);
-    const categories = asStringArray(item.categories);
-    icons.push(iconRecord({
-      provider: "thesvg",
-      slug,
-      title,
-      aliases,
-      categories,
-      variants,
-      hex: asString(item.hex),
-      license: asString(item.license),
-      url: asString(item.url),
-      guidelines: asString(item.guidelines),
-    }));
-    seen.add(slug);
-  }
-  return icons;
-}
-
-function selfhstVariants(reference, item) {
-  const variants = [];
-  if (item.SVG === "Yes" || item.SVG === "Y") variants.push({ name: "default", path: `/svg/${reference}.svg` });
-  if (item.Light === "Yes" || item.Light === "Y") variants.push({ name: "light", path: `/svg/${reference}-light.svg` });
-  if (item.Dark === "Yes" || item.Dark === "Y") variants.push({ name: "dark", path: `/svg/${reference}-dark.svg` });
-  return variants;
-}
-
-async function loadSelfhstIcons() {
-  const registry = await fetchJsonAny([
-    `${PROVIDERS.selfhst.cdnBase}/index.json`,
-    "https://raw.githubusercontent.com/selfhst/icons/main/index.json",
-  ], "selfh.st index");
-  if (!Array.isArray(registry)) return [];
-  const icons = [];
-  const seen = new Set();
-  for (const item of registry) {
-    if (!isRecord(item)) continue;
-    const slug = asString(item.Reference);
-    const title = asString(item.Name);
-    if (!slug || !title || !isSafePathPart(slug) || seen.has(slug)) continue;
-    const variants = selfhstVariants(slug, item);
-    if (variants.length === 0) continue;
-    const tagTerms = asString(item.Tags)?.split(",").map((value) => value.trim()).filter(Boolean) ?? [];
-    const categories = [asString(item.Category), ...tagTerms].filter(Boolean);
-    icons.push(iconRecord({
-      provider: "selfhst",
-      slug,
-      title,
-      aliases: [],
-      categories,
-      variants,
-    }));
-    seen.add(slug);
-  }
-  return icons;
-}
-
-function dashboardVariants(slug, item, svgFiles) {
-  const variants = [];
-  if (svgFiles.has(`${slug}.svg`)) variants.push({ name: "default", path: `/svg/${slug}.svg` });
-  if (isRecord(item.colors)) {
-    for (const variantName of ["light", "dark"]) {
-      const fileSlug = asString(item.colors[variantName]);
-      if (!fileSlug || !isSafePathPart(fileSlug)) continue;
-      if (svgFiles.has(`${fileSlug}.svg`)) variants.push({ name: variantName, path: `/svg/${fileSlug}.svg` });
-    }
-  }
-  return variants;
-}
-
-async function loadDashboardIcons() {
-  const [metadata, tree] = await Promise.all([
-    fetchJsonAny([
-      `${PROVIDERS.dashboardIcons.cdnBase}/metadata.json`,
-      "https://raw.githubusercontent.com/homarr-labs/dashboard-icons/main/metadata.json",
-    ], "Dashboard Icons metadata"),
-    fetchJsonAny([
-      `${PROVIDERS.dashboardIcons.cdnBase}/tree.json`,
-      "https://raw.githubusercontent.com/homarr-labs/dashboard-icons/main/tree.json",
-    ], "Dashboard Icons tree"),
-  ]);
-  if (!isRecord(metadata) || !isRecord(tree) || !Array.isArray(tree.svg)) return [];
-  const svgFiles = new Set(tree.svg.filter((item) => typeof item === "string"));
-  const icons = [];
-  for (const [slug, item] of Object.entries(metadata)) {
-    if (!isSafePathPart(slug) || !isRecord(item)) continue;
-    const variants = dashboardVariants(slug, item, svgFiles);
-    if (variants.length === 0) continue;
-    const aliases = asStringArray(item.aliases);
-    const categories = asStringArray(item.categories);
-    icons.push(iconRecord({
-      provider: "dashboardIcons",
-      slug,
-      title: titleFromSlug(slug),
-      aliases,
-      categories,
-      variants,
-    }));
-  }
-  return icons;
-}
-
-function titleFromSlug(slug) {
-  return slug.split("-").filter(Boolean).map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1)}`).join(" ");
-}
-
-const icons = [
-  ...await loadTheSvgIcons(),
-  ...await loadSelfhstIcons(),
-  ...await loadDashboardIcons(),
-];
-
-if (icons.length === 0) {
-  // 空索引会让前端/后端候选解析退化为只有 favicon，因此必须作为生成失败处理。
-  throw new Error("built-in icon index generation produced no icons");
-}
+const icons = await buildBuiltInIconIndex(mediaResolverConfig, fetchJson);
+const json = canonicalBuiltInIconIndexJson(icons);
+const hash = createHash("sha256").update(json).digest("hex");
+const metadataJson = canonicalBuiltInIconSeedMetadataJson(createBuiltInIconSeedMetadata(
+  icons,
+  hash,
+  await fetchProviderVersions(mediaResolverConfig),
+));
 
 for (const outputPath of outputPaths) {
   await mkdir(path.dirname(outputPath), { recursive: true });
-  // 前端运行时和 Go embedded static 必须写入同一 JSON 内容，保证 Docker 与 Cloudflare 候选行为一致。
-  await writeFile(outputPath, `${JSON.stringify(icons)}\n`, "utf8");
+  // 前端 seed 和 Go embedded static seed 必须写入同一 JSON 内容，保证 Docker 与 Cloudflare 冷启动行为一致。
+  await writeFile(outputPath, json, "utf8");
 }
 
-const counts = icons.reduce((acc, icon) => ({ ...acc, [icon.provider]: (acc[icon.provider] ?? 0) + 1 }), {});
-console.log(`Generated ${icons.length} built-in icons (${Object.entries(counts).map(([provider, count]) => `${provider}:${count}`).join(", ")}) at ${outputPaths.map((item) => path.relative(process.cwd(), item)).join(", ")}`);
+for (const outputPath of metadataOutputPaths) {
+  await mkdir(path.dirname(outputPath), { recursive: true });
+  // metadata 记录生成期真实 GitHub commit；当前版本展示只能读这里或刷新后的 provider 状态，不能手写来源词。
+  await writeFile(outputPath, metadataJson, "utf8");
+}
+
+const counts = countBuiltInIconProviders(icons);
+console.log(`Generated ${icons.length} built-in icons (${Object.entries(counts).map(([provider, count]) => `${provider}:${count}`).join(", ")}) at ${outputPaths.map((item) => path.relative(process.cwd(), item)).join(", ")} with metadata ${metadataOutputPaths.map((item) => path.relative(process.cwd(), item)).join(", ")}`);

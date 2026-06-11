@@ -1,5 +1,7 @@
 package main
 
+// Server酱通知测试保护官方请求形状和失败响应解析。
+// 这个渠道是外部 HTTP 发送边界，测试必须避免真实网络，同时覆盖 sendkey 缺失与 provider 错误文本。
 import (
 	"bytes"
 	"encoding/json"

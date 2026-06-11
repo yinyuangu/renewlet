@@ -20,6 +20,7 @@ const SETTINGS_SECTIONS = [
   { id: "settings-ai-recognition", labelKey: "settings.sectionNav.aiRecognition" },
   { id: "settings-budget", labelKey: "settings.sectionNav.budget" },
   { id: "settings-data-config", labelKey: "settings.sectionNav.dataConfig" },
+  { id: "settings-cloud-backup", labelKey: "settings.sectionNav.cloudBackup" },
   { id: "settings-exchange", labelKey: "settings.sectionNav.exchange" },
   { id: "settings-calendar-feed", labelKey: "settings.sectionNav.calendarFeed" },
   { id: "settings-public-status", labelKey: "settings.sectionNav.publicStatus" },

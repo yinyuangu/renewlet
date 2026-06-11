@@ -1,0 +1,82 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { DEFAULT_CUSTOM_CONFIG } from "@/types/config";
+import { DEFAULT_SETTINGS } from "@/types/subscription";
+import { assetService } from "./asset-service";
+import { customConfigService } from "./custom-config-service";
+import { settingsService } from "./settings-service";
+
+const mocks = vi.hoisted(() => ({
+  apiFetch: vi.fn(),
+  getCurrentUserId: vi.fn(() => "user_1"),
+}));
+
+vi.mock("@/lib/api-client", () => ({
+  apiFetch: mocks.apiFetch,
+}));
+
+vi.mock("@/lib/pocketbase", () => ({
+  pb: {
+    lang: "zh-CN",
+    beforeSend: undefined,
+  },
+  getCurrentUserId: mocks.getCurrentUserId,
+  getAuthHeader: vi.fn(() => ({})),
+}));
+
+beforeEach(() => {
+  mocks.apiFetch.mockReset();
+  mocks.getCurrentUserId.mockReturnValue("user_1");
+});
+
+describe("product API services", () => {
+  it("loads and saves settings through /api/app/settings", async () => {
+    mocks.apiFetch.mockResolvedValue({ settings: DEFAULT_SETTINGS });
+
+    await settingsService.get();
+    await settingsService.update(DEFAULT_SETTINGS, { monthlyBudget: 2000 });
+
+    expect(mocks.apiFetch.mock.calls[0]?.[0]).toBe("/api/app/settings");
+    expect(mocks.apiFetch.mock.calls[1]?.[0]).toBe("/api/app/settings");
+    expect(mocks.apiFetch.mock.calls[1]?.[2]).toMatchObject({ method: "PUT" });
+    for (const [url] of mocks.apiFetch.mock.calls) {
+      expect(String(url)).not.toContain("/api/collections/settings/records");
+    }
+  });
+
+  it("loads and saves custom config through /api/app/custom-config", async () => {
+    const emptyConfig = { categories: [], statuses: [], paymentMethods: [], currencies: [] };
+    mocks.apiFetch.mockResolvedValue({ config: emptyConfig });
+
+    await customConfigService.get();
+    await customConfigService.save(DEFAULT_CUSTOM_CONFIG);
+
+    expect(mocks.apiFetch.mock.calls[0]?.[0]).toBe("/api/app/custom-config");
+    expect(mocks.apiFetch.mock.calls[1]?.[0]).toBe("/api/app/custom-config");
+    expect(mocks.apiFetch.mock.calls[1]?.[2]).toMatchObject({ method: "PUT" });
+    for (const [url] of mocks.apiFetch.mock.calls) {
+      expect(String(url)).not.toContain("/api/collections/custom_configs/records");
+    }
+  });
+
+  it("uploads and lists assets through /api/app/assets", async () => {
+    mocks.apiFetch
+      .mockResolvedValueOnce({ url: "/api/app/assets/asset_1" })
+      .mockResolvedValueOnce({
+        items: [{ id: "asset_1", url: "/api/app/assets/asset_1", kind: "logo" }],
+        page: 1,
+        totalPages: 1,
+      });
+
+    await assetService.create(new Blob(["logo"], { type: "image/png" }), "logo", "logo.png");
+    await assetService.listLogos(1);
+
+    const uploadInit = mocks.apiFetch.mock.calls[0]?.[2] as RequestInit | undefined;
+    expect(mocks.apiFetch.mock.calls[0]?.[0]).toBe("/api/app/assets");
+    expect(uploadInit).toMatchObject({ method: "POST" });
+    expect(uploadInit?.body).toBeInstanceOf(FormData);
+    expect(mocks.apiFetch.mock.calls[1]?.[0]).toBe("/api/app/assets?kind=logo&page=1&perPage=48");
+    for (const [url] of mocks.apiFetch.mock.calls) {
+      expect(String(url)).not.toContain("/api/collections/assets/records");
+    }
+  });
+});

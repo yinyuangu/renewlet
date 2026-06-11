@@ -1,3 +1,8 @@
+/**
+ * Cloudflare 系统版本 handler 只提供只读部署状态。
+ *
+ * Worker 不能执行 Docker 式下载、替换二进制或重启；这里仍检查 GitHub Release，让前端能提示用户同步部署。
+ */
 import { systemVersionResponseSchema } from "@renewlet/shared/schemas/app";
 import { z } from "zod";
 import rootPackageJson from "../../../package.json";
@@ -7,10 +12,11 @@ import { serverText } from "./server-i18n";
 import type { Env } from "./types";
 
 const DEV_VERSION = "0.0.0-dev";
-const SHORT_COMMIT_LENGTH = 7;
 const GITHUB_LATEST_RELEASE_URL = "https://api.github.com/repos/zhiyingzzhou/renewlet/releases/latest";
 const GITHUB_API_VERSION = "2026-03-10";
-const COMMIT_SHA_PATTERN = /^[0-9a-f]{7,40}$/i;
+const STABLE_BUILD_VERSION_PATTERN = /^\d+\.\d+\.\d+$/;
+const BRANCH_BUILD_VERSION_PATTERN = /^\d+\.\d+\.\d+-dev\+[0-9a-f]{7,40}$/i;
+const PLACEHOLDER_DEV_VERSION_PATTERN = /^0\.0\.0-dev(?:\+.*)?$/;
 const STABLE_VERSION_PATTERN = /^v?(\d+)\.(\d+)\.(\d+)$/;
 const COMPARABLE_VERSION_PATTERN = /^v?(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$/;
 
@@ -48,7 +54,7 @@ export async function systemVersion(request: Request, env: Env): Promise<Respons
   const locale = requestLocale(request);
   const commit = cloudflareBuildValue(env.RENEWLET_COMMIT, "");
   const buildTime = cloudflareBuildValue(env.RENEWLET_BUILD_TIME, "");
-  const version = resolveCloudflareVersion(env.RENEWLET_VERSION, commit);
+  const version = resolveCloudflareVersion(env.RENEWLET_VERSION);
   const releaseCheck = await checkLatestStableRelease(version, locale);
   return json(systemVersionResponseSchema.parse({
     currentVersion: version,
@@ -99,17 +105,14 @@ function cloudflareBuildValue(value: string | undefined, fallback: string): stri
   return trimmed;
 }
 
-function resolveCloudflareVersion(rawVersion: string | undefined, commit: string): string {
+function resolveCloudflareVersion(rawVersion: string | undefined): string {
   const version = cloudflareBuildValue(rawVersion, "");
-  if (version && version !== DEV_VERSION) return version;
-  const shortCommit = shortCommitSuffix(commit);
-  return `${rootPackageJson.version}-dev${shortCommit ? `+${shortCommit}` : ""}`;
-}
-
-function shortCommitSuffix(commit: string): string {
-  const trimmed = commit.trim();
-  if (!COMMIT_SHA_PATTERN.test(trimmed)) return "";
-  return trimmed.slice(0, SHORT_COMMIT_LENGTH);
+  if (!version || version === DEV_VERSION || PLACEHOLDER_DEV_VERSION_PATTERN.test(version)) {
+    // Deploy Button/Workers Builds 不一定注入 CI 元信息；缺省值代表官方稳定包版本，只有显式分支构建才允许展示 dev 后缀。
+    return rootPackageJson.version;
+  }
+  if (STABLE_BUILD_VERSION_PATTERN.test(version) || BRANCH_BUILD_VERSION_PATTERN.test(version)) return version;
+  return rootPackageJson.version;
 }
 
 async function checkLatestStableRelease(currentVersion: string, locale: ReturnType<typeof requestLocale>) {

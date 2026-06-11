@@ -1,5 +1,8 @@
 package main
 
+// subscription_routes.go 承载绕过 PocketBase SDK 形状的订阅专用 API。
+//
+// 这里输出前端稳定 DTO，并把手动续订限制在当前 owner、非自动续订、非 one-time 订阅上。
 import (
 	"encoding/json"
 	"net/http"
@@ -48,6 +51,7 @@ func handleSubscriptionRenew(app core.App, e *core.RequestEvent) error {
 
 func subscriptionAPIFromRecord(record *core.Record) map[string]interface{} {
 	billingCycle := record.GetString("billingCycle")
+	// API 形状与前端 Zod/shared 契约对齐；PocketBase 原始字段名和 nil JSON 不直接透出。
 	out := map[string]interface{}{
 		"id":                           record.Id,
 		"name":                         record.GetString("name"),
@@ -95,6 +99,7 @@ func subscriptionAPIFromRecord(record *core.Record) map[string]interface{} {
 }
 
 func jsonValueForResponse(value interface{}, fallback interface{}) interface{} {
+	// PocketBase JSON 字段可能以字符串、[]byte 或 nil 形态出现；响应边界统一兜底成前端可解析结构。
 	data, err := jsonBytesFromValue(value)
 	if err != nil || len(data) == 0 {
 		return fallback

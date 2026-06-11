@@ -60,6 +60,9 @@ func main() {
 	if err := registerNotificationCron(app); err != nil {
 		log.Fatal(err)
 	}
+	if err := registerCloudBackupCron(app); err != nil {
+		log.Fatal(err)
+	}
 	// Record hook 必须早于 Serve route 注册，这样 API、SDK 和管理后台写入都能共享同一套持久层校验。
 	registerRecordHooks(app)
 

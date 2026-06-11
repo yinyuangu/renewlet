@@ -1,6 +1,7 @@
 package main
 
-// 本文件测试 PocketBase schema 自愈和迁移收敛，确保 collection 字段、索引和历史 logo 数据保持当前正式契约。
+// Schema 测试保护 PocketBase collection 自愈、索引和迁移收敛。
+// 字段默认值、date-only、autoRenew 和 Logo URL 契约改动必须先在这里证明旧库能被收敛到当前形状。
 
 import (
 	"strings"

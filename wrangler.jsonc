@@ -4,6 +4,12 @@
   "main": "packages/cloudflare/src/index.ts",
   "compatibility_date": "2026-05-20",
   "compatibility_flags": ["nodejs_compat"],
+  "dev": {
+    // 本地移动端/局域网验收需要监听所有网卡；这个设置只影响 wrangler dev，不改变 Cloudflare 生产入口。
+    "ip": "0.0.0.0",
+    "port": 8787,
+    "local_protocol": "http"
+  },
   "assets": {
     "directory": "./packages/client/dist",
     // 静态资源使用 SPA fallback；产品 API 和公开 ICS 必须先交给 Worker 做认证/Token 校验。

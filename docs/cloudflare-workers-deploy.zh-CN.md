@@ -15,6 +15,12 @@ https://<worker-name>.<workers-dev-subdomain>.workers.dev/setup
 
 保持生成的部署命令为 `pnpm deploy`。Renewlet 的 deploy 脚本会先应用 D1 migrations，再发布 Worker，确保新表先创建好，更新后的 API 再开始对外服务。
 
+### 无法获取存储库内容
+
+如果 Cloudflare 页面提示 `Failed to get repository contents` / `无法获取存储库内容`，通常是部署向导读取 GitHub 公共仓库时遇到临时限流或网络出口问题，不代表 Renewlet 服务端或 Worker 代码部署失败。
+
+如果你使用代理节点、公司/校园网络或其他共享网络出口，当前出口 IP 也可能被 GitHub 或 Cloudflare 临时限流。不要连续重试；可以稍后再试、切换更稳定的代理节点/网络出口；仍失败时，改用下面的手动部署流程。
+
 ### 升级办法
 
 一键部署会在你的 GitHub/GitLab 账号下生成一个仓库。以后升级，更新这个仓库，不要重新点一键部署按钮。
@@ -166,7 +172,7 @@ Renewlet 的 Worker binding 名固定如下：
 
 ### 5. 配置 GitHub Secrets
 
-在你的 fork 仓库里打开 `Settings` -> `Secrets and variables` -> `Actions` -> `New repository secret`，添加下面 5 个 repository secrets：
+在你的 fork 仓库里打开 `Settings` -> `Secrets and variables` -> `Actions` -> `New repository secret`，添加下面 5 个必需 repository secrets：
 
 | Secret | 值 |
 | --- | --- |
@@ -175,6 +181,22 @@ Renewlet 的 Worker binding 名固定如下：
 | `WORKER_NAME` | Worker 名称，例如 `renewlet` 或 `renewlet-prod` |
 | `D1_DATABASE_ID` | 从 Cloudflare 控制台复制的 D1 database ID |
 | `R2_BUCKET_NAME` | R2 bucket 名称，例如 `renewlet-assets` |
+
+可选：Renewlet 会用 GitHub Release 检查版本弹窗，也会用 GitHub 仓库 commit 检查内置图标库状态。大多数部署可以匿名检查；如果版本或图标库状态出现 GitHub `403` / 限流错误，再额外添加下面这个 repository secret：
+
+| Secret | 值 |
+| --- | --- |
+| `RENEWLET_GITHUB_TOKEN` | 只读 GitHub token；workflow 会在部署 Worker 时通过临时 `--secrets-file` 上传为 Worker secret |
+
+一键部署用户不使用这张 GitHub Actions secrets 表；需要时在 Cloudflare Dashboard 打开 Renewlet Worker，进入 `Settings` -> `Variables and Secrets`，添加同名 `RENEWLET_GITHUB_TOKEN` Secret 后重新部署。
+
+本地 `pnpm dev:cloudflare` 放到已忽略的 `.dev.vars`：
+
+```env
+RENEWLET_GITHUB_TOKEN="github_pat_..."
+```
+
+不要把这个 token 写进 `wrangler.jsonc` 的 `vars`、`wrangler.generated.jsonc` 或前端代码。
 
 <img src="./screenshots/cloudflare/github-actions-secrets.jpg" alt="New repository secret" width="720">
 
@@ -188,7 +210,7 @@ Renewlet 的 Worker binding 名固定如下：
 
 首次部署建议从 GitHub Actions 手动运行。之后同步 fork 更新后，仓库启用 Actions 时会自动重新部署；也可以随时从 GitHub Actions 手动运行：
 
-workflow 需要下面 5 个 repository secrets 才会部署到 Cloudflare。没有配齐时，它只验证 Cloudflare 构建路径，不会修改任何远端 D1 数据库或 Worker。
+workflow 需要上面 5 个必需 repository secrets 才会部署到 Cloudflare。没有配齐时，它只验证 Cloudflare 构建路径，不会修改任何远端 D1 数据库或 Worker。
 
 1. 打开你的 fork 仓库。
 2. 进入 `Actions`。
@@ -252,12 +274,23 @@ pnpm exec wrangler d1 migrations apply DB --remote --config wrangler.generated.j
 pnpm exec wrangler deploy --config wrangler.generated.jsonc
 ```
 
+如果本机 CLI 部署也需要 `RENEWLET_GITHUB_TOKEN`，先生成未提交的 secrets 文件，再沿用同一个 generated config 部署：
+
+```bash
+cat > cloudflare-worker-secrets.local <<'EOF'
+RENEWLET_GITHUB_TOKEN="github_pat_..."
+EOF
+
+pnpm exec wrangler deploy --config wrangler.generated.jsonc --secrets-file cloudflare-worker-secrets.local
+```
+
 ## 其他配置
 
 | 名称 | 类型 | 用途 |
 | --- | --- | --- |
 | `SETUP_ENABLED` | Worker var | `/setup` 开关，默认 `true` |
 | `SESSION_TTL_DAYS` | Worker var | 登录有效期，默认 30 天 |
+| `RENEWLET_GITHUB_TOKEN` | Worker secret | 可选；提高 GitHub Release 和内置图标库版本检查额度 |
 | `VITE_RENEWLET_RUNTIME=cloudflare` | 构建变量 | 前端使用 Worker API |
 
 ## 常见情况

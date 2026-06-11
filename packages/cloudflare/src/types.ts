@@ -13,6 +13,7 @@ export interface Env {
   ASSETS_BUCKET: R2Bucket;
   SETUP_ENABLED?: string;
   SESSION_TTL_DAYS?: string;
+  RENEWLET_GITHUB_TOKEN?: string;
   RENEWLET_VERSION?: string;
   RENEWLET_COMMIT?: string;
   RENEWLET_BUILD_TIME?: string;
@@ -134,6 +135,40 @@ export interface PublicStatusPageRow {
   user_id: string;
   token: string;
   show_prices: number;
+  created_at: string;
+  updated_at: string;
+}
+
+/** 云同步与备份目标；credential_json 是 provider 级 write-only secret，出站只能暴露 credentialSet。 */
+export interface CloudBackupTargetRow {
+  user_id: string;
+  provider: "webdav" | "s3";
+  config_json: string;
+  credential_json: string;
+  schedule_enabled: number;
+  schedule_frequency: "daily" | "weekly";
+  schedule_time: string;
+  schedule_weekday: "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday";
+  retention: number;
+  last_backup_at: string | null;
+  last_status: "idle" | "success" | "failed";
+  last_error: string | null;
+  locked_until: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** 全局内置图标索引 metadata；gzip JSON 本体放 R2，避免 D1 单行承载多 MB 索引。 */
+export interface MediaIconIndexRow {
+  key: "active";
+  hash: string | null;
+  r2_key: string | null;
+  icon_count: number;
+  provider_counts_json: string;
+  provider_status_json: string;
+  checked_at: string | null;
+  index_updated_at: string | null;
+  locked_until: string | null;
   created_at: string;
   updated_at: string;
 }

@@ -1,6 +1,7 @@
 package main
 
-// 本文件测试日历 Feed 登录态管理 API 与公开 ICS token 路由的完整生命周期，防止 Go 后端和 Worker 行为分叉。
+// 日历 Feed 测试保护登录态管理 API、公开 ICS bearer token、scope 隔离和撤销语义。
+// 外部日历客户端不带登录态，所以这些用例必须证明 token 是唯一公开读取入口。
 
 import (
 	"encoding/json"

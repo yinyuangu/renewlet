@@ -18,6 +18,7 @@
 import { useEffect, useState } from 'react';
 import { Header } from '@/components/header';
 import { BackToTopFloatButton } from '@/components/back-to-top-float-button';
+import { ImportDataDialog } from '@/components/import-data-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -56,7 +57,9 @@ import { BuiltInIconSourcesSection } from './built-in-icon-sources-section';
 import { AIRecognitionSettingsSection } from './ai-recognition-settings-section';
 import { CalendarFeedSection } from './calendar-feed-section';
 import { PublicStatusPageSection } from './public-status-page-section';
+import { CloudBackupSection } from './cloud-backup-section';
 import { CheckboxSettingRow, LoadingButtonContent } from './settings-shared-controls';
+import { useCloudBackupController } from '../application/use-cloud-backup-controller';
 import {
   DesktopSettingsSectionNav,
   MobileSettingsPageHeader,
@@ -87,6 +90,7 @@ export function SettingsScreen() {
     updateStatuses,
     updatePaymentMethods,
     updateSetting,
+    monthlyBudgetInput,
     monthlyBudgetError,
     handleMonthlyBudgetInputChange,
     toggleChannel,
@@ -105,6 +109,7 @@ export function SettingsScreen() {
     isSavingSettings,
     notificationHistory,
     calendarFeed,
+    builtInIconIndex,
     publicStatusPage,
     password,
     passwordResetEnabled,
@@ -156,7 +161,13 @@ export function SettingsScreen() {
   const [selectedNotificationChannel, setSelectedNotificationChannel] = useState<NotificationChannel | null>(null);
   const [notificationReminderDaysInput, setNotificationReminderDaysInput] = useState(String(settings.notificationReminderDays));
   const [mobileSectionNavOpen, setMobileSectionNavOpen] = useState(false);
+  const [cloudBackupImportOpen, setCloudBackupImportOpen] = useState(false);
+  const [cloudBackupRestoreFile, setCloudBackupRestoreFile] = useState<File | null>(null);
   const { activeSectionId, handleSectionClick } = useSettingsSectionNavigation();
+  const cloudBackup = useCloudBackupController((file) => {
+    setCloudBackupRestoreFile(file);
+    setCloudBackupImportOpen(true);
+  });
   const activeNotificationChannel = selectedNotificationChannel ?? settings.enabledChannels[0] ?? 'telegram';
   const handleNotificationChannelToggle = (channel: NotificationChannel) => {
     setSelectedNotificationChannel(channel);
@@ -271,6 +282,7 @@ export function SettingsScreen() {
                 className={SETTINGS_SECTION_SCROLL_CLASS}
                 sources={settings.builtInIconSources}
                 onChange={(sources) => updateSetting('builtInIconSources', sources)}
+                iconIndex={builtInIconIndex}
               />
 
               <AIRecognitionSettingsSection
@@ -294,7 +306,7 @@ export function SettingsScreen() {
                         allowedDecimalSeparators={[".", "。"]}
                         inputMode="decimal"
                         enterKeyHint="done"
-                        value={settings.monthlyBudget}
+                        value={monthlyBudgetInput}
                         onRawValueChange={handleMonthlyBudgetInputChange}
                         className="w-full border-border bg-secondary min-[380px]:w-[200px]"
                         placeholder="1500"
@@ -389,6 +401,12 @@ export function SettingsScreen() {
                   />
                 </div>
               </section>
+
+              <CloudBackupSection
+                id="settings-cloud-backup"
+                className={SETTINGS_SECTION_SCROLL_CLASS}
+                controller={cloudBackup}
+              />
 
               <ExchangeRatesSection
                 id="settings-exchange"
@@ -618,6 +636,15 @@ export function SettingsScreen() {
           </div>
         </div>
       ) : null}
+
+      <ImportDataDialog
+        open={cloudBackupImportOpen}
+        onOpenChange={setCloudBackupImportOpen}
+        settings={settings}
+        config={customConfig}
+        initialFile={cloudBackupRestoreFile}
+        onInitialFileConsumed={() => setCloudBackupRestoreFile(null)}
+      />
     </div>
   );
 }

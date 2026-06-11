@@ -1,3 +1,8 @@
+/**
+ * 公开状态页 Worker handler 管理低权限 bearer token 和公开 allowlist 投影。
+ *
+ * 登录态 API 只回显可复制 URL；公开 API 不读 session，必须同时保护 token、owner、价格开关和 R2 私有资产引用。
+ */
 import {
   publicStatusPageCreateRequestSchema,
   publicStatusPageCreateResponseSchema,

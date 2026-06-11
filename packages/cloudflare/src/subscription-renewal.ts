@@ -9,6 +9,11 @@ import type { Env, SubscriptionRow } from "./types";
 
 const RENEWAL_MAINTENANCE_PAGE_SIZE = 500;
 
+/**
+ * 将 D1 订阅行推进为 shared 续订结果。
+ *
+ * Cloudflare 运行面只做 row -> shared input 映射，账单日算法本身不在 Worker 内复制分叉。
+ */
 export function advanceSubscriptionRenewal(
   row: SubscriptionRow,
   today: string,
@@ -23,6 +28,7 @@ export function dateOnlyInZone(date: Date, timezone: string): string {
   return `${part(parts, "year")}-${part(parts, "month")}-${part(parts, "day")}`;
 }
 
+/** scheduled 顶层先跑全用户自动续订，再进入通知调度，避免过期旧日期进入本轮提醒。 */
 export async function renewAutoSubscriptionsForAllUsers(env: Env, now = new Date()): Promise<{ usersProcessed: number; subscriptionsUpdated: number }> {
   let usersProcessed = 0;
   let subscriptionsUpdated = 0;
@@ -39,6 +45,7 @@ export async function renewAutoSubscriptionsForAllUsers(env: Env, now = new Date
   return { usersProcessed, subscriptionsUpdated };
 }
 
+/** 单用户入口从 settings 读取时区；通知、手动运行和 Cron 都复用同一 today 计算。 */
 export async function renewAutoSubscriptionsForUser(env: Env, userId: string, now = new Date()): Promise<number> {
   const settings = await getSettings(env, userId);
   return renewAutoSubscriptionsForUserInTimezone(env, userId, settings.timezone, now);
@@ -64,6 +71,7 @@ export async function renewAutoSubscriptionsForUserInTimezone(env: Env, userId: 
       updated += 1;
       pageUpdated += 1;
     }
+    // 本轮更新后继续从头查，保证一次 cron 能追上跨多期过期订阅，同时不会依赖被改写的游标。
     if (pageUpdated === 0) return updated;
     if (rows.results.length < RENEWAL_MAINTENANCE_PAGE_SIZE) return updated;
   }

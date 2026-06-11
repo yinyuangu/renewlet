@@ -1,9 +1,16 @@
+/**
+ * 内置分类/支付方式服务端标签生成器。
+ *
+ * 触发时机：维护内置配置标签后手动运行，或 `pnpm check:built-in-config-labels` 在 CI 中比对。
+ * 输入：`packages/shared/data/built-in-config-labels.json` 与 server-i18n active catalog；输出 Go/Worker 共享的 key 映射。
+ *
+ * 注意：shared JSON 是事实源；Go/Worker 只消费生成结果，不能在运行面里复制一套内置标签文案。
+ */
 import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-// 内置分类/支付方式的服务端标签生成器：shared JSON 是事实源，Go/Worker 只消费生成的 key 映射。
 const rootDir = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const sourcePath = path.join(rootDir, "packages/shared/data/built-in-config-labels.json");
 const serverI18nDir = path.join(rootDir, "packages/shared/data/server-i18n");

@@ -1,3 +1,8 @@
+/**
+ * ICS 生成器是 Go/PocketBase 和 Cloudflare 公开日历 Feed 的共同输出层。
+ *
+ * 它只接收应用已经计算好的下一次 date-only 事件；不生成 RRULE，避免外部日历复刻 Renewlet 续订算法。
+ */
 import ical, { ICalAlarmType, ICalCalendarMethod } from "ical-generator";
 
 /** ICS 中的单个续费事件；date 始终是 YYYY-MM-DD，不是 datetime。 */
@@ -34,6 +39,7 @@ export interface RenewalCalendarEventLabels {
   paymentMethod?: string | undefined;
 }
 
+/** 文案由调用方按用户 locale 传入，ICS 模块只负责结构和转义，不依赖服务端 i18n runtime。 */
 export interface RenewalCalendarEventText {
   amount: (value: { amount: string; currency: string }) => string;
   billingCycle: (cycle: string) => string;

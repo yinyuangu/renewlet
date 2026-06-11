@@ -109,6 +109,7 @@ describe("buildRenewalCalendarIcs", () => {
 
     expect(ics).toContain("BEGIN:VCALENDAR\r\n");
     expect(ics).toContain("NAME:Renewlet Renewals\r\n");
+    // 外部日历按 CRLF 和折行规则解析；断言前先 unfold，避免把兼容性折行误判为内容缺失。
     const unfolded = ics.replaceAll("\r\n ", "");
     expect(unfolded).toContain("SOURCE;VALUE=URI:https://example.com/calendar/renewals.ics?token=abc\r\n");
     expect(ics).toContain("DTSTAMP:20260529T102030Z\r\n");
@@ -124,6 +125,7 @@ describe("buildRenewalCalendarIcs", () => {
   });
 
   it("keeps calendar events without alarms when reminder days are disabled", () => {
+    // reminderDays=-2 只关闭提醒，不删除续费/到期事件；公开 Feed 仍应保留日期事实但不写 VALARM。
     const event = buildRenewalCalendarEvent({
       subscription: {
         id: "sub_quiet",

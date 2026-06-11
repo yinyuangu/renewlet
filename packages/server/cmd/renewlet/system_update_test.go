@@ -1,6 +1,7 @@
 package main
 
-// 本文件测试 Docker 页面内自更新：Release 选择、checksum、路径穿越防护、并发锁和 restart pending 状态流。
+// 系统更新测试保护 Docker 页面内自更新的 Release 选择、checksum、备份恢复和 pending restart 状态机。
+// fake client 隔离 GitHub 网络，重点锁住 /renewlet 稳定入口与 current 二进制替换契约。
 
 import (
 	"archive/tar"

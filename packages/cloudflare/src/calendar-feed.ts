@@ -1,3 +1,8 @@
+/**
+ * Cloudflare 日历 Feed handler 管理可撤销的公开 ICS bearer URL。
+ *
+ * D1 token 是公开读取的唯一凭据；ICS 只导出下一次 date-only 全日事件，不复制续订算法或暴露登录态。
+ */
 import {
   calendarFeedCreateRequestSchema,
   calendarFeedCreateResponseSchema,
