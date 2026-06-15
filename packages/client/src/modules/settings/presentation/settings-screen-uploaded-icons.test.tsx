@@ -78,7 +78,7 @@ describe("SettingsScreen uploaded icon management", () => {
     const section = document.getElementById("settings-uploaded-icons");
     expect(section).not.toBeNull();
     expect(within(section as HTMLElement).getByText("上传图标")).toBeInTheDocument();
-    expect(within(section as HTMLElement).getByText("已加载 5 个上传资产 · Logo 4 · 图标 1")).toBeInTheDocument();
+    expect(within(section as HTMLElement).getByText("已加载 5 个上传图标 · 订阅 Logo 4 · 支付方式 1")).toBeInTheDocument();
     expect(within(section as HTMLElement).getByRole("button", { name: "刷新" })).toBeInTheDocument();
     expect(within(section as HTMLElement).getByRole("button", { name: "管理上传图标" })).toBeInTheDocument();
     expect(within(section as HTMLElement).queryByText("logo-1.png")).not.toBeInTheDocument();
@@ -87,7 +87,7 @@ describe("SettingsScreen uploaded icon management", () => {
     expect(within(section as HTMLElement).queryByText("logo-4.png")).not.toBeInTheDocument();
     expect(within(section as HTMLElement).queryByText("server.svg")).not.toBeInTheDocument();
     expect(within(section as HTMLElement).queryByText("还没有上传过订阅 Logo")).not.toBeInTheDocument();
-    expect(within(section as HTMLElement).queryByText("还没有上传过自定义图标")).not.toBeInTheDocument();
+    expect(within(section as HTMLElement).queryByText("还没有上传过支付方式图标")).not.toBeInTheDocument();
     expect(within(section as HTMLElement).queryByRole("button", { name: "加载更多" })).not.toBeInTheDocument();
     expect(within(section as HTMLElement).queryByRole("button", { name: /^删除/ })).not.toBeInTheDocument();
 
@@ -95,13 +95,14 @@ describe("SettingsScreen uploaded icon management", () => {
     const manager = await screen.findByRole("dialog", { name: "管理上传图标" });
     expect(manager).toHaveClass("overflow-hidden", "bg-card");
     expect(within(manager).getByRole("tab", { name: "订阅 Logo" })).toHaveAttribute("aria-selected", "true");
+    expect(within(manager).getByRole("tab", { name: "支付方式图标" })).toBeInTheDocument();
     expect(within(manager).getByText("logo-1.png")).toBeInTheDocument();
     expect(within(manager).getByText("logo-4.png")).toBeInTheDocument();
     await user.click(within(manager).getByRole("button", { name: "加载更多" }));
     expect(loadMore).toHaveBeenCalled();
 
     await user.click(within(manager).getByRole("button", { name: "删除 logo-1.png" }));
-    const dialog = await screen.findByRole("alertdialog", { name: "删除上传资产？" });
+    const dialog = await screen.findByRole("alertdialog", { name: "删除上传图标？" });
     expect(within(dialog).getByText("logo-1.png")).toBeInTheDocument();
     const confirm = within(dialog).getByRole("button", { name: "删除" });
     expect(confirm).toHaveClass("bg-destructive");
@@ -110,7 +111,7 @@ describe("SettingsScreen uploaded icon management", () => {
     expect(deleteAsset).toHaveBeenCalledWith(expect.objectContaining({ id: "asset-logo-1" }));
   });
 
-  it("keeps the uploaded asset delete dialog open when the asset is still referenced", async () => {
+  it("keeps the uploaded icon delete dialog open when the icon is still referenced", async () => {
     const user = userEvent.setup();
     const deleteAsset = vi.fn().mockResolvedValue(false);
     mocks.useUploadedAssetsManager.mockReturnValue(createUploadedAssetsManagerState({
@@ -131,7 +132,7 @@ describe("SettingsScreen uploaded icon management", () => {
       },
       deleteError: {
         assetId: "asset-used",
-        message: "仍被 2 个订阅使用，请先替换或清空相关订阅 Logo。",
+        message: "仍被 2 个订阅使用，请先到订阅里换掉 Logo。",
       },
       deleteAsset,
     }));
@@ -139,16 +140,58 @@ describe("SettingsScreen uploaded icon management", () => {
     renderSettingsScreen();
     const section = document.getElementById("settings-uploaded-icons") as HTMLElement;
     expect(within(section).queryByText("used.png")).not.toBeInTheDocument();
-    expect(within(section).queryByText("仍被 2 个订阅使用，请先替换或清空相关订阅 Logo。")).not.toBeInTheDocument();
+    expect(within(section).queryByText("仍被 2 个订阅使用，请先到订阅里换掉 Logo。")).not.toBeInTheDocument();
 
     await user.click(within(section).getByRole("button", { name: "管理上传图标" }));
     const manager = await screen.findByRole("dialog", { name: "管理上传图标" });
     expect(within(manager).getByText("used.png")).toBeInTheDocument();
-    expect(within(manager).getByText("仍被 2 个订阅使用，请先替换或清空相关订阅 Logo。")).toBeInTheDocument();
+    expect(within(manager).getByText("仍被 2 个订阅使用，请先到订阅里换掉 Logo。")).toBeInTheDocument();
     await user.click(within(manager).getByRole("button", { name: "删除 used.png" }));
-    await user.click(within(await screen.findByRole("alertdialog", { name: "删除上传资产？" })).getByRole("button", { name: "删除" }));
+    await user.click(within(await screen.findByRole("alertdialog", { name: "删除上传图标？" })).getByRole("button", { name: "删除" }));
 
     expect(deleteAsset).toHaveBeenCalledWith(expect.objectContaining({ id: "asset-used" }));
-    expect(screen.getByRole("alertdialog", { name: "删除上传资产？" })).toBeInTheDocument();
+    expect(screen.getByRole("alertdialog", { name: "删除上传图标？" })).toBeInTheDocument();
+  });
+
+  it("keeps payment method referenced icons in the dialog with a payment-method hint", async () => {
+    const user = userEvent.setup();
+    const deleteAsset = vi.fn().mockResolvedValue(false);
+    mocks.useUploadedAssetsManager.mockReturnValue(createUploadedAssetsManagerState({
+      icon: {
+        assets: [{
+          id: "asset-payment",
+          url: "/api/app/assets/asset-payment",
+          kind: "icon",
+          originalName: "card.svg",
+        }],
+        error: null,
+        hasLoaded: true,
+        hasMore: false,
+        isLoading: false,
+        isLoadingMore: false,
+        refresh: vi.fn().mockResolvedValue(undefined),
+        loadMore: vi.fn().mockResolvedValue(undefined),
+      },
+      deleteError: {
+        assetId: "asset-payment",
+        message: "仍被 1 个支付方式使用，请先到支付方式管理里换掉图标。",
+      },
+      deleteAsset,
+    }));
+
+    renderSettingsScreen();
+    const section = document.getElementById("settings-uploaded-icons") as HTMLElement;
+    expect(within(section).queryByText("card.svg")).not.toBeInTheDocument();
+
+    await user.click(within(section).getByRole("button", { name: "管理上传图标" }));
+    const manager = await screen.findByRole("dialog", { name: "管理上传图标" });
+    await user.click(within(manager).getByRole("tab", { name: "支付方式图标" }));
+    expect(within(manager).getByText("card.svg")).toBeInTheDocument();
+    expect(within(manager).getByText("仍被 1 个支付方式使用，请先到支付方式管理里换掉图标。")).toBeInTheDocument();
+    await user.click(within(manager).getByRole("button", { name: "删除 card.svg" }));
+    await user.click(within(await screen.findByRole("alertdialog", { name: "删除上传图标？" })).getByRole("button", { name: "删除" }));
+
+    expect(deleteAsset).toHaveBeenCalledWith(expect.objectContaining({ id: "asset-payment" }));
+    expect(screen.getByRole("alertdialog", { name: "删除上传图标？" })).toBeInTheDocument();
   });
 });

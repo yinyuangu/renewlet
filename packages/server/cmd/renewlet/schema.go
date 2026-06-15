@@ -325,6 +325,7 @@ func ensureSubscriptionsCollection(app core.App, users *core.Collection) error {
 			return false, err
 		}
 		c.AddIndex("idx_subscriptions_user", false, "user", "")
+		c.AddIndex("idx_subscriptions_user_logo", false, "user, logo", "")
 		c.AddIndex("idx_subscriptions_user_next_billing", false, "user, nextBillingDate", "")
 		return replaceLegacyLogoURLField, nil
 	})

@@ -1,21 +1,24 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { ApiError } from "@/lib/api-client";
-import type { UploadedAsset, UploadedAssetsPage, UploadKind } from "@/lib/api/schemas/media";
+import { assetInUseDetailsSchema, type AssetInUseDetails, type UploadedAsset } from "@/lib/api/schemas/media";
 import { useToast } from "@/hooks/use-toast";
+import {
+  invalidateUploadedAssetsQueries,
+  removeUploadedAssetFromQueryCache,
+  useUploadedAssetsByKind,
+} from "@/hooks/use-uploaded-assets";
 import { assetService } from "@/services/asset-service";
 import { getDisplayErrorMessage } from "@/lib/display-error";
 import { useI18n } from "@/i18n/I18nProvider";
 
-interface UploadedAssetKindState {
+interface UploadedAssetKindController {
   assets: UploadedAsset[];
   error: Error | null;
   hasLoaded: boolean;
   hasMore: boolean;
   isLoading: boolean;
   isLoadingMore: boolean;
-}
-
-interface UploadedAssetKindController extends UploadedAssetKindState {
   refresh: () => Promise<void>;
   loadMore: () => Promise<void>;
 }
@@ -33,88 +36,14 @@ export interface UploadedAssetsManagerController {
   deleteAsset: (asset: UploadedAsset) => Promise<boolean>;
 }
 
-type InternalKindState = Omit<UploadedAssetKindState, "hasMore"> & {
-  page: number;
-  totalPages: number;
-};
-
-const EMPTY_KIND_STATE: InternalKindState = {
-  assets: [],
-  error: null,
-  hasLoaded: false,
-  isLoading: false,
-  isLoadingMore: false,
-  page: 0,
-  totalPages: 0,
-};
-
-const ASSET_KINDS: UploadKind[] = ["logo", "icon"];
-
 export function useUploadedAssetsManager(): UploadedAssetsManagerController {
   const { t } = useI18n();
   const { toast } = useToast();
-  const requestTokensRef = useRef<Record<UploadKind, number>>({ logo: 0, icon: 0 });
-  const mountedRef = useRef(true);
-  const [stateByKind, setStateByKind] = useState<Record<UploadKind, InternalKindState>>({
-    logo: EMPTY_KIND_STATE,
-    icon: EMPTY_KIND_STATE,
-  });
+  const queryClient = useQueryClient();
+  const logo = useUploadedAssetsByKind("logo", { enabled: true });
+  const icon = useUploadedAssetsByKind("icon", { enabled: true });
   const [deletingAssetId, setDeletingAssetId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<AssetDeleteError | null>(null);
-
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-      requestTokensRef.current.logo += 1;
-      requestTokensRef.current.icon += 1;
-    };
-  }, []);
-
-  const loadPage = useCallback(async (kind: UploadKind, page: number) => {
-    const isFirstPage = page === 1;
-    const token = requestTokensRef.current[kind] + 1;
-    requestTokensRef.current[kind] = token;
-    const isCurrentRequest = () => mountedRef.current && requestTokensRef.current[kind] === token;
-
-    setStateByKind((current) => ({
-      ...current,
-      [kind]: {
-        ...current[kind],
-        error: null,
-        isLoading: isFirstPage,
-        isLoadingMore: !isFirstPage,
-      },
-    }));
-
-    try {
-      const result = await assetService.list(kind, page);
-      if (!isCurrentRequest()) return;
-      setStateByKind((current) => ({
-        ...current,
-        [kind]: nextKindState(current[kind], result, isFirstPage),
-      }));
-    } catch (error: unknown) {
-      if (!isCurrentRequest()) return;
-      setStateByKind((current) => ({
-        ...current,
-        [kind]: {
-          ...current[kind],
-          error: error instanceof Error ? error : new Error("Uploaded assets load failed"),
-          hasLoaded: true,
-          isLoading: false,
-          isLoadingMore: false,
-        },
-      }));
-    }
-  }, []);
-
-  useEffect(() => {
-    // 设置页管理区是上传资产的审计入口；进入页面即加载两类资产，删除后再本地收敛列表。
-    for (const kind of ASSET_KINDS) {
-      void loadPage(kind, 1);
-    }
-  }, [loadPage]);
 
   const deleteAsset = useCallback(async (asset: UploadedAsset) => {
     if (deletingAssetId) return false;
@@ -122,7 +51,8 @@ export function useUploadedAssetsManager(): UploadedAssetsManagerController {
     setDeleteError(null);
     try {
       await assetService.delete(asset.id);
-      setStateByKind((current) => removeAssetFromState(current, asset));
+      removeUploadedAssetFromQueryCache(queryClient, asset);
+      await invalidateUploadedAssetsQueries(queryClient, asset.kind);
       toast({
         title: t("settings.uploadedIconsDeleteSuccess"),
         description: t("settings.uploadedIconsDeleteSuccessDescription", { name: assetLabel(asset, t("settings.uploadedIconsUnnamedAsset")) }),
@@ -141,29 +71,7 @@ export function useUploadedAssetsManager(): UploadedAssetsManagerController {
     } finally {
       setDeletingAssetId(null);
     }
-  }, [deletingAssetId, t, toast]);
-
-  const makeKindController = useCallback((kind: UploadKind): UploadedAssetKindController => {
-    const state = stateByKind[kind];
-    return {
-      assets: state.assets,
-      error: state.error,
-      hasLoaded: state.hasLoaded,
-      hasMore: state.hasLoaded && state.page < state.totalPages,
-      isLoading: state.isLoading,
-      isLoadingMore: state.isLoadingMore,
-      refresh: () => loadPage(kind, 1),
-      loadMore: () => {
-        if (!state.hasLoaded || state.page >= state.totalPages || state.isLoading || state.isLoadingMore) {
-          return Promise.resolve();
-        }
-        return loadPage(kind, state.page + 1);
-      },
-    };
-  }, [loadPage, stateByKind]);
-
-  const logo = useMemo(() => makeKindController("logo"), [makeKindController]);
-  const icon = useMemo(() => makeKindController("icon"), [makeKindController]);
+  }, [deletingAssetId, queryClient, t, toast]);
 
   return {
     logo,
@@ -174,52 +82,11 @@ export function useUploadedAssetsManager(): UploadedAssetsManagerController {
   };
 }
 
-function nextKindState(current: InternalKindState, result: UploadedAssetsPage, isFirstPage: boolean): InternalKindState {
-  return {
-    assets: isFirstPage ? result.items : mergeAssets(current.assets, result.items),
-    error: null,
-    hasLoaded: true,
-    isLoading: false,
-    isLoadingMore: false,
-    page: result.page,
-    totalPages: result.totalPages,
-  };
-}
-
-function mergeAssets(current: UploadedAsset[], next: UploadedAsset[]): UploadedAsset[] {
-  const seen = new Set(current.map((asset) => asset.id));
-  const merged = [...current];
-  for (const asset of next) {
-    if (seen.has(asset.id)) continue;
-    seen.add(asset.id);
-    merged.push(asset);
-  }
-  return merged;
-}
-
-function removeAssetFromState(
-  current: Record<UploadKind, InternalKindState>,
-  deleted: UploadedAsset,
-): Record<UploadKind, InternalKindState> {
-  return {
-    ...current,
-    [deleted.kind]: {
-      ...current[deleted.kind],
-      assets: current[deleted.kind].assets.filter((asset) => asset.id !== deleted.id),
-    },
-  };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
-}
-
-function assetInUseCount(error: unknown): number | null {
+function assetInUseDetails(error: unknown): AssetInUseDetails | null {
   if (!(error instanceof ApiError) || error.code !== "ASSET_IN_USE") return null;
   const payload = error.details;
-  if (!isRecord(payload) || !isRecord(payload["details"])) return null;
-  const usageCount = payload["details"]["usageCount"];
-  return typeof usageCount === "number" && Number.isInteger(usageCount) && usageCount > 0 ? usageCount : null;
+  const parsed = assetInUseDetailsSchema.safeParse(isApiErrorBody(payload) ? payload.details : null);
+  return parsed.success ? parsed.data : null;
 }
 
 function assetDeleteErrorMessage(
@@ -227,13 +94,26 @@ function assetDeleteErrorMessage(
   fallback: string,
   t: ReturnType<typeof useI18n>["t"],
 ): string {
-  const usageCount = assetInUseCount(error);
-  if (usageCount !== null) {
-    return t("settings.uploadedIconsDeleteBlockedDescription", { count: usageCount });
+  const details = assetInUseDetails(error);
+  if (details) {
+    if (details.subscriptionLogoCount > 0 && details.paymentMethodIconCount > 0) {
+      return t("settings.uploadedIconsDeleteBlockedByBoth", {
+        subscriptionCount: details.subscriptionLogoCount,
+        paymentMethodCount: details.paymentMethodIconCount,
+      });
+    }
+    if (details.paymentMethodIconCount > 0) {
+      return t("settings.uploadedIconsDeleteBlockedByPaymentMethods", { count: details.paymentMethodIconCount });
+    }
+    return t("settings.uploadedIconsDeleteBlockedBySubscriptions", { count: details.subscriptionLogoCount });
   }
   return getDisplayErrorMessage(error, fallback);
 }
 
 function assetLabel(asset: UploadedAsset, fallback: string): string {
   return asset.originalName?.trim() || fallback;
+}
+
+function isApiErrorBody(value: unknown): value is { details: unknown } {
+  return value !== null && typeof value === "object" && !Array.isArray(value) && "details" in value;
 }

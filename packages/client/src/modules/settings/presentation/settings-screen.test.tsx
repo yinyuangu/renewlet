@@ -522,7 +522,7 @@ describe("SettingsScreen SMTP email settings", () => {
     await user.click(configureButton);
 
     const dialog = await screen.findByRole("dialog", { name: "配置内置图标来源" });
-    expect(within(dialog).getByText("选择 Logo 和自定义图标搜索可使用的内置 SVG 图标库，并控制是否展示上游变体。")).toBeInTheDocument();
+    expect(within(dialog).getByText("选择 Logo 和支付方式图标搜索可使用的内置 SVG 图标库，并控制是否展示上游变体。")).toBeInTheDocument();
     expect(within(dialog).getByRole("switch", { name: "切换 TheSVG 来源" })).toBeEnabled();
     expect(within(dialog).getByRole("switch", { name: "切换 selfh.st icons 来源" })).toBeEnabled();
     expect(within(dialog).getByRole("switch", { name: "切换 Dashboard Icons 来源" })).toBeEnabled();

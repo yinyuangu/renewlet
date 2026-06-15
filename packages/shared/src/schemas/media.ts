@@ -27,6 +27,8 @@ export const uploadedAssetsPageSchema = z.object({
 
 export const assetInUseDetailsSchema = z.object({
   usageCount: z.number().int().positive(),
+  subscriptionLogoCount: z.number().int().nonnegative(),
+  paymentMethodIconCount: z.number().int().nonnegative(),
 }).strict();
 
 export const mediaCandidateKindSchema = uploadKindSchema;

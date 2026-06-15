@@ -24,6 +24,7 @@ vi.mock("./smtp", () => ({
 interface AssetTestState {
   assets: AssetRow[];
   subscriptions: Pick<SubscriptionRow, "user_id" | "logo">[];
+  customConfigs: Array<{ user_id: string; config_json: string }>;
   deletedMetadata: Array<{ userId: string; id: string }>;
 }
 
@@ -35,6 +36,7 @@ function createEnv(overrides: Partial<AssetTestState> = {}) {
   const state: AssetTestState = {
     assets: [],
     subscriptions: [],
+    customConfigs: [],
     deletedMetadata: [],
     ...overrides,
   };
@@ -80,6 +82,10 @@ class AssetTestStatement {
       const count = this.state.subscriptions.filter((row) => row.user_id === userId && row.logo === logo).length;
       return { count } as T;
     }
+    if (this.sql.includes("FROM custom_configs")) {
+      const [userId] = this.values as [string];
+      return this.state.customConfigs.find((row) => row.user_id === userId) as T | undefined ?? null;
+    }
     return null;
   }
 
@@ -116,6 +122,23 @@ function assetRow(overrides: Partial<AssetRow> = {}): AssetRow {
     created_at: "2026-06-01T00:00:00.000Z",
     updated_at: "2026-06-01T00:00:00.000Z",
     ...overrides,
+  };
+}
+
+function customConfigRow(userId: string, icon: string) {
+  return {
+    user_id: userId,
+    config_json: JSON.stringify({
+      categories: [],
+      statuses: [],
+      paymentMethods: [{
+        id: "card",
+        value: "card",
+        labels: { "zh-CN": "银行卡", "en-US": "Card" },
+        icon,
+      }],
+      currencies: [],
+    }),
   };
 }
 
@@ -166,11 +189,56 @@ describe("Cloudflare uploaded assets", () => {
       .rejects.toMatchObject({
         status: 409,
         code: "ASSET_IN_USE",
-        details: { usageCount: 2 },
+        details: { usageCount: 2, subscriptionLogoCount: 2, paymentMethodIconCount: 0 },
       });
 
     expect(fixture.r2Delete).not.toHaveBeenCalled();
     expect(fixture.state.assets).toHaveLength(1);
+    expect(fixture.state.deletedMetadata).toEqual([]);
+  });
+
+  it("blocks deletion while payment methods still reference the uploaded icon", async () => {
+    const fixture = createEnv({
+      assets: [assetRow({ kind: "icon", r2_key: "usr_asset_owner/icon/asset_logo/icon.svg" })],
+      customConfigs: [
+        customConfigRow(USER_ID, "/api/app/assets/asset_logo"),
+        customConfigRow("usr_other", "/api/app/assets/asset_logo"),
+      ],
+    });
+
+    await expect(deleteAsset(requestFixture(), fixture.env, "asset_logo"))
+      .rejects.toMatchObject({
+        status: 409,
+        code: "ASSET_IN_USE",
+        details: { usageCount: 1, subscriptionLogoCount: 0, paymentMethodIconCount: 1 },
+      });
+
+    expect(fixture.r2Delete).not.toHaveBeenCalled();
+    expect(fixture.state.assets).toHaveLength(1);
+    expect(fixture.state.deletedMetadata).toEqual([]);
+  });
+
+  it("reports mixed subscription and payment method references without counting other users", async () => {
+    const fixture = createEnv({
+      assets: [assetRow()],
+      subscriptions: [
+        { user_id: USER_ID, logo: "/api/app/assets/asset_logo" },
+        { user_id: "usr_other", logo: "/api/app/assets/asset_logo" },
+      ],
+      customConfigs: [
+        customConfigRow(USER_ID, "/api/app/assets/asset_logo"),
+        customConfigRow("usr_other", "/api/app/assets/asset_logo"),
+      ],
+    });
+
+    await expect(deleteAsset(requestFixture(), fixture.env, "asset_logo"))
+      .rejects.toMatchObject({
+        status: 409,
+        code: "ASSET_IN_USE",
+        details: { usageCount: 2, subscriptionLogoCount: 1, paymentMethodIconCount: 1 },
+      });
+
+    expect(fixture.r2Delete).not.toHaveBeenCalled();
     expect(fixture.state.deletedMetadata).toEqual([]);
   });
 

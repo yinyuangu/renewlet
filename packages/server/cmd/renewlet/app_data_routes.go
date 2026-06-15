@@ -62,7 +62,9 @@ type uploadAssetResponse struct {
 }
 
 type assetInUseDetails struct {
-	UsageCount int64 `json:"usageCount"`
+	UsageCount             int64 `json:"usageCount"`
+	SubscriptionLogoCount  int64 `json:"subscriptionLogoCount"`
+	PaymentMethodIconCount int64 `json:"paymentMethodIconCount"`
 }
 
 type subscriptionWriteRequest struct {
@@ -389,17 +391,16 @@ func handleAssetDelete(app core.App, e *core.RequestEvent) error {
 		return e.NotFoundError(serverText(locale, "asset.missing"), err)
 	}
 
-	assetURL := "/api/app/assets/" + record.Id
-	usageCount, err := app.CountRecords("subscriptions", dbx.HashExp{"user": e.Auth.Id, "logo": assetURL})
+	usage, err := countAssetReferences(app, e.Auth.Id, record.Id)
 	if err != nil {
 		return e.InternalServerError(serverText(locale, "common.internalError"), err)
 	}
-	if usageCount > 0 {
-		// 订阅 logo 是唯一持久引用入口；先阻止删除，让用户显式替换引用，避免公开页和备份出现坏图片。
+	if usage.UsageCount > 0 {
+		// 上传图标有两个持久引用入口；删除只阻止，不替用户改订阅或支付方式配置。
 		return e.JSON(http.StatusConflict, map[string]interface{}{
 			"message": serverText(locale, "asset.inUse"),
 			"code":    "ASSET_IN_USE",
-			"details": assetInUseDetails{UsageCount: usageCount},
+			"details": usage,
 		})
 	}
 
@@ -407,6 +408,47 @@ func handleAssetDelete(app core.App, e *core.RequestEvent) error {
 		return e.BadRequestError(serverText(locale, "common.invalidRequestParameters"), err)
 	}
 	return e.JSON(http.StatusOK, newOKResponse())
+}
+
+func countAssetReferences(app core.App, userID string, assetID string) (assetInUseDetails, error) {
+	assetURL := "/api/app/assets/" + assetID
+	subscriptionLogoCount, err := app.CountRecords("subscriptions", dbx.HashExp{"user": userID, "logo": assetURL})
+	if err != nil {
+		return assetInUseDetails{}, err
+	}
+	paymentMethodIconCount, err := countPaymentMethodIconReferences(app, userID, assetURL)
+	if err != nil {
+		return assetInUseDetails{}, err
+	}
+	return assetInUseDetails{
+		UsageCount:             subscriptionLogoCount + paymentMethodIconCount,
+		SubscriptionLogoCount:  subscriptionLogoCount,
+		PaymentMethodIconCount: paymentMethodIconCount,
+	}, nil
+}
+
+func countPaymentMethodIconReferences(app core.App, userID string, assetURL string) (int64, error) {
+	record, err := app.FindFirstRecordByFilter("custom_configs", "user = {:user}", dbx.Params{"user": userID})
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return 0, nil
+		}
+		return 0, err
+	}
+	config, err := customConfigFromValue(record.Get("config"))
+	if err != nil {
+		return 0, err
+	}
+	if err := normalizeCustomConfigPayload(&config); err != nil {
+		return 0, err
+	}
+	var count int64
+	for _, item := range config.PaymentMethods {
+		if item.Icon == assetURL {
+			count++
+		}
+	}
+	return count, nil
 }
 
 func readLimitedJSONBody(reader io.Reader) (json.RawMessage, error) {

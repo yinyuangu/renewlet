@@ -1,6 +1,7 @@
 // 已上传 Logo 列表测试保护产品 API 分页去重和过期请求忽略，避免关闭 sheet 后旧响应复活列表状态。
 import { StrictMode, type ReactNode } from "react";
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useUploadedLogoAssets } from "./use-uploaded-logo-assets";
 
@@ -59,8 +60,17 @@ function listResult(overrides: Partial<AssetsListFixture> = {}): AssetsListFixtu
   };
 }
 
-function StrictWrapper({ children }: { children: ReactNode }) {
-  return <StrictMode>{children}</StrictMode>;
+function createWrapper(strict = false) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+    },
+  });
+  function Wrapper({ children }: { children: ReactNode }) {
+    const content = <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+    return strict ? <StrictMode>{content}</StrictMode> : content;
+  }
+  return Wrapper;
 }
 
 describe("useUploadedLogoAssets", () => {
@@ -71,12 +81,13 @@ describe("useUploadedLogoAssets", () => {
 
   it("loads logo assets through the product API list endpoint", async () => {
     mocks.apiFetch.mockResolvedValueOnce(listResult());
-    const { result } = renderHook(() => useUploadedLogoAssets());
+    const { result } = renderHook(() => useUploadedLogoAssets(), { wrapper: createWrapper() });
 
     await act(async () => {
       await result.current.loadInitial();
     });
 
+    await waitFor(() => expect(result.current.assets).toHaveLength(1));
     expect(mocks.apiFetch).toHaveBeenCalledWith("/api/app/assets?kind=logo&page=1&perPage=48", expect.anything());
     expect(result.current.assets).toEqual([
       {
@@ -95,12 +106,13 @@ describe("useUploadedLogoAssets", () => {
 
   it("settles a successful load after the StrictMode setup-cleanup check", async () => {
     mocks.apiFetch.mockResolvedValueOnce(listResult());
-    const { result } = renderHook(() => useUploadedLogoAssets(), { wrapper: StrictWrapper });
+    const { result } = renderHook(() => useUploadedLogoAssets(), { wrapper: createWrapper(true) });
 
     await act(async () => {
       await result.current.loadInitial();
     });
 
+    await waitFor(() => expect(result.current.assets).toHaveLength(1));
     expect(result.current.isLoading).toBe(false);
     expect(result.current.error).toBeNull();
     expect(result.current.assets.map((asset) => asset.id)).toEqual(["asset-1"]);
@@ -121,11 +133,12 @@ describe("useUploadedLogoAssets", () => {
           { id: "asset-2", url: "/api/app/assets/asset-2", kind: "logo", originalName: "second.svg" },
         ],
       }));
-    const { result } = renderHook(() => useUploadedLogoAssets());
+    const { result } = renderHook(() => useUploadedLogoAssets(), { wrapper: createWrapper() });
 
     await act(async () => {
       await result.current.loadInitial();
     });
+    await waitFor(() => expect(result.current.assets.map((asset) => asset.id)).toEqual(["asset-1"]));
     expect(result.current.hasMore).toBe(true);
 
     await act(async () => {
@@ -133,19 +146,20 @@ describe("useUploadedLogoAssets", () => {
     });
 
     expect(mocks.apiFetch.mock.calls[1]?.[0]).toBe("/api/app/assets?kind=logo&page=2&perPage=48");
-    expect(result.current.assets.map((asset) => asset.id)).toEqual(["asset-1", "asset-2"]);
+    await waitFor(() => expect(result.current.assets.map((asset) => asset.id)).toEqual(["asset-1", "asset-2"]));
   });
 
   it("exposes load errors and can retry the first page", async () => {
     mocks.apiFetch
       .mockRejectedValueOnce(new Error("offline"))
       .mockResolvedValueOnce(listResult({ items: [{ id: "asset-retry", url: "/api/app/assets/asset-retry", kind: "logo" }] }));
-    const { result } = renderHook(() => useUploadedLogoAssets());
+    const { result } = renderHook(() => useUploadedLogoAssets(), { wrapper: createWrapper() });
 
     await act(async () => {
       await result.current.loadInitial();
     });
 
+    await waitFor(() => expect(result.current.hasLoaded).toBe(true));
     expect(result.current.error?.message).toBe("offline");
     expect(result.current.hasLoaded).toBe(true);
     expect(result.current.assets).toEqual([]);
@@ -154,6 +168,7 @@ describe("useUploadedLogoAssets", () => {
       await result.current.loadInitial();
     });
 
+    await waitFor(() => expect(result.current.assets).toHaveLength(1));
     expect(result.current.error).toBeNull();
     expect(result.current.assets).toEqual([
       {

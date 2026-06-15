@@ -123,6 +123,7 @@ func TestEnsureSchemaCreatesContractFieldsAndIndexes(t *testing.T) {
 	})
 
 	assertIndex(t, app, "subscriptions", "idx_subscriptions_user")
+	assertIndex(t, app, "subscriptions", "idx_subscriptions_user_logo")
 	assertIndex(t, app, "settings", "idx_settings_user_unique")
 	assertIndex(t, app, "custom_configs", "idx_custom_configs_user_unique")
 	assertIndex(t, app, "notification_jobs", "idx_notification_jobs_user_local_time_unique")
