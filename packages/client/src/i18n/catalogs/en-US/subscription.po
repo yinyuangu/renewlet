@@ -496,12 +496,12 @@ msgstr "Create a separate calendar subscription for “{name}” that only syncs
 #. js-lingui-explicit-id
 #: src/i18n/descriptors/subscription.ts:111
 msgid "subscription.oneTimeMode.buyout"
-msgstr "Buyout / long-term"
+msgstr "Lifetime"
 
 #. js-lingui-explicit-id
 #: src/i18n/descriptors/subscription.ts:124
 msgid "subscription.oneTimeBuyoutReminderHelp"
-msgstr "Buyout / long-term purchases have no expiry date, so no expiry reminder will be sent."
+msgstr "Lifetime purchases have no expiry date, so no expiry reminder will be sent."
 
 #. js-lingui-explicit-id
 #: src/i18n/descriptors/subscription.ts:11

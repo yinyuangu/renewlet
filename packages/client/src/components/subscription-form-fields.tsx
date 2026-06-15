@@ -350,7 +350,7 @@ export const SubscriptionFormFields = memo(function SubscriptionFormFields({
                   key={mode}
                   type="button"
                   className={cn(
-                    "min-h-8 rounded-sm px-2 text-sm font-medium transition-colors",
+                    "inline-flex min-h-8 min-w-0 items-center justify-center whitespace-nowrap rounded-sm px-2 text-sm font-medium transition-colors",
                     formData.oneTimeMode === mode
                       ? "bg-background text-foreground shadow-sm"
                       : "text-muted-foreground hover:text-foreground",

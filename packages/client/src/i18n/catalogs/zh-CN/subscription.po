@@ -496,12 +496,12 @@ msgstr "为「{name}」创建单独日历订阅，只同步这次服务到期。
 #. js-lingui-explicit-id
 #: src/i18n/descriptors/subscription.ts:111
 msgid "subscription.oneTimeMode.buyout"
-msgstr "买断/长期有效"
+msgstr "长期有效"
 
 #. js-lingui-explicit-id
 #: src/i18n/descriptors/subscription.ts:124
 msgid "subscription.oneTimeBuyoutReminderHelp"
-msgstr "买断/长期有效没有到期日，不会发送到期提醒。"
+msgstr "长期有效没有到期日，不会发送到期提醒。"
 
 #. js-lingui-explicit-id
 #: src/i18n/descriptors/subscription.ts:11
