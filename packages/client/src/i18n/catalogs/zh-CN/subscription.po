@@ -1676,12 +1676,12 @@ msgstr "未找到货币"
 #. js-lingui-explicit-id
 #: src/i18n/descriptors/subscription.ts:505
 msgid "dashboard.next7Days"
-msgstr "未来 7 天内"
+msgstr "提醒窗口内"
 
 #. js-lingui-explicit-id
 #: src/i18n/descriptors/subscription.ts:512
 msgid "upcoming.noneNextTwoWeeks"
-msgstr "未来两周内无续费或到期"
+msgstr "暂无进入提醒窗口的续费或到期"
 
 #. js-lingui-explicit-id
 #: src/i18n/descriptors/subscription.ts:343

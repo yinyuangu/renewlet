@@ -1676,12 +1676,12 @@ msgstr "No currency found"
 #. js-lingui-explicit-id
 #: src/i18n/descriptors/subscription.ts:505
 msgid "dashboard.next7Days"
-msgstr "Next 7 days"
+msgstr "Reminder window"
 
 #. js-lingui-explicit-id
 #: src/i18n/descriptors/subscription.ts:512
 msgid "upcoming.noneNextTwoWeeks"
-msgstr "No renewals in the next two weeks"
+msgstr "No renewals or expiries in the reminder window"
 
 #. js-lingui-explicit-id
 #: src/i18n/descriptors/subscription.ts:343

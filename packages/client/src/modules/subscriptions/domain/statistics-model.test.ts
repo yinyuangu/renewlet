@@ -1,10 +1,11 @@
 // 统计模型测试保护金额换算、有效状态和图表分组口径，首页/统计页必须共享这些业务语义。
 import { describe, expect, it } from "vitest";
 import { DEFAULT_CUSTOM_CONFIG } from "@/types/config";
-import type { Subscription } from "@/types/subscription";
+import { DISABLED_REMINDER_DAYS, INHERIT_REMINDER_DAYS, type Subscription } from "@/types/subscription";
 import { assertDateOnly } from "@/lib/time/date-only";
 import { buildDashboardStats } from "./dashboard-stats";
 import { buildStatisticsModel } from "./statistics-model";
+import { buildUpcomingReminderItems } from "./upcoming-reminders";
 
 type RecurringBillingCycle = Exclude<Subscription["billingCycle"], "custom" | "one-time">;
 type SubscriptionBaseFixture = Omit<Subscription, "billingCycle" | "customDays" | "customCycleUnit" | "oneTimeTermCount" | "oneTimeTermUnit">;
@@ -159,6 +160,7 @@ describe("subscription statistics models", () => {
       startDate: assertDateOnly("2025-07-05"),
       nextBillingDate: assertDateOnly("2026-01-05"),
       autoCalculateNextBillingDate: false,
+      reminderDays: 4,
       oneTimeTermCount: 6,
       oneTimeTermUnit: "month",
     });
@@ -245,27 +247,69 @@ describe("subscription statistics models", () => {
     expect(model.budgetRemaining).toBe(23);
   });
 
-  it("dashboard upcoming window ignores inactive rows and counts 0..7 days", () => {
+  it("dashboard upcoming count reuses the reminder window model", () => {
     const stats = buildDashboardStats({
       subscriptions: [
-        subscription({ id: "today", nextBillingDate: assertDateOnly("2026-01-01") }),
-        subscription({ id: "soon", nextBillingDate: assertDateOnly("2026-01-08") }),
-        subscription({ id: "later", nextBillingDate: assertDateOnly("2026-01-09") }),
-        subscription({ id: "paused", status: "paused", nextBillingDate: assertDateOnly("2026-01-02") }),
+        subscription({ id: "explicit30", nextBillingDate: assertDateOnly("2026-07-15"), reminderDays: 30 }),
+        subscription({ id: "inherit30", nextBillingDate: assertDateOnly("2026-07-15"), reminderDays: INHERIT_REMINDER_DAYS }),
+        subscription({ id: "disabled", nextBillingDate: assertDateOnly("2026-07-15"), reminderDays: DISABLED_REMINDER_DAYS }),
+        subscription({ id: "paused", status: "paused", nextBillingDate: assertDateOnly("2026-07-15"), reminderDays: 30 }),
       ],
       defaultCurrency: "USD",
       convert,
-      now: new Date("2026-01-01T00:00:00.000Z"),
+      notificationReminderDays: 30,
+      now: new Date("2026-06-15T00:00:00.000Z"),
     });
 
     expect(stats.upcomingCount).toBe(2);
     expect(stats.activeSubscriptions).toHaveLength(3);
   });
 
+  it("builds upcoming reminder items from effective reminder days", () => {
+    const items = buildUpcomingReminderItems({
+      subscriptions: [
+        subscription({ id: "explicit30", name: "Explicit 30", nextBillingDate: assertDateOnly("2026-07-15"), reminderDays: 30 }),
+        subscription({ id: "inherit30", name: "Inherited 30", nextBillingDate: assertDateOnly("2026-07-15"), reminderDays: INHERIT_REMINDER_DAYS }),
+        subscription({ id: "disabled", name: "Disabled", nextBillingDate: assertDateOnly("2026-07-15"), reminderDays: DISABLED_REMINDER_DAYS }),
+        subscription({ id: "today", name: "Today", nextBillingDate: assertDateOnly("2026-06-15"), reminderDays: 0 }),
+        subscription({ id: "tomorrow", name: "Tomorrow", nextBillingDate: assertDateOnly("2026-06-16"), reminderDays: 0 }),
+        subscription({ id: "old14Miss", name: "Old 14 Miss", nextBillingDate: assertDateOnly("2026-06-30"), reminderDays: 30 }),
+        subscription({
+          id: "buyout",
+          name: "Buyout",
+          billingCycle: "one-time",
+          nextBillingDate: assertDateOnly("2026-06-30"),
+          autoCalculateNextBillingDate: false,
+          reminderDays: 30,
+        }),
+        subscription({
+          id: "fixedTerm",
+          name: "Fixed Term",
+          billingCycle: "one-time",
+          nextBillingDate: assertDateOnly("2026-06-30"),
+          autoCalculateNextBillingDate: false,
+          oneTimeTermCount: 12,
+          oneTimeTermUnit: "month",
+          reminderDays: 30,
+        }),
+      ],
+      notificationReminderDays: 30,
+      now: new Date("2026-06-15T00:00:00.000Z"),
+    });
+
+    expect(items.map((item) => [item.subscription.id, item.daysUntil, item.kind, item.reminderDays])).toEqual([
+      ["today", 0, "renewal", 0],
+      ["fixedTerm", 15, "expiry", 30],
+      ["old14Miss", 15, "renewal", 30],
+      ["explicit30", 30, "renewal", 30],
+      ["inherit30", 30, "renewal", 30],
+    ]);
+  });
+
   it("dashboard excludes effective expired subscriptions from active counts and upcoming renewals", () => {
     const stats = buildDashboardStats({
       subscriptions: [
-        subscription({ id: "active", status: "active", nextBillingDate: assertDateOnly("2026-01-05") }),
+        subscription({ id: "active", status: "active", nextBillingDate: assertDateOnly("2026-01-05"), reminderDays: 4 }),
         subscription({ id: "legacyExpired", status: "active", nextBillingDate: assertDateOnly("2025-12-31") }),
         subscription({ id: "storedExpired", status: "expired", nextBillingDate: assertDateOnly("2026-01-02") }),
       ],
