@@ -1,5 +1,11 @@
 package main
 
+// media_icon_index_github.go 负责内置图标 provider 的 GitHub 版本探测。
+//
+// 架构位置：
+//   - 管理员显式 check/refresh 才会触发这里的 GitHub 请求。
+//   - active 索引仍保存在 PocketBase media_icon_indexes；版本探测失败不能清空旧索引。
+//   - RENEWLET_GITHUB_TOKEN 只作为后端出站 header，任何错误响应都必须脱敏后再回显。
 import (
 	"context"
 	"encoding/json"
@@ -15,6 +21,8 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 )
 
+// checkLatestBuiltInIconProviderVersion 读取缓存状态并按 ETag 探测 provider 最新 commit。
+// not modified 时复用已保存 latest，避免共享出口重复消耗 GitHub API 配额。
 func checkLatestBuiltInIconProviderVersion(ctx context.Context, app core.App, provider string) (*builtInIconProviderVersionResponse, string, error) {
 	record, _ := findMediaIconIndexRecord(app)
 	state := providerStatesFromRecord(record)[provider]
@@ -31,6 +39,8 @@ func checkLatestBuiltInIconProviderVersion(ctx context.Context, app core.App, pr
 	return version, etag, nil
 }
 
+// fetchLatestBuiltInIconProviderVersion 只读取 GitHub metadata，不下载/托管 registry SVG 内容。
+// TheSVG 的 latest release tag 只是展示辅助，active 版本仍以 commit SHA 为准。
 func fetchLatestBuiltInIconProviderVersion(ctx context.Context, provider string, etag string) (*builtInIconProviderVersionResponse, string, bool, error) {
 	config, ok := mediaResolverBuiltInProviderConfig(provider)
 	if !ok {
@@ -80,6 +90,8 @@ func fetchLatestBuiltInIconProviderVersion(ctx context.Context, provider string,
 	return version, nextETag, false, nil
 }
 
+// fetchGitHubJSON 执行有界 GitHub JSON 请求。
+// 响应体大小和 token 脱敏都在这里收敛，避免 provider check 把限流页或凭据带进前端详情。
 func fetchGitHubJSON(ctx context.Context, url string, etag string, target any) (string, bool, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -124,6 +136,7 @@ func fetchGitHubJSON(ctx context.Context, url string, etag string, target any) (
 	return nextETag, false, nil
 }
 
+// gitHubVersionCheckHTTPError 将 GitHub 限流/拒绝访问转换为可展示但不持久化的上游错误详情。
 func gitHubVersionCheckHTTPError(res *http.Response) error {
 	secrets := []string{}
 	if token := strings.TrimSpace(os.Getenv("RENEWLET_GITHUB_TOKEN")); token != "" {
@@ -148,6 +161,7 @@ func gitHubVersionCheckHTTPError(res *http.Response) error {
 	return createUpstreamHTTPError("GitHub", res, providerResponse, fallbackText(providerMessage, fmt.Sprintf("GitHub version check HTTP %d", res.StatusCode)))
 }
 
+// gitHubRateLimitRetryHint 只使用 GitHub 标准限流头构造短提示，不解析错误 body 中可能包含的额外信息。
 func gitHubRateLimitRetryHint(res *http.Response) string {
 	if retryAfter := strings.TrimSpace(res.Header.Get("Retry-After")); retryAfter != "" {
 		return "Retry after " + retryAfter + "s."
@@ -163,6 +177,7 @@ func gitHubRateLimitRetryHint(res *http.Response) string {
 	return "Retry after " + time.Unix(resetUnix, 0).UTC().Format(time.RFC3339) + "."
 }
 
+// fetchLatestBuiltInIconRelease 仅作为展示补充；失败时静默回落 commit metadata，不能阻断 provider check。
 func fetchLatestBuiltInIconRelease(ctx context.Context, owner string, repo string) (string, string) {
 	url := strings.TrimRight(builtInIconGitHubAPIBase, "/") + "/repos/" + owner + "/" + repo + "/releases/latest"
 	var release struct {
@@ -176,6 +191,7 @@ func fetchLatestBuiltInIconRelease(ctx context.Context, owner string, repo strin
 	return strings.TrimSpace(release.TagName), strings.TrimSpace(release.PublishedAt)
 }
 
+// builtInIconProviderGitHubConfig 是 shared media resolver 配置在 Go 侧的最小 GitHub 投影。
 type builtInIconProviderGitHubConfig struct {
 	Owner         string
 	Repo          string
@@ -183,6 +199,7 @@ type builtInIconProviderGitHubConfig struct {
 	LatestRelease bool
 }
 
+// mediaResolverBuiltInProviderConfig 从生成期 media resolver 配置读取 provider 对应的 GitHub 来源。
 func mediaResolverBuiltInProviderConfig(provider string) (builtInIconProviderGitHubConfig, bool) {
 	for _, item := range mediaResolverCfg.BuiltInProviders {
 		if item.Provider == provider {

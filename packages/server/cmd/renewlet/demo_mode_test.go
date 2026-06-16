@@ -12,6 +12,7 @@ import (
 
 func newDemoModeTestApp(t *testing.T) (core.App, *core.Record, string) {
 	t.Helper()
+	// demo 模式测试必须走完整 schema/hooks，让路由和直接 record 写入共享同一套保护。
 	t.Setenv(demoModeEnvName, "true")
 	app := newSchemaTestApp(t)
 	if err := ensureSchema(app); err != nil {
@@ -47,6 +48,7 @@ func countUserRecords(t *testing.T, app core.App, collection string, userID stri
 func TestDemoModeCreatesRepairsSeedsAndDisablesSetup(t *testing.T) {
 	app, demo, token := newDemoModeTestApp(t)
 
+	// demo 身份会被启动修复，避免公开演示环境被改成管理员、封禁或弱密码状态。
 	if demo.Email() != demoModePolicy.Email || demo.GetString("name") != demoModePolicy.Name {
 		t.Fatalf("unexpected demo identity: email=%q name=%q", demo.Email(), demo.GetString("name"))
 	}
@@ -74,6 +76,7 @@ func TestDemoModeCreatesRepairsSeedsAndDisablesSetup(t *testing.T) {
 		t.Fatalf("expected demo reset not to pre-generate public status pages, got %d", got)
 	}
 
+	// 公开 token 和日历 token 只能由访客显式生成，seed 不能提前创建可分享链接。
 	publicStatusCreate := serveTestRequest(t, app, http.MethodPost, "/api/app/public-status-page", `{}`, token)
 	if publicStatusCreate.Code != http.StatusOK {
 		t.Fatalf("expected demo user to manually generate public status page, got %d: %s", publicStatusCreate.Code, publicStatusCreate.Body.String())
@@ -126,6 +129,7 @@ func TestDemoModeResetOnlyTouchesDemoUserData(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// reset 只清演示用户资料；普通用户数据隔离是 demo 模式能跑在线环境的前提。
 	if err := demoModePolicy.ResetUserData(app, demo, time.Now().UTC()); err != nil {
 		t.Fatal(err)
 	}
@@ -148,6 +152,7 @@ func TestDemoModeResetOnlyTouchesDemoUserData(t *testing.T) {
 func TestDemoModeAllowsNormalSettingsButProtectsExternalIntegrationSettings(t *testing.T) {
 	app, demo, token := newDemoModeTestApp(t)
 
+	// 普通展示设置允许保存，外部通知/AI/备份凭据必须禁止，避免公开演示触发真实第三方调用。
 	normal := serveTestRequest(t, app, http.MethodPut, "/api/app/settings", `{"themeMode":"light","monthlyBudget":123}`, token)
 	if normal.Code != http.StatusOK {
 		t.Fatalf("expected ordinary settings save to succeed, got %d: %s", normal.Code, normal.Body.String())
@@ -217,6 +222,7 @@ func TestDemoModeProtectsAccountRoutesAndRecordHooks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// 直接 Save/Delete 和管理员路由都必须被 hook 拦住，不能只保护公开 API。
 	if err := app.Delete(reloaded); err == nil {
 		t.Fatal("expected demo user delete to be rejected")
 	}
@@ -234,6 +240,7 @@ func TestDemoModeProtectsAccountRoutesAndRecordHooks(t *testing.T) {
 func TestDemoModeBlocksExternalSideEffectsButNotNormalUsers(t *testing.T) {
 	app, _, token := newDemoModeTestApp(t)
 
+	// 这些入口会触发外发请求或云端状态变化，demo 用户只能浏览，不能替部署者发送真实请求。
 	for _, tc := range []struct {
 		name   string
 		method string
@@ -294,6 +301,7 @@ func TestDemoModeEnforcesSubscriptionAndAssetQuota(t *testing.T) {
 func TestDemoModeCronsSkipDemoUser(t *testing.T) {
 	app, demo, _ := newDemoModeTestApp(t)
 
+	// 自动续订和通知 cron 都要跳过 demo 用户，避免 seed 数据随时间漂移或产生历史噪声。
 	renewal, err := renewAutoSubscriptionsForAllUsers(app, time.Now().UTC())
 	if err != nil {
 		t.Fatal(err)

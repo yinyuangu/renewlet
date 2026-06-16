@@ -15,6 +15,7 @@ import (
 func (service *systemUpdateService) downloadFnForTest(binaryContent string) {
 	if fake, ok := service.client.(*fakeSystemReleaseClient); ok {
 		fake.downloadFn = func(targetPath string) error {
+			// 页面内更新下载的是 Release tar.gz，测试同时生成 checksum，覆盖真实校验链路而不是裸写二进制。
 			if err := writeTarGz(targetPath, map[string]string{"renewlet": binaryContent}); err != nil {
 				return err
 			}
@@ -30,6 +31,7 @@ func (service *systemUpdateService) downloadFnForTest(binaryContent string) {
 }
 
 func writeTarGz(path string, files map[string]string) error {
+	// 自更新包必须保留可执行权限，避免测试通过但容器重启后 /opt/renewlet/current/renewlet 无法执行。
 	var buffer bytes.Buffer
 	gzipWriter := gzip.NewWriter(&buffer)
 	tarWriter := tar.NewWriter(gzipWriter)
@@ -56,6 +58,7 @@ func writeTarGz(path string, files map[string]string) error {
 
 func releaseFixture(tag string, prerelease bool, draft bool) githubRelease {
 	version := strings.TrimPrefix(tag, "v")
+	// fixture 固定 GitHub Release 资产命名，保护 Docker 页面内更新对 archive/checksums 的查找契约。
 	return githubRelease{
 		TagName:     tag,
 		Name:        "Renewlet " + version,

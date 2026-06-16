@@ -21,6 +21,7 @@ export interface SettingsBuiltInIconIndexController {
   refreshProvider: (provider: BuiltInIconProvider) => Promise<void>;
 }
 
+// 内置图标索引是管理员级全局状态，不能和 settings 表单草稿混在一起，否则会制造未保存提示和普通用户可见状态。
 export function useSettingsBuiltInIconIndexController(canManage: boolean): SettingsBuiltInIconIndexController {
   const { t } = useI18n();
   const { toast } = useToast();
@@ -37,6 +38,7 @@ export function useSettingsBuiltInIconIndexController(canManage: boolean): Setti
     try {
       await checkProvider.mutateAsync(provider);
     } catch (error) {
+      // check 失败仍 refetch 后端状态，因为 GitHub 限流/上游错误会被记录为 provider 级摘要。
       const details = createRawErrorResponseDetails(error);
       setErrorDetails(details);
       setErrorDetailsOpen(true);
@@ -53,6 +55,7 @@ export function useSettingsBuiltInIconIndexController(canManage: boolean): Setti
 
   const handleCheckAllProviders = useCallback(async () => {
     if (!canManage || checkProvider.isPending) return;
+    // 按 provider 串行检查，避免共享出口同时打 GitHub registry 触发 403/429。
     for (const provider of BUILT_IN_ICON_PROVIDERS) {
       await runProviderCheck(provider);
     }
@@ -63,6 +66,7 @@ export function useSettingsBuiltInIconIndexController(canManage: boolean): Setti
     setRefreshingProvider(provider);
     try {
       const response = await refreshProvider.mutateAsync(provider);
+      // 刷新成功只替换对应 provider 的聚合索引，用户已保存的 Logo URL 不会被批量改写。
       toast({
         title: t("settings.builtInIconIndexRefreshSuccess"),
         description: t("settings.builtInIconIndexRefreshSuccessDescription", {
