@@ -4,22 +4,36 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { systemRestart, systemUpdate, systemVersion } from "./system";
 import type { Env } from "./types";
 
+const authMocks = vi.hoisted(() => ({
+  role: "admin" as "admin" | "user",
+}));
+
 vi.mock("./auth", () => ({
-  requireAdmin: vi.fn(async () => ({
+  requireAuth: vi.fn(async () => ({
     token: "session-token",
-    user: { id: "usr_admin", email: "admin@example.com", name: "Admin", role: "admin", banned: 0 },
+    user: { id: "usr_current", email: "current@example.com", name: "Current", role: authMocks.role, banned: 0 },
   })),
+  requireAdmin: vi.fn(async () => {
+    if (authMocks.role !== "admin") {
+      throw Object.assign(new Error("Administrator permission required"), { status: 403 });
+    }
+    return {
+      token: "session-token",
+      user: { id: "usr_admin", email: "admin@example.com", name: "Admin", role: "admin", banned: 0 },
+    };
+  }),
 }));
 
 describe("Cloudflare system update contract", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    authMocks.role = "admin";
   });
 
   it("returns deploy-only version capability", async () => {
     const fetchMock = mockLatestRelease("1.2.3");
 
-    const response = await systemVersion(new Request("https://renewlet.example/api/app/admin/system/version", {
+    const response = await systemVersion(new Request("https://renewlet.example/api/app/system/version", {
       headers: { "accept-language": "en-US" },
     }), envFixture());
 
@@ -61,7 +75,7 @@ describe("Cloudflare system update contract", () => {
     delete env.RENEWLET_VERSION;
     delete env.RENEWLET_COMMIT;
 
-    const response = await systemVersion(new Request("https://renewlet.example/api/app/admin/system/version", {
+    const response = await systemVersion(new Request("https://renewlet.example/api/app/system/version", {
       headers: { "accept-language": "en-US" },
     }), env);
 
@@ -93,7 +107,7 @@ describe("Cloudflare system update contract", () => {
       RENEWLET_COMMIT: "504c1681822ac60f0caafdb0b1ba731853c9169d",
     });
 
-    const response = await systemVersion(new Request("https://renewlet.example/api/app/admin/system/version", {
+    const response = await systemVersion(new Request("https://renewlet.example/api/app/system/version", {
       headers: { "accept-language": "en-US" },
     }), env);
 
@@ -122,7 +136,7 @@ describe("Cloudflare system update contract", () => {
       RENEWLET_COMMIT: "",
     });
 
-    const response = await systemVersion(new Request("https://renewlet.example/api/app/admin/system/version", {
+    const response = await systemVersion(new Request("https://renewlet.example/api/app/system/version", {
       headers: { "accept-language": "en-US" },
     }), env);
 
@@ -150,7 +164,7 @@ describe("Cloudflare system update contract", () => {
       RENEWLET_COMMIT: "504c1681822ac60f0caafdb0b1ba731853c9169d",
     });
 
-    const response = await systemVersion(new Request("https://renewlet.example/api/app/admin/system/version", {
+    const response = await systemVersion(new Request("https://renewlet.example/api/app/system/version", {
       headers: { "accept-language": "en-US" },
     }), env);
 
@@ -179,7 +193,7 @@ describe("Cloudflare system update contract", () => {
       RENEWLET_COMMIT: "d0059b51822ac60f0caafdb0b1ba731853c9169d",
     });
 
-    const response = await systemVersion(new Request("https://renewlet.example/api/app/admin/system/version", {
+    const response = await systemVersion(new Request("https://renewlet.example/api/app/system/version", {
       headers: { "accept-language": "en-US" },
     }), env);
 
@@ -203,7 +217,7 @@ describe("Cloudflare system update contract", () => {
   it("skips release candidates from the Atom feed when selecting the stable target", async () => {
     mockReleaseFeed(["1.3.0-rc.1", "1.2.3"]);
 
-    const response = await systemVersion(new Request("https://renewlet.example/api/app/admin/system/version", {
+    const response = await systemVersion(new Request("https://renewlet.example/api/app/system/version", {
       headers: { "accept-language": "en-US" },
     }), envFixture({ RENEWLET_VERSION: "1.2.2" }));
 
@@ -229,7 +243,7 @@ describe("Cloudflare system update contract", () => {
     delete env.RENEWLET_VERSION;
     delete env.RENEWLET_COMMIT;
 
-    const response = await systemVersion(new Request("https://renewlet.example/api/app/admin/system/version", {
+    const response = await systemVersion(new Request("https://renewlet.example/api/app/system/version", {
       headers: { "accept-language": "en-US" },
     }), env);
 
@@ -255,6 +269,27 @@ describe("Cloudflare system update contract", () => {
     expect(JSON.stringify(body).toLowerCase()).not.toContain("authorization");
   });
 
+  it("lets non-admin users read versions without raw upstream details", async () => {
+    authMocks.role = "user";
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("release feed unavailable", { status: 403 })));
+
+    const response = await systemVersion(new Request("https://renewlet.example/api/app/system/version", {
+      headers: { "accept-language": "en-US" },
+    }), envFixture());
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as Record<string, unknown>;
+    expect(body).toMatchObject({
+      deployment: "cloudflare",
+      updateMode: "cloudflare-deploy",
+      updateSupported: false,
+      checkSucceeded: false,
+      hasUpdate: false,
+      warning: "GitHub Releases cannot be fetched right now. Try again later.",
+    });
+    expect(body).not.toHaveProperty("errorDetails");
+  });
+
   it("rejects executable updates in the Worker runtime", async () => {
     await expect(systemUpdate(new Request("https://renewlet.example/api/app/admin/system/update", {
       headers: { "accept-language": "en-US" },
@@ -273,6 +308,17 @@ describe("Cloudflare system update contract", () => {
       status: 400,
       code: "SYSTEM_RESTART_UNSUPPORTED",
     });
+  });
+
+  it("keeps executable system actions admin-only", async () => {
+    authMocks.role = "user";
+
+    await expect(systemUpdate(new Request("https://renewlet.example/api/app/admin/system/update", {
+      method: "POST",
+    }), envFixture())).rejects.toMatchObject({ status: 403 });
+    await expect(systemRestart(new Request("https://renewlet.example/api/app/admin/system/restart", {
+      method: "POST",
+    }), envFixture())).rejects.toMatchObject({ status: 403 });
   });
 });
 

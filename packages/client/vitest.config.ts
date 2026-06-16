@@ -2,8 +2,10 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { lingui } from "@lingui/vite-plugin";
 import { defineConfig } from "vitest/config";
+import { resolveClientBuildVersion } from "./vite/build-version";
 
 const rootDir = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(rootDir, "../..");
 
 export default defineConfig({
   plugins: [lingui({ failOnCompileError: true })],
@@ -11,6 +13,9 @@ export default defineConfig({
     alias: {
       "@": path.resolve(rootDir, "src"),
     },
+  },
+  define: {
+    __RENEWLET_CLIENT_BUILD_VERSION__: JSON.stringify(resolveClientBuildVersion(repoRoot)),
   },
   test: {
     environment: "jsdom",

@@ -164,6 +164,9 @@ async function routeApp(request: Request, env: Env, url: URL): Promise<Response>
   if (head === "account" && second === "password-reset" && third === "status") {
     return routeMethods(request, { GET: () => passwordResetStatus() });
   }
+  if (head === "system" && second === "version" && !third) {
+    return routeMethods(request, { GET: () => systemVersion(request, env) });
+  }
 
   if (head === "admin" && second === "users" && !third) {
     return routeMethods(request, {
@@ -176,9 +179,6 @@ async function routeApp(request: Request, env: Env, url: URL): Promise<Response>
       PATCH: () => adminPatchUser(request, env, third),
       DELETE: () => adminDeleteUser(request, env, third),
     });
-  }
-  if (head === "admin" && second === "system" && third === "version") {
-    return routeMethods(request, { GET: () => systemVersion(request, env) });
   }
   if (head === "admin" && second === "system" && third === "update") {
     return routeMethods(request, { POST: () => systemUpdate(request, env) });

@@ -1,4 +1,5 @@
 // 系统更新弹窗测试保护 Docker 页面内更新的 pending restart 状态流和 Cloudflare/source 禁用分支。
+import rootPackageJson from "../../../../package.json";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -111,7 +112,7 @@ function versionFixture(overrides: Record<string, unknown> = {}) {
 
 function mockVersionEndpoint(overrides: Record<string, unknown> = {}) {
   mocks.apiFetch.mockImplementation((input: string) => {
-    if (input.startsWith("/api/app/admin/system/version")) return Promise.resolve(versionFixture(overrides));
+    if (input.startsWith("/api/app/system/version")) return Promise.resolve(versionFixture(overrides));
     return Promise.reject(new Error(`Unexpected request ${input}`));
   });
 }
@@ -160,6 +161,18 @@ describe("SystemUpdateDialog", () => {
     await waitFor(() => expect(mocks.apiFetch).toHaveBeenCalledWith(expect.stringContaining("force=true"), expect.anything(), expect.anything()));
   });
 
+  it("shows the build version while the badge query is still pending", () => {
+    mocks.apiFetch.mockImplementation((input: string) => {
+      if (input.startsWith("/api/app/system/version")) return new Promise(() => {});
+      return Promise.reject(new Error(`Unexpected request ${input}`));
+    });
+
+    renderWithQuery(<SystemVersionBadge />);
+
+    expect(screen.getByText(`v${rootPackageJson.version}`)).toBeInTheDocument();
+    expect(screen.queryByText("v...")).not.toBeInTheDocument();
+  });
+
   it("shows up-to-date state with a check mark and disables update action", async () => {
     mockVersionEndpoint({
       latestVersion: "1.0.0",
@@ -183,7 +196,7 @@ describe("SystemUpdateDialog", () => {
   it("shows checking state while the popover version query is pending", async () => {
     let resolveVersion: (value: ReturnType<typeof versionFixture>) => void = () => {};
     mocks.apiFetch.mockImplementation((input: string) => {
-      if (input.startsWith("/api/app/admin/system/version")) {
+      if (input.startsWith("/api/app/system/version")) {
         return new Promise((resolve) => {
           resolveVersion = resolve;
         });
@@ -203,7 +216,7 @@ describe("SystemUpdateDialog", () => {
 
   it("updates release builds and then shows restart flow", async () => {
     mocks.apiFetch.mockImplementation((input: string, _schema: unknown, init?: RequestInit) => {
-      if (input.startsWith("/api/app/admin/system/version")) return Promise.resolve(versionFixture());
+      if (input.startsWith("/api/app/system/version")) return Promise.resolve(versionFixture());
       if (input === "/api/app/admin/system/update" && init?.method === "POST") {
         return Promise.resolve({ ok: true, currentVersion: "1.0.0", targetVersion: "1.1.0", needsRestart: true, message: "更新完成" });
       }
@@ -419,7 +432,7 @@ describe("SystemUpdateDialog", () => {
 
   it("shows update error and retry button", async () => {
     mocks.apiFetch.mockImplementation((input: string, _schema: unknown, init?: RequestInit) => {
-      if (input.startsWith("/api/app/admin/system/version")) return Promise.resolve(versionFixture());
+      if (input.startsWith("/api/app/system/version")) return Promise.resolve(versionFixture());
       if (input === "/api/app/admin/system/update" && init?.method === "POST") {
         return Promise.reject(new Error("下载失败"));
       }
@@ -444,7 +457,7 @@ describe("SystemUpdateDialog", () => {
     vi.spyOn(systemRestartBrowser, "reload").mockImplementation(reload);
     const fetchMock = vi.spyOn(window, "fetch").mockResolvedValue({ ok: true } as Response);
     mocks.apiFetch.mockImplementation((input: string, _schema: unknown, init?: RequestInit) => {
-      if (input.startsWith("/api/app/admin/system/version")) return Promise.resolve(versionFixture());
+      if (input.startsWith("/api/app/system/version")) return Promise.resolve(versionFixture());
       if (input === "/api/app/admin/system/update" && init?.method === "POST") {
         return Promise.resolve({ ok: true, currentVersion: "1.0.0", targetVersion: "1.1.0", needsRestart: true, message: "更新完成" });
       }
@@ -498,7 +511,7 @@ describe("SystemUpdateDialog", () => {
 
   it("shows check failed state when the version response is invalid", async () => {
     mocks.apiFetch.mockImplementation((input: string) => {
-      if (input.startsWith("/api/app/admin/system/version")) return Promise.reject(new Error("invalid_response"));
+      if (input.startsWith("/api/app/system/version")) return Promise.reject(new Error("invalid_response"));
       return Promise.reject(new Error(`Unexpected request ${input}`));
     });
 

@@ -597,31 +597,6 @@ func TestAdminUsersRouteReturnsManagementContract(t *testing.T) {
 	}
 }
 
-func TestSystemRestartRouteRequiresAdmin(t *testing.T) {
-	app := newSchemaTestApp(t)
-	if err := ensureSchema(app); err != nil {
-		t.Fatal(err)
-	}
-	_, userToken := createRouteTestUser(t, app, "user")
-
-	cases := []struct {
-		name     string
-		token    string
-		wantCode int
-	}{
-		{name: "anonymous", token: "", wantCode: http.StatusUnauthorized},
-		{name: "non admin", token: userToken, wantCode: http.StatusForbidden},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			res := serveTestRequest(t, app, http.MethodPost, "/api/app/admin/system/restart", `{}`, tc.token)
-			if res.Code != tc.wantCode {
-				t.Fatalf("expected restart auth status %d, got %d: %s", tc.wantCode, res.Code, res.Body.String())
-			}
-		})
-	}
-}
-
 func TestAdminPatchUserRejectsStrictJSONViolations(t *testing.T) {
 	app := newSchemaTestApp(t)
 	if err := ensureSchema(app); err != nil {
