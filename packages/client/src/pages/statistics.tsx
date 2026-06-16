@@ -19,6 +19,7 @@ import type { Subscription } from '@/types/subscription';
 import { Header } from '@/components/header';
 import { StatisticsPageSkeleton } from '@/components/loading-skeleton';
 import { RechartsFrame } from '@/components/recharts-frame';
+import { StatisticsTrendChart } from '@/components/statistics-trend-chart';
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip } from 'recharts';
 import { CircleHelp, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -342,6 +343,11 @@ const Statistics = () => {
             />
           </div>
         </section>
+
+        <StatisticsTrendChart
+          data={stats.trendData}
+          defaultCurrency={defaultCurrency}
+        />
 
         {/* 拆分视图 */}
         <section>

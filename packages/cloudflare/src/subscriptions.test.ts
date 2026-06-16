@@ -1,10 +1,21 @@
 // Worker 订阅 mapper 测试保护 D1 行契约，避免新增字段在 create/update/import/export 边界漂移。
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { subscriptionNormalizationFixtures } from "@renewlet/shared/contract-fixtures";
 import { toApiSubscription } from "./db";
-import { toSubscriptionRow, type SubscriptionBody } from "./subscriptions";
+import { toSubscriptionRow, updateSubscription, type SubscriptionBody } from "./subscriptions";
+import type { Env, SubscriptionRow } from "./types";
+
+const authMocks = vi.hoisted(() => ({
+  requireAuth: vi.fn(),
+}));
+
+vi.mock("./auth", () => ({
+  requireAuth: authMocks.requireAuth,
+}));
+
+const USER_ID = "usr_subscription_owner";
 
 function subscriptionBody(overrides: Partial<SubscriptionBody> = {}): SubscriptionBody {
   return {
@@ -40,6 +51,15 @@ function subscriptionBody(overrides: Partial<SubscriptionBody> = {}): Subscripti
 }
 
 describe("Cloudflare subscription mapper", () => {
+  beforeEach(() => {
+    authMocks.requireAuth.mockReset();
+    authMocks.requireAuth.mockResolvedValue({
+      user: { id: USER_ID },
+      session: { id: "ses" },
+      token: "test",
+    });
+  });
+
   it.each(subscriptionNormalizationFixtures)("matches shared normalization fixture $name", (fixture) => {
     const body = subscriptionBody(fixture.input);
     const row = toSubscriptionRow("sub_fixture", "usr_fixture", body, "2026-06-05T00:00:00.000Z", "2026-06-05T00:00:00.000Z");
@@ -145,6 +165,40 @@ describe("Cloudflare subscription mapper", () => {
     expect(toApiSubscription(row)).toMatchObject({
       publicHidden: true,
     });
+  });
+
+  it("normalizes dirty tags_json while applying a subscription PATCH", async () => {
+    const existing = {
+      ...toSubscriptionRow("sub_dirty_tags", USER_ID, subscriptionBody({ tags: ["legacy"] }), "2026-06-05T00:00:00.000Z", "2026-06-05T00:00:00.000Z"),
+      tags_json: "{dirty-json",
+    } satisfies SubscriptionRow;
+    let updateValues: unknown[] | null = null;
+    const env = {
+      DB: {
+        prepare: (sql: string) => ({
+          bind: (...values: unknown[]) => ({
+            first: async <T>() => sql.includes("FROM subscriptions") ? existing as T : null,
+            run: async () => {
+              updateValues = values;
+              return { success: true, meta: { changes: 1 }, results: [] } as unknown as D1Result;
+            },
+          }),
+        }),
+      } as unknown as D1Database,
+      ASSETS: {} as Fetcher,
+      ASSETS_BUCKET: {} as R2Bucket,
+    } satisfies Env;
+
+    const response = await updateSubscription(new Request("https://renewlet.test/api/app/subscriptions/sub_dirty_tags", {
+      method: "PATCH",
+      headers: { "content-type": "application/json", authorization: "Bearer test" },
+      body: JSON.stringify({ notes: "updated" }),
+    }), env, "sub_dirty_tags");
+    const body = await response.json() as { subscription: { tags: string[] } };
+
+    expect(response.status).toBe(200);
+    expect(body.subscription.tags).toEqual([]);
+    expect(updateValues?.[21]).toBe("[]");
   });
 
   it("clears one-time term fields for recurring subscriptions", () => {

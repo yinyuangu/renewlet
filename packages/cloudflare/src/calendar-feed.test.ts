@@ -8,6 +8,7 @@ import {
   createSubscriptionCalendarFeed,
   deleteCalendarFeed,
   deleteSubscriptionCalendarFeed,
+  downloadSubscriptionCalendarIcs,
   readCalendarFeed,
 } from "./calendar-feed";
 import { sha256 } from "./crypto";
@@ -157,6 +158,75 @@ describe("calendar feed worker handlers", () => {
     expect(unfoldedIcs).toContain("SUMMARY:Fixed Term Plan");
     expect(unfoldedIcs).toContain("UID:renewlet-expiry-");
     expect(unfoldedIcs).not.toContain("One Time Plan");
+  });
+
+  it("downloads authenticated one-off subscription ICS without feed metadata", async () => {
+    const env = await createCalendarFeedTestEnv();
+
+    const response = await downloadSubscriptionCalendarIcs(authorizedRequest("https://renewlet.example/api/app/subscriptions/sub_paused/calendar.ics"), env, "sub_paused");
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("text/calendar; charset=utf-8");
+    expect(response.headers.get("content-disposition")).toBe(`attachment; filename="renewlet-sub_paused.ics"`);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+    const ics = await response.text();
+    const unfoldedIcs = unfoldIcsText(ics);
+
+    expectCalendarIcsLineEndings(ics);
+    expect(unfoldedIcs).toContain("NAME:Renewlet - Paused Plan");
+    expect(unfoldedIcs).toContain("SUMMARY:Paused Plan");
+    expect(unfoldedIcs).toContain("Category: Developer Tools");
+    expect(unfoldedIcs).toContain("Payment method: Credit Card");
+    expect(unfoldedIcs).toContain("CATEGORIES:Developer Tools");
+    expect(unfoldedIcs).not.toContain("SOURCE;VALUE=URI");
+    expect(unfoldedIcs).not.toContain("REFRESH-INTERVAL");
+    expect(unfoldedIcs).not.toContain("X-PUBLISHED-TTL");
+    expect(unfoldedIcs).not.toContain("Active Plan");
+  });
+
+  it("rejects non-owner and buyout one-off ICS downloads but accepts fixed-term expiry downloads", async () => {
+    const env = await createCalendarFeedTestEnv();
+    env.__state.subscriptions.push({
+      ...subscriptionRow("sub_other", "Other User Plan", "active", "monthly", "2099-06-05"),
+      user_id: "usr_other",
+    });
+
+    await expect(downloadSubscriptionCalendarIcs(authorizedRequest("https://renewlet.example/api/app/subscriptions/sub_other/calendar.ics"), env, "sub_other"))
+      .rejects.toMatchObject({ status: 404 });
+    await expect(downloadSubscriptionCalendarIcs(authorizedRequest("https://renewlet.example/api/app/subscriptions/sub_once/calendar.ics"), env, "sub_once"))
+      .rejects.toMatchObject({ status: 404 });
+
+    const fixedTermResponse = await downloadSubscriptionCalendarIcs(authorizedRequest("https://renewlet.example/api/app/subscriptions/sub_fixed_term/calendar.ics"), env, "sub_fixed_term");
+    expect(fixedTermResponse.status).toBe(200);
+    const fixedTermIcs = unfoldIcsText(await fixedTermResponse.text());
+    expect(fixedTermIcs).toContain("SUMMARY:Fixed Term Plan");
+    expect(fixedTermIcs).toContain("UID:renewlet-expiry-");
+  });
+
+  it("does not create the feed table when downloading authenticated one-off ICS", async () => {
+    const env = await createCalendarFeedTestEnv({ calendarFeedsTableExists: false });
+
+    const response = await downloadSubscriptionCalendarIcs(authorizedRequest("https://renewlet.example/api/app/subscriptions/sub_paused/calendar.ics"), env, "sub_paused");
+
+    expect(response.status).toBe(200);
+    expect(env.__state.calendarFeedsTableExists).toBe(false);
+  });
+
+  it("returns a valid empty ICS when a downloaded subscription has an invalid date-only value", async () => {
+    const env = await createCalendarFeedTestEnv({
+      subscriptions: [
+        subscriptionRow("sub_invalid_date", "Invalid Date Plan", "active", "monthly", "not-a-date"),
+      ],
+    });
+
+    const response = await downloadSubscriptionCalendarIcs(authorizedRequest("https://renewlet.example/api/app/subscriptions/sub_invalid_date/calendar.ics"), env, "sub_invalid_date");
+    const ics = await response.text();
+
+    expect(response.status).toBe(200);
+    expectCalendarIcsLineEndings(ics);
+    expect(ics).toContain("BEGIN:VCALENDAR");
+    expect(ics).toContain("END:VCALENDAR");
+    expect(ics).not.toContain("BEGIN:VEVENT");
   });
 
   it("rejects subscription-scoped feed creation for another user's subscription", async () => {

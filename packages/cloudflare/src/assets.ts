@@ -6,6 +6,7 @@ import { requireAuth } from "./auth";
 import type { AssetRow, Env } from "./types";
 
 const MAX_ASSET_BYTES = 2 * 1024 * 1024;
+const MAX_ASSET_FORM_BYTES = MAX_ASSET_BYTES + 64 * 1024;
 const ALLOWED_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif", "image/svg+xml", "image/x-icon", "image/vnd.microsoft.icon"]);
 
 /**
@@ -16,6 +17,7 @@ const ALLOWED_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "i
 export async function uploadAsset(request: Request, env: Env): Promise<Response> {
   const locale = requestLocale(request);
   const auth = await requireAuth(request, env);
+  assertAssetUploadContentLength(request, locale);
   const form = await request.formData();
   const kind = uploadKindSchema.parse(form.get("kind"));
   const file = form.get("file");
@@ -43,6 +45,17 @@ export async function uploadAsset(request: Request, env: Env): Promise<Response>
   `).bind(id, auth.user.id, kind, key, file.name, contentType, file.size, timestamp, timestamp).run();
 
   return json({ url: `/api/app/assets/${id}` }, { status: 201 });
+}
+
+function assertAssetUploadContentLength(request: Request, locale: ReturnType<typeof requestLocale>): void {
+  const raw = request.headers.get("content-length");
+  if (!raw) return;
+  const contentLength = Number(raw.trim());
+  if (!Number.isFinite(contentLength)) return;
+  // multipart envelope 允许少量表单开销；真正的文件大小仍由 File.size 校验，避免 header 缺失时误拒正常上传。
+  if (contentLength > MAX_ASSET_FORM_BYTES) {
+    throw new HttpError(400, serverText(locale, "asset.invalidImageSize"));
+  }
 }
 
 /**

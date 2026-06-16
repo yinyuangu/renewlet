@@ -13,6 +13,7 @@ import {
   updateCustomHeadScriptStaticHeaders,
   type CustomHeadScript,
 } from "./vite/custom-head-script";
+import { resolveClientBuildVersion } from "./vite/build-version";
 
 const rootDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(rootDir, "../..");
@@ -101,6 +102,7 @@ export default defineConfig(({ command, mode }) => {
   const env = loadEnv(mode, repoRoot, "");
   const devProxyTarget = process.env["VITE_DEV_PROXY_TARGET"] ?? env["VITE_DEV_PROXY_TARGET"] ?? "http://127.0.0.1:3000";
   const renewletRuntime = process.env["VITE_RENEWLET_RUNTIME"] ?? env["VITE_RENEWLET_RUNTIME"];
+  const clientBuildVersion = resolveClientBuildVersion(repoRoot, { ...env, ...process.env });
   const shouldInjectCustomHeadScript = command === "serve" || renewletRuntime === "cloudflare";
   // Docker build 的最终 HTML 由 Go 运行时注入；只有 Vite dev 和 Cloudflare Static Assets build 在这一层拥有最终 HTML/CSP。
   const customHeadScript = shouldInjectCustomHeadScript
@@ -123,6 +125,9 @@ export default defineConfig(({ command, mode }) => {
       alias: {
         "@": path.resolve(rootDir, "src"),
       },
+    },
+    define: {
+      __RENEWLET_CLIENT_BUILD_VERSION__: JSON.stringify(clientBuildVersion),
     },
     server: {
       port: 5173,

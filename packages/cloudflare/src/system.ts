@@ -6,7 +6,7 @@
 import { systemVersionResponseSchema } from "@renewlet/shared/schemas/app";
 import { XMLParser } from "fast-xml-parser";
 import rootPackageJson from "../../../package.json";
-import { requireAdmin } from "./auth";
+import { requireAdmin, requireAuth } from "./auth";
 import { HttpError, json, requestLocale } from "./http";
 import { serverText } from "./server-i18n";
 import type { Env } from "./types";
@@ -84,12 +84,13 @@ const releaseFeedParser = new XMLParser({
  * Worker 部署没有可替换的本地二进制，但仍应只读检查 GitHub Release，避免把“不能页面内执行更新”误当成“不能判断版本”。
  */
 export async function systemVersion(request: Request, env: Env): Promise<Response> {
-  await requireAdmin(request, env);
+  const auth = await requireAuth(request, env);
   const locale = requestLocale(request);
   const commit = cloudflareBuildValue(env.RENEWLET_COMMIT, "");
   const buildTime = cloudflareBuildValue(env.RENEWLET_BUILD_TIME, "");
   const version = resolveCloudflareVersion(env.RENEWLET_VERSION);
   const releaseCheck = await checkLatestStableRelease(version, locale, env);
+  const isAdmin = auth.user.role === "admin";
   return json(systemVersionResponseSchema.parse({
     currentVersion: version,
     latestVersion: releaseCheck.latestVersion,
@@ -102,7 +103,8 @@ export async function systemVersion(request: Request, env: Env): Promise<Respons
     releaseInfo: releaseCheck.releaseInfo,
     cached: false,
     ...(releaseCheck.warning ? { warning: releaseCheck.warning } : {}),
-    ...(releaseCheck.errorDetails ? { errorDetails: releaseCheck.errorDetails } : {}),
+    // 版本 badge 面向所有登录用户；GitHub raw response 仍只随管理员排障响应一次性回显。
+    ...(isAdmin && releaseCheck.errorDetails ? { errorDetails: releaseCheck.errorDetails } : {}),
     build: {
       version,
       commit,

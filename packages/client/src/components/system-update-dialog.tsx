@@ -6,6 +6,7 @@ import { RawErrorResponseDialog } from "@/components/raw-error-response-dialog";
 import { useSystemRestart, useSystemUpdate, useSystemVersion } from "@/hooks/use-system-version";
 import { useI18n } from "@/i18n/I18nProvider";
 import { ApiError } from "@/lib/api-client";
+import { clientBuildVersion } from "@/lib/client-build-info";
 import { createRawErrorResponseDetails, type RawErrorResponseDetails } from "@/lib/raw-error-response";
 import { cn } from "@/lib/utils";
 import type { SystemDeployment, SystemVersionResponse } from "@/lib/api/schemas/app";
@@ -280,7 +281,8 @@ export function SystemVersionBadge({ className }: { className?: string | undefin
   const { t } = useI18n();
   const versionQuery = useSystemVersion(true, false);
   const version = versionQuery.data;
-  const label = version?.hasUpdate ? t("system.badgeUpdate", { version: version.latestVersion }) : t("system.badgeVersion", { version: version?.currentVersion ?? "..." });
+  const currentVersion = version?.currentVersion ?? clientBuildVersion;
+  const label = version?.hasUpdate ? t("system.badgeUpdate", { version: version.latestVersion }) : t("system.badgeVersion", { version: currentVersion });
 
   return (
     <span

@@ -2,7 +2,7 @@
   "name": "@renewlet/shared",
   "private": true,
   "license": "MIT",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "type": "module",
   "exports": {
     "./schemas/account": "./src/schemas/account.ts",
@@ -28,6 +28,7 @@
     "./ai-recognition-prompt": "./src/ai-recognition-prompt.ts",
     "./built-in-icons": "./src/built-in-icons.ts",
     "./built-in-icon-index-builder": "./src/built-in-icon-index-builder.ts",
+    "./calendar-events": "./src/calendar-events.ts",
     "./contract-fixtures": "./src/contract-fixtures.ts",
     "./favicon-domains": "./src/favicon-domains.ts",
     "./media-resolver": "./src/media-resolver.ts",

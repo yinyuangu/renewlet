@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { AlertCircle, Check, Clock3, Image as ImageIcon, RefreshCw, SlidersHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { RawErrorResponseDialog } from '@/components/raw-error-response-dialog';
@@ -26,13 +26,11 @@ interface BuiltInIconIndexController {
   canManage: boolean;
   status: BuiltInIconIndexStatus | undefined;
   isLoading: boolean;
-  checkingProvider: BuiltInIconProvider | null;
+  checkingProviders: BuiltInIconProvider[];
   refreshingProvider: BuiltInIconProvider | null;
   errorDetails: RawErrorResponseDetails | null;
   errorDetailsOpen: boolean;
   setErrorDetailsOpen: (open: boolean) => void;
-  openProviderStatus: (provider: BuiltInIconProvider) => Promise<void>;
-  closeProviderStatus: (provider: BuiltInIconProvider) => void;
   checkAllProviders: () => Promise<void>;
   checkProvider: (provider: BuiltInIconProvider) => Promise<void>;
   refreshProvider: (provider: BuiltInIconProvider) => Promise<void>;
@@ -65,6 +63,12 @@ export function BuiltInIconSourcesSection({ id, className, sources, onChange, ic
     .map((provider) => t(`settings.builtInIconSourceShort.${provider}`))
     .join(" / ");
   const providerStatusById = useMemo(() => new Map(iconIndex?.status?.providers.map((item) => [item.provider, item])), [iconIndex?.status]);
+  const handleDialogOpenChange = (open: boolean) => {
+    setDialogOpen(open);
+    if (open && iconIndex?.canManage) {
+      void iconIndex.checkAllProviders();
+    }
+  };
 
   const updateProvider = (
     provider: BuiltInIconProvider,
@@ -101,7 +105,7 @@ export function BuiltInIconSourcesSection({ id, className, sources, onChange, ic
           </div>
         </div>
 
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <Dialog open={dialogOpen} onOpenChange={handleDialogOpenChange}>
           <DialogTrigger asChild>
             <Button type="button" variant="outline" className="w-full shrink-0 gap-2 sm:w-auto">
               <SlidersHorizontal className="h-4 w-4" />
@@ -254,32 +258,17 @@ interface BuiltInIconProviderStatusView {
 function BuiltInIconProviderStatusPopover({ provider, status, iconIndex, t }: BuiltInIconProviderStatusPopoverProps) {
   const { formatDateTime, formatNumber } = useI18n();
   const [open, setOpen] = useState(false);
-  const { closeProviderStatus, openProviderStatus } = iconIndex;
-  const checking = iconIndex.checkingProvider === provider;
+  const checking = iconIndex.checkingProviders.includes(provider);
   const refreshing = iconIndex.refreshingProvider === provider || Boolean(status?.refreshing);
   const busy = iconIndex.isLoading || checking || refreshing;
   const providerName = t(`settings.builtInIconSource.${provider}`);
   const statusView = getBuiltInIconProviderStatusView({ checking, iconIndex, refreshing, status, t });
   const canRefresh = Boolean(status && (status.updateAvailable || status.lastError) && !busy);
 
-  useEffect(() => {
-    return () => {
-      // Dialog 关闭会直接卸载 provider 卡片；这里只释放打开周期锁，不取消已经发出的检查请求。
-      closeProviderStatus(provider);
-    };
-  }, [closeProviderStatus, provider]);
-
   return (
     <Popover
       open={open}
-      onOpenChange={(nextOpen) => {
-        setOpen(nextOpen);
-        if (nextOpen) {
-          void openProviderStatus(provider);
-        } else {
-          closeProviderStatus(provider);
-        }
-      }}
+      onOpenChange={setOpen}
     >
       <PopoverTrigger asChild>
         <button
@@ -401,17 +390,17 @@ function getBuiltInIconProviderStatusView({
   status: BuiltInIconIndexProviderStatus | undefined;
   t: (key: MessageKey, params?: MessageParams) => string;
 }): BuiltInIconProviderStatusView {
-  if (refreshing) {
-    return {
-      kind: "refreshing",
-      label: t("settings.builtInIconIndexBadge.refreshing"),
-      className: "border-primary/30 bg-primary/10 text-primary hover:bg-primary/15",
-    };
-  }
   if (checking) {
     return {
       kind: "checking",
       label: t("settings.builtInIconIndexBadge.checking"),
+      className: "border-primary/30 bg-primary/10 text-primary hover:bg-primary/15",
+    };
+  }
+  if (refreshing) {
+    return {
+      kind: "refreshing",
+      label: t("settings.builtInIconIndexBadge.refreshing"),
       className: "border-primary/30 bg-primary/10 text-primary hover:bg-primary/15",
     };
   }

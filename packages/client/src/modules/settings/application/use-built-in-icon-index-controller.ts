@@ -11,13 +11,11 @@ export interface SettingsBuiltInIconIndexController {
   canManage: boolean;
   status: BuiltInIconIndexStatus | undefined;
   isLoading: boolean;
-  checkingProvider: BuiltInIconProvider | null;
+  checkingProviders: BuiltInIconProvider[];
   refreshingProvider: BuiltInIconProvider | null;
   errorDetails: RawErrorResponseDetails | null;
   errorDetailsOpen: boolean;
   setErrorDetailsOpen: (open: boolean) => void;
-  openProviderStatus: (provider: BuiltInIconProvider) => Promise<void>;
-  closeProviderStatus: (provider: BuiltInIconProvider) => void;
   checkAllProviders: () => Promise<void>;
   checkProvider: (provider: BuiltInIconProvider) => Promise<void>;
   refreshProvider: (provider: BuiltInIconProvider) => Promise<void>;
@@ -30,15 +28,15 @@ export function useSettingsBuiltInIconIndexController(canManage: boolean): Setti
   const status = useBuiltInIconIndexStatus(canManage);
   const checkProvider = useCheckBuiltInIconIndexProvider();
   const refreshProvider = useRefreshBuiltInIconIndexProvider();
-  const [checkingProvider, setCheckingProvider] = useState<BuiltInIconProvider | null>(null);
+  const [checkingProviders, setCheckingProviders] = useState<BuiltInIconProvider[]>([]);
   const [refreshingProvider, setRefreshingProvider] = useState<BuiltInIconProvider | null>(null);
   const [errorDetails, setErrorDetails] = useState<RawErrorResponseDetails | null>(null);
   const [errorDetailsOpen, setErrorDetailsOpen] = useState(false);
-  const openedProviderStatusChecksRef = useRef<Set<BuiltInIconProvider>>(new Set());
+  const batchCheckInFlightRef = useRef(false);
   const providerStatuses = status.data?.providers;
 
   const runProviderCheck = useCallback(async (provider: BuiltInIconProvider) => {
-    setCheckingProvider(provider);
+    setCheckingProviders((current) => current.includes(provider) ? current : [...current, provider]);
     try {
       await checkProvider.mutateAsync(provider);
     } catch (error) {
@@ -48,7 +46,7 @@ export function useSettingsBuiltInIconIndexController(canManage: boolean): Setti
       setErrorDetailsOpen(true);
       await status.refetch();
     } finally {
-      setCheckingProvider((current) => current === provider ? null : current);
+      setCheckingProviders((current) => current.filter((item) => item !== provider));
     }
   }, [checkProvider, status]);
 
@@ -57,34 +55,23 @@ export function useSettingsBuiltInIconIndexController(canManage: boolean): Setti
     await runProviderCheck(provider);
   }, [canManage, checkProvider.isPending, runProviderCheck]);
 
-  const handleOpenProviderStatus = useCallback(async (provider: BuiltInIconProvider) => {
-    if (!canManage) return;
-    if (openedProviderStatusChecksRef.current.has(provider)) return;
-    // Popover 打开只预检 GitHub metadata；先锁住本次打开周期，避免焦点重入或重渲染重复打共享出口。
-    openedProviderStatusChecksRef.current.add(provider);
-    const providerStatus = providerStatuses?.find((item) => item.provider === provider);
-    if (
-      checkProvider.isPending ||
-      checkingProvider === provider ||
-      refreshingProvider === provider ||
-      Boolean(providerStatus?.refreshing)
-    ) {
-      return;
-    }
-    await runProviderCheck(provider);
-  }, [canManage, checkProvider.isPending, checkingProvider, providerStatuses, refreshingProvider, runProviderCheck]);
-
-  const handleCloseProviderStatus = useCallback((provider: BuiltInIconProvider) => {
-    openedProviderStatusChecksRef.current.delete(provider);
-  }, []);
-
   const handleCheckAllProviders = useCallback(async () => {
-    if (!canManage || checkProvider.isPending) return;
-    // 按 provider 串行检查，避免共享出口同时打 GitHub registry 触发 403/429。
-    for (const provider of BUILT_IN_ICON_PROVIDERS) {
-      await runProviderCheck(provider);
+    if (!canManage || checkProvider.isPending || batchCheckInFlightRef.current) return;
+    batchCheckInFlightRef.current = true;
+    const providers = BUILT_IN_ICON_PROVIDERS.filter((provider) => {
+      const providerStatus = providerStatuses?.find((item) => item.provider === provider);
+      return refreshingProvider !== provider && !providerStatus?.refreshing;
+    });
+    setCheckingProviders((current) => Array.from(new Set([...current, ...providers])));
+    try {
+      // 弹层级检查要串行访问 GitHub feed；并发会放大共享出口 403/429，还会让 badge 状态乱跳。
+      for (const provider of providers) {
+        await runProviderCheck(provider);
+      }
+    } finally {
+      batchCheckInFlightRef.current = false;
     }
-  }, [canManage, checkProvider.isPending, runProviderCheck]);
+  }, [canManage, checkProvider.isPending, providerStatuses, refreshingProvider, runProviderCheck]);
 
   const handleRefreshProvider = useCallback(async (provider: BuiltInIconProvider) => {
     if (!canManage || refreshProvider.isPending) return;
@@ -120,13 +107,11 @@ export function useSettingsBuiltInIconIndexController(canManage: boolean): Setti
     canManage,
     status: status.data,
     isLoading: status.isLoading,
-    checkingProvider,
+    checkingProviders,
     refreshingProvider,
     errorDetails,
     errorDetailsOpen,
     setErrorDetailsOpen,
-    openProviderStatus: handleOpenProviderStatus,
-    closeProviderStatus: handleCloseProviderStatus,
     checkAllProviders: handleCheckAllProviders,
     checkProvider: handleCheckProvider,
     refreshProvider: handleRefreshProvider,

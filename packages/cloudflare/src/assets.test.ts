@@ -1,6 +1,6 @@
 // Worker 私有资产测试保护 D1 owner 索引、订阅引用阻止和 R2/D1 删除顺序。
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { deleteAsset } from "./assets";
+import { deleteAsset, uploadAsset } from "./assets";
 import worker from "./index";
 import type { AssetRow, Env, SubscriptionRow } from "./types";
 
@@ -241,6 +241,23 @@ describe("Cloudflare uploaded assets", () => {
 
     expect(fixture.r2Delete).not.toHaveBeenCalled();
     expect(fixture.state.deletedMetadata).toEqual([]);
+  });
+
+  it("rejects oversized uploads before parsing multipart form data", async () => {
+    const fixture = createEnv();
+    const request = new Request("https://renewlet.test/api/app/assets", {
+      method: "POST",
+      headers: {
+        authorization: "Bearer test",
+        "content-length": String(2 * 1024 * 1024 + 64 * 1024 + 1),
+        "x-renewlet-locale": "en-US",
+      },
+    });
+    const formDataSpy = vi.spyOn(request, "formData").mockRejectedValue(new Error("formData should not be called"));
+
+    await expect(uploadAsset(request, fixture.env)).rejects.toMatchObject({ status: 400 });
+
+    expect(formDataSpy).not.toHaveBeenCalled();
   });
 
   it("routes DELETE /api/app/assets/{id} to the asset deletion handler", async () => {

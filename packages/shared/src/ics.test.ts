@@ -1,6 +1,7 @@
 // ICS 测试保护公开日历订阅的转义、全日事件和 UID 规则，外部日历客户端依赖这些稳定输出。
 import { describe, expect, it } from "vitest";
-import { buildRenewalCalendarEvent, buildRenewalCalendarIcs } from "./ics";
+import { buildRenewalCalendarEvent } from "./calendar-events";
+import { buildRenewalCalendarIcs } from "./ics";
 
 describe("buildRenewalCalendarIcs", () => {
   it("maps renewal subscriptions into the shared calendar event shape", () => {

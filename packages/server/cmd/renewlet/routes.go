@@ -162,15 +162,6 @@ func registerRoutes(app core.App, router *router.Router[*core.RequestEvent]) {
 		}
 		return e.JSON(http.StatusOK, newOKResponse())
 	})
-	admin.GET("/system/version", func(e *core.RequestEvent) error {
-		locale := requestLocale(e.Request)
-		force := e.Request.URL.Query().Get("force") == "true"
-		info, err := defaultSystemUpdateService.CheckVersion(e.Request.Context(), locale, force)
-		if err != nil {
-			return e.InternalServerError(serverText(locale, "system.checkVersionFailed"), err)
-		}
-		return e.JSON(http.StatusOK, info)
-	})
 	admin.POST("/system/update", func(e *core.RequestEvent) error {
 		locale := requestLocale(e.Request)
 		if _, err := decodeStrictJSON[systemUpdateRequest](e.Request, locale); err != nil {
@@ -225,6 +216,7 @@ func registerRoutes(app core.App, router *router.Router[*core.RequestEvent]) {
 	})
 
 	auth := router.Group("/api/app").Bind(apis.RequireAuth("users"))
+	auth.GET("/system/version", func(e *core.RequestEvent) error { return handleSystemVersion(e) })
 	auth.PUT("/account/password", func(e *core.RequestEvent) error {
 		locale := requestLocale(e.Request)
 		if err := demoModePolicy.RejectAccountMutation(e); err != nil {
@@ -285,6 +277,7 @@ func registerRoutes(app core.App, router *router.Router[*core.RequestEvent]) {
 	auth.PATCH("/public-status-page", func(e *core.RequestEvent) error { return handlePublicStatusPageUpdate(app, e) })
 	auth.DELETE("/public-status-page", func(e *core.RequestEvent) error { return handlePublicStatusPageDelete(app, e) })
 	auth.POST("/subscriptions/{id}/renew", func(e *core.RequestEvent) error { return handleSubscriptionRenew(app, e) })
+	auth.GET("/subscriptions/{id}/calendar.ics", func(e *core.RequestEvent) error { return handleSubscriptionCalendarICSDownload(app, e) })
 	auth.GET("/subscriptions/{id}/calendar-feed", func(e *core.RequestEvent) error { return handleSubscriptionCalendarFeedStatus(app, e) })
 	auth.POST("/subscriptions/{id}/calendar-feed", func(e *core.RequestEvent) error { return handleSubscriptionCalendarFeedCreate(app, e) })
 	auth.DELETE("/subscriptions/{id}/calendar-feed", func(e *core.RequestEvent) error { return handleSubscriptionCalendarFeedDelete(app, e) })
@@ -294,4 +287,40 @@ func registerRoutes(app core.App, router *router.Router[*core.RequestEvent]) {
 	router.GET("/api/app/account/password-reset/status", func(e *core.RequestEvent) error {
 		return e.JSON(http.StatusOK, passwordResetStatusResponse{Enabled: app.Settings().SMTP.Enabled})
 	})
+}
+
+func handleSystemVersion(e *core.RequestEvent) error {
+	locale := requestLocale(e.Request)
+	if !canReadSystemVersion(e.Auth) {
+		return e.ForbiddenError(serverText(locale, "auth.adminRequiredShort"), nil)
+	}
+	force := e.Request.URL.Query().Get("force") == "true"
+	info, err := defaultSystemUpdateService.CheckVersion(e.Request.Context(), locale, force)
+	if err != nil {
+		return e.InternalServerError(serverText(locale, "system.checkVersionFailed"), err)
+	}
+	if !canPerformSystemUpdate(e.Auth) {
+		info = readOnlySystemVersionResponse(info, locale)
+	}
+	return e.JSON(http.StatusOK, info)
+}
+
+func canReadSystemVersion(user *core.Record) bool {
+	return user != nil && !user.GetBool("banned")
+}
+
+func canPerformSystemUpdate(user *core.Record) bool {
+	return user != nil && user.GetString("role") == "admin" && !user.GetBool("banned")
+}
+
+func readOnlySystemVersionResponse(response *systemVersionResponse, locale appLocale) *systemVersionResponse {
+	clone := cloneSystemVersionResponse(response, response != nil && response.Cached)
+	if clone == nil {
+		return nil
+	}
+	// 版本 badge 面向所有登录用户；执行更新和上游 raw details 仍只属于管理员排障/运维边界。
+	clone.UpdateSupported = false
+	clone.UnsupportedReason = serverText(locale, "auth.adminRequiredShort")
+	clone.ErrorDetails = nil
+	return clone
 }

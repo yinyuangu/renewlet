@@ -247,6 +247,119 @@ describe("subscription statistics models", () => {
     expect(model.budgetRemaining).toBe(23);
   });
 
+  it("builds 12-month cashflow trend from recurring billing dates", () => {
+    const model = buildStatisticsModel({
+      subscriptions: [
+        subscription({ id: "monthly", price: 10, billingCycle: "monthly", nextBillingDate: assertDateOnly("2026-01-15") }),
+        subscription({ id: "annual", price: 120, billingCycle: "annual", nextBillingDate: assertDateOnly("2026-03-01") }),
+        subscription({ id: "custom", price: 30, billingCycle: "custom", customDays: 2, customCycleUnit: "month", nextBillingDate: assertDateOnly("2026-02-10") }),
+      ],
+      config: DEFAULT_CUSTOM_CONFIG,
+      monthlyBudget: 0,
+      defaultCurrency: "USD",
+      convert,
+      now: new Date("2026-01-01T00:00:00.000Z"),
+    });
+
+    expect(model.trendData).toHaveLength(12);
+    expect(model.trendData.map((item) => item.monthKey)).toEqual([
+      "2026-01",
+      "2026-02",
+      "2026-03",
+      "2026-04",
+      "2026-05",
+      "2026-06",
+      "2026-07",
+      "2026-08",
+      "2026-09",
+      "2026-10",
+      "2026-11",
+      "2026-12",
+    ]);
+    expect(model.trendData.map((item) => item.cashflow)).toEqual([
+      10,
+      40,
+      130,
+      40,
+      10,
+      40,
+      10,
+      40,
+      10,
+      40,
+      10,
+      40,
+    ]);
+  });
+
+  it("builds amortized trend for recurring and fixed-term subscriptions without one-time cashflow", () => {
+    const model = buildStatisticsModel({
+      subscriptions: [
+        subscription({ id: "monthly", price: 10, billingCycle: "monthly", nextBillingDate: assertDateOnly("2026-01-15") }),
+        subscription({
+          id: "fixedTerm",
+          price: 120,
+          billingCycle: "one-time",
+          startDate: assertDateOnly("2026-02-15"),
+          nextBillingDate: assertDateOnly("2026-04-15"),
+          oneTimeTermCount: 2,
+          oneTimeTermUnit: "month",
+        }),
+        subscription({
+          id: "buyout",
+          price: 500,
+          billingCycle: "one-time",
+          startDate: assertDateOnly("2026-01-01"),
+          nextBillingDate: assertDateOnly("2026-01-01"),
+        }),
+      ],
+      config: DEFAULT_CUSTOM_CONFIG,
+      monthlyBudget: 0,
+      defaultCurrency: "USD",
+      convert,
+      now: new Date("2026-01-01T00:00:00.000Z"),
+    });
+
+    expect(model.trendData.map((item) => item.cashflow)).toEqual([10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10]);
+    expect(model.trendData.slice(0, 5).map((item) => [item.monthKey, item.amortized])).toEqual([
+      ["2026-01", 10],
+      ["2026-02", 70],
+      ["2026-03", 70],
+      ["2026-04", 70],
+      ["2026-05", 10],
+    ]);
+  });
+
+  it("converts currency before trend aggregation", () => {
+    const model = buildStatisticsModel({
+      subscriptions: [
+        subscription({ id: "usd", price: 10, currency: "USD", billingCycle: "monthly", nextBillingDate: assertDateOnly("2026-01-05") }),
+        subscription({ id: "cny", price: 70, currency: "CNY", billingCycle: "monthly", nextBillingDate: assertDateOnly("2026-01-10") }),
+      ],
+      config: DEFAULT_CUSTOM_CONFIG,
+      monthlyBudget: 0,
+      defaultCurrency: "CNY",
+      convert,
+      now: new Date("2026-01-01T00:00:00.000Z"),
+    });
+
+    expect(model.trendData[0]).toEqual(expect.objectContaining({ cashflow: 140, amortized: 140 }));
+  });
+
+  it("uses the configured timezone to choose the trend start month", () => {
+    const model = buildStatisticsModel({
+      subscriptions: [subscription({ id: "monthly", price: 10, billingCycle: "monthly", nextBillingDate: assertDateOnly("2026-07-01") })],
+      config: DEFAULT_CUSTOM_CONFIG,
+      monthlyBudget: 0,
+      defaultCurrency: "USD",
+      convert,
+      now: new Date("2026-06-30T16:30:00.000Z"),
+      timeZone: "Asia/Shanghai",
+    });
+
+    expect(model.trendData[0]?.monthKey).toBe("2026-07");
+  });
+
   it("dashboard upcoming count reuses the reminder window model", () => {
     const stats = buildDashboardStats({
       subscriptions: [

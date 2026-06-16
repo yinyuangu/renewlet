@@ -4,7 +4,7 @@
  * Worker 没有 PocketBase hook，因此 create/update/import/renew 都必须在这里复用同一套字段归一和 owner 过滤。
  */
 import { subscriptionCreateBodySchema, subscriptionsListQuerySchema, subscriptionUpdateBodySchema } from "@renewlet/shared/schemas/subscriptions";
-import { boolToInt, countSubscriptions, getSettings, getSubscription, listSubscriptionsPage, newId, nowIso, parseJsonObject, parseSubscriptionCursor, subscriptionCursor, toApiSubscription } from "./db";
+import { boolToInt, countSubscriptions, getSettings, getSubscription, listSubscriptionsPage, newId, nowIso, parseJsonObject, parseStringArray, parseSubscriptionCursor, subscriptionCursor, toApiSubscription } from "./db";
 import { advanceSubscriptionRenewal, dateOnlyInZone } from "./subscription-renewal";
 import { HttpError, json, ok, readJson, readOptionalJson, requestLocale } from "./http";
 import { serverText } from "./server-i18n";
@@ -188,6 +188,8 @@ function parseSubscriptionBodyForStorage(body: unknown, locale: ReturnType<typeo
 
 /** 把 D1 row 还原成 shared 写入 body，用于 PATCH 合并而不是直接拼 SQL 字段。 */
 function toBody(row: SubscriptionRow): SubscriptionBody {
+  // PATCH 合并要容忍历史脏 tags_json；本次 UPDATE 会经 toSubscriptionRow 收敛回合法数组 JSON。
+  const tags = parseStringArray(row.tags_json);
   return {
     name: row.name,
     logo: row.logo,
@@ -210,7 +212,7 @@ function toBody(row: SubscriptionRow): SubscriptionBody {
     trialEndDate: row.trial_end_date,
     website: row.website,
     notes: row.notes,
-    tags: JSON.parse(row.tags_json) as string[],
+    tags,
     reminderDays: row.reminder_days,
     repeatReminderEnabled: row.repeat_reminder_enabled === 1,
     repeatReminderInterval: row.repeat_reminder_interval as SubscriptionBody["repeatReminderInterval"],

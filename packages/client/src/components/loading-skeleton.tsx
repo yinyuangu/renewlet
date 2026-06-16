@@ -217,6 +217,19 @@ function StatisticsContentSkeleton() {
         </div>
       </section>
 
+      <section className="mb-8">
+        <div className="min-w-0 rounded-xl border border-border bg-card p-6 shadow-card">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="grid gap-2">
+              <SkeletonBox className="h-6 w-24" />
+              <SkeletonBox className="h-4 w-64 max-w-full" />
+            </div>
+            <SkeletonBox className="h-9 w-full rounded-md sm:w-48" />
+          </div>
+          <SkeletonBox className="h-[280px] w-full rounded-lg" />
+        </div>
+      </section>
+
       <section>
         <SkeletonBox className="mb-4 h-6 w-24" />
         <div className="grid min-w-0 gap-6 md:grid-cols-2">

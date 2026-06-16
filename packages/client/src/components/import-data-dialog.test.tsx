@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_CUSTOM_CONFIG } from "@/types/config";
 import { DEFAULT_SETTINGS } from "@/types/subscription";
 import { ApiError } from "@/lib/api-client";
+import { uploadedAssetsQueryKeys } from "@/hooks/use-uploaded-assets";
 import { ImportDataDialog } from "./import-data-dialog";
 
 type ImportExportService = typeof import("@/services/import-export-service").importExportService;
@@ -117,7 +118,7 @@ function renderImportDialog(props: {
     },
   });
 
-  return render(
+  const rendered = render(
     <QueryClientProvider client={queryClient}>
       <ImportDataDialog
         open
@@ -129,6 +130,7 @@ function renderImportDialog(props: {
       />
     </QueryClientProvider>,
   );
+  return { ...rendered, queryClient };
 }
 
 describe("ImportDataDialog", () => {
@@ -294,6 +296,72 @@ describe("ImportDataDialog", () => {
 
     expect(await screen.findByText("Logo 上传失败，请移除异常 Logo 后重试。")).toBeInTheDocument();
     expect(mocks.applyChunked).not.toHaveBeenCalled();
+  });
+
+  it("invalidates uploaded logo assets after a staged logo import succeeds", async () => {
+    const user = userEvent.setup();
+    const { queryClient } = renderImportDialog();
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+
+    await user.click(screen.getByRole("tab", { name: "粘贴 JSON" }));
+    fireEvent.change(screen.getByPlaceholderText("粘贴 Renewlet 或 Wallos JSON..."), {
+      target: {
+        value: JSON.stringify([{
+          Name: "Uploaded Logo App",
+          "Payment Cycle": "Monthly",
+          "Next Payment": "2026-06-01",
+          Price: "$10",
+          Category: "Software",
+          "Payment Method": "Visa",
+        }]),
+      },
+    });
+    await user.click(screen.getByRole("button", { name: "生成预览" }));
+    await screen.findByRole("button", { name: "编辑 Uploaded Logo App" });
+
+    await user.click(screen.getByRole("button", { name: "编辑 Uploaded Logo App" }));
+    await user.click(screen.getByRole("button", { name: "执行导入" }));
+
+    await waitFor(() => {
+      expect(mocks.applyChunked).toHaveBeenCalledTimes(1);
+    });
+    expect(mocks.createAsset).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: uploadedAssetsQueryKeys.byKind("logo") });
+    });
+  });
+
+  it("does not invalidate uploaded assets when import apply uploaded no logos", async () => {
+    const user = userEvent.setup();
+    const { queryClient } = renderImportDialog();
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+
+    await user.click(screen.getByRole("tab", { name: "粘贴 JSON" }));
+    fireEvent.change(screen.getByPlaceholderText("粘贴 Renewlet 或 Wallos JSON..."), {
+      target: {
+        value: JSON.stringify([{
+          Name: "Plain Import App",
+          "Payment Cycle": "Monthly",
+          "Next Payment": "2026-06-01",
+          Price: "$10",
+          Category: "Software",
+          "Payment Method": "Visa",
+        }]),
+      },
+    });
+    await user.click(screen.getByRole("button", { name: "生成预览" }));
+    await screen.findByText("Plain Import App");
+
+    await user.click(screen.getByRole("button", { name: "执行导入" }));
+
+    await waitFor(() => {
+      expect(mocks.applyChunked).toHaveBeenCalledTimes(1);
+    });
+    await waitFor(() => {
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["custom-config"] });
+    });
+    expect(mocks.createAsset).not.toHaveBeenCalled();
+    expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: uploadedAssetsQueryKeys.byKind("logo") });
   });
 
   it("keeps backend apply messages visible in the dialog error state", async () => {

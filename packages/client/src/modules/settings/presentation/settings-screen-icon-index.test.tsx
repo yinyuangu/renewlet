@@ -76,11 +76,10 @@ describe("SettingsScreen built-in icon index controls", () => {
         },
       },
     });
+    const checkAllProviders = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
     const check = vi.fn<(provider: BuiltInIconProvider) => Promise<void>>().mockResolvedValue(undefined);
-    const openProviderStatus = vi.fn<(provider: BuiltInIconProvider) => Promise<void>>()
-      .mockImplementation((provider) => check(provider));
     const refresh = vi.fn<(provider: BuiltInIconProvider) => Promise<void>>().mockResolvedValue(undefined);
-    controller.builtInIconIndex.openProviderStatus = openProviderStatus;
+    controller.builtInIconIndex.checkAllProviders = checkAllProviders;
     controller.builtInIconIndex.checkProvider = check;
     controller.builtInIconIndex.refreshProvider = refresh;
     mocks.useSettingsFormController.mockReturnValue(controller);
@@ -95,14 +94,12 @@ describe("SettingsScreen built-in icon index controls", () => {
     expect(within(dialog).queryByText(/最新：/)).not.toBeInTheDocument();
     const statusBadge = within(dialog).getByRole("button", { name: "查看 TheSVG 图标索引状态：有更新" });
     expect(statusBadge).toHaveTextContent("有更新");
-    expect(controller.builtInIconIndex.checkAllProviders).not.toHaveBeenCalled();
+    expect(checkAllProviders).toHaveBeenCalledTimes(1);
 
     const updateSettingCallsBeforeRefresh = controller.updateSetting.mock.calls.length;
     await user.click(statusBadge);
 
-    expect(openProviderStatus).toHaveBeenCalledWith("thesvg");
-    expect(check).toHaveBeenCalledTimes(1);
-    expect(check).toHaveBeenCalledWith("thesvg");
+    expect(check).not.toHaveBeenCalled();
     expect(await screen.findByText("图标数量")).toBeInTheDocument();
     const portalHost = screen.getByText("图标数量").closest("[data-mobile-overlay-portal]");
     expect(portalHost).toHaveClass("contents");
@@ -113,7 +110,7 @@ describe("SettingsScreen built-in icon index controls", () => {
     expect(screen.queryByText("手动更新")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "检查 TheSVG 最新版本" }));
-    expect(check).toHaveBeenCalledTimes(2);
+    expect(check).toHaveBeenCalledTimes(1);
     expect(check).toHaveBeenCalledWith("thesvg");
 
     await user.click(screen.getByRole("button", { name: "更新" }));
@@ -124,14 +121,13 @@ describe("SettingsScreen built-in icon index controls", () => {
     expect(screen.queryByRole("button", { name: "保存更改" })).not.toBeInTheDocument();
   });
 
-  it("automatically checks a provider when admins open its status popover", async () => {
+  it("checks all providers when admins open the sources dialog", async () => {
     const user = userEvent.setup();
+    const checkAllProviders = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
     const check = vi.fn<(provider: BuiltInIconProvider) => Promise<void>>().mockResolvedValue(undefined);
-    const openProviderStatus = vi.fn<(provider: BuiltInIconProvider) => Promise<void>>()
-      .mockImplementation((provider) => check(provider));
     const controller = createControllerState({
       builtInIconIndex: {
-        openProviderStatus,
+        checkAllProviders,
         checkProvider: check,
       },
     });
@@ -141,20 +137,22 @@ describe("SettingsScreen built-in icon index controls", () => {
     await user.click(screen.getByRole("button", { name: "配置" }));
 
     const dialog = await screen.findByRole("dialog", { name: "配置内置图标来源" });
+    expect(checkAllProviders).toHaveBeenCalledTimes(1);
+
     await user.click(within(dialog).getByRole("button", { name: "查看 Dashboard Icons 图标索引状态：未检查" }));
 
-    expect(openProviderStatus).toHaveBeenCalledWith("dashboardIcons");
-    expect(check).toHaveBeenCalledWith("dashboardIcons");
+    expect(checkAllProviders).toHaveBeenCalledTimes(1);
+    expect(check).not.toHaveBeenCalled();
     expect(controller.updateSetting).not.toHaveBeenCalled();
   });
 
   it("hides the icon index refresh panel from non-admin controllers", async () => {
     const user = userEvent.setup();
-    const openProviderStatus = vi.fn<(provider: BuiltInIconProvider) => Promise<void>>().mockResolvedValue(undefined);
+    const checkAllProviders = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
     mocks.useSettingsFormController.mockReturnValue(createControllerState({
       builtInIconIndex: {
         canManage: false,
-        openProviderStatus,
+        checkAllProviders,
       },
     }));
 
@@ -164,7 +162,85 @@ describe("SettingsScreen built-in icon index controls", () => {
     const dialog = await screen.findByRole("dialog", { name: "配置内置图标来源" });
     expect(within(dialog).queryByRole("button", { name: /图标索引状态/ })).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("button", { name: "更新" })).not.toBeInTheDocument();
-    expect(openProviderStatus).not.toHaveBeenCalled();
+    expect(checkAllProviders).not.toHaveBeenCalled();
+  });
+
+  it("shows checking before stale up-to-date status while the dialog-level check is running", async () => {
+    const user = userEvent.setup();
+    const controller = createControllerState({
+      builtInIconIndex: {
+        checkingProviders: ["thesvg"],
+        status: {
+          source: "runtime",
+          hash: "runtime-hash",
+          iconCount: 1,
+          providerCounts: { thesvg: 1, selfhst: 0, dashboardIcons: 0 },
+          checkedAt: "2026-06-11T00:00:00.000Z",
+          updatedAt: "2026-06-11T00:00:00.000Z",
+          refreshing: false,
+          providers: [
+            {
+              provider: "thesvg",
+              current: {
+                sourceRef: "sha1234567890abcdef",
+                displayVersion: "sha1234",
+                commitSha: "sha1234567890abcdef",
+                commitShortSha: "sha1234",
+                commitDate: "2026-06-10T00:00:00.000Z",
+                releaseTag: null,
+                releasePublishedAt: null,
+              },
+              latest: {
+                sourceRef: "sha1234567890abcdef",
+                displayVersion: "sha1234",
+                commitSha: "sha1234567890abcdef",
+                commitShortSha: "sha1234",
+                commitDate: "2026-06-10T00:00:00.000Z",
+                releaseTag: null,
+                releasePublishedAt: null,
+              },
+              iconCount: 1,
+              checkedAt: "2026-06-11T00:00:00.000Z",
+              refreshedAt: "2026-06-11T00:00:00.000Z",
+              lastError: null,
+              refreshing: false,
+              updateAvailable: false,
+            },
+            {
+              provider: "selfhst",
+              current: null,
+              latest: null,
+              iconCount: 0,
+              checkedAt: null,
+              refreshedAt: null,
+              lastError: null,
+              refreshing: false,
+              updateAvailable: false,
+            },
+            {
+              provider: "dashboardIcons",
+              current: null,
+              latest: null,
+              iconCount: 0,
+              checkedAt: null,
+              refreshedAt: null,
+              lastError: null,
+              refreshing: false,
+              updateAvailable: false,
+            },
+          ],
+        },
+      },
+    });
+    mocks.useSettingsFormController.mockReturnValue(controller);
+
+    renderSettingsScreen();
+    await user.click(screen.getByRole("button", { name: "配置" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "配置内置图标来源" });
+    const statusBadge = within(dialog).getByRole("button", { name: "查看 TheSVG 图标索引状态：检查中" });
+    expect(statusBadge).toHaveTextContent("检查中");
+    expect(within(dialog).queryByRole("button", { name: "查看 TheSVG 图标索引状态：已最新" })).not.toBeInTheDocument();
   });
 
   it("shows unknown instead of source labels when current provider version has no commit metadata", async () => {

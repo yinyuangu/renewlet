@@ -331,10 +331,8 @@ export function createControllerState(overrides: {
     canManage?: boolean;
     status?: BuiltInIconIndexStatus;
     isLoading?: boolean;
-    checkingProvider?: BuiltInIconProvider | null;
+    checkingProviders?: BuiltInIconProvider[];
     refreshingProvider?: BuiltInIconProvider | null;
-    openProviderStatus?: (provider: BuiltInIconProvider) => Promise<void>;
-    closeProviderStatus?: (provider: BuiltInIconProvider) => void;
     checkAllProviders?: () => Promise<void>;
     checkProvider?: (provider: BuiltInIconProvider) => Promise<void>;
     refreshProvider?: (provider: BuiltInIconProvider) => Promise<void>;
@@ -350,8 +348,6 @@ export function createControllerState(overrides: {
   externalIntegrationsDisabled?: boolean;
 } = {}) {
   const fn = vi.fn();
-  const openProviderStatus = vi.fn<(provider: BuiltInIconProvider) => Promise<void>>().mockResolvedValue(undefined);
-  const closeProviderStatus = vi.fn<(provider: BuiltInIconProvider) => void>();
   const checkAllProviders = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
   const checkProvider = vi.fn<(provider: BuiltInIconProvider) => Promise<void>>().mockResolvedValue(undefined);
   const refreshProvider = vi.fn<(provider: BuiltInIconProvider) => Promise<void>>().mockResolvedValue(undefined);
@@ -455,13 +451,11 @@ export function createControllerState(overrides: {
         })),
       },
       isLoading: overrides.builtInIconIndex?.isLoading ?? false,
-      checkingProvider: overrides.builtInIconIndex?.checkingProvider ?? null,
+      checkingProviders: overrides.builtInIconIndex?.checkingProviders ?? [],
       refreshingProvider: overrides.builtInIconIndex?.refreshingProvider ?? null,
       errorDetails: null,
       errorDetailsOpen: false,
       setErrorDetailsOpen: fn,
-      openProviderStatus: overrides.builtInIconIndex?.openProviderStatus ?? openProviderStatus,
-      closeProviderStatus: overrides.builtInIconIndex?.closeProviderStatus ?? closeProviderStatus,
       checkAllProviders: overrides.builtInIconIndex?.checkAllProviders ?? checkAllProviders,
       checkProvider: overrides.builtInIconIndex?.checkProvider ?? checkProvider,
       refreshProvider: overrides.builtInIconIndex?.refreshProvider ?? refreshProvider,
