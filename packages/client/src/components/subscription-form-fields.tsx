@@ -191,10 +191,10 @@ function CostSharingFields({
             {members.map((member) => (
               <div
                 key={member.id}
-                className="grid gap-3 rounded-lg border border-border bg-background/70 p-3 shadow-sm transition-colors hover:bg-background sm:grid-cols-[minmax(0,1fr)_minmax(8rem,9.5rem)_2.25rem] sm:items-center"
+                className="grid gap-2.5 rounded-lg border border-border bg-background/70 p-3 shadow-sm transition-colors hover:bg-background sm:grid-cols-[minmax(0,1fr)_minmax(10.5rem,11rem)_2.25rem] sm:items-center"
               >
-                <div className="grid min-w-0 grid-cols-[2.25rem_minmax(0,1fr)] gap-2">
-                  <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-xs font-semibold text-primary shadow-inner">
+                <div className="grid min-w-0 grid-cols-[2rem_minmax(0,1fr)] gap-2">
+                  <div className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-xs font-semibold text-primary shadow-inner">
                     {costSharingMemberInitial(member.name)}
                   </div>
                   <div className="grid min-w-0 gap-2">
@@ -222,7 +222,7 @@ function CostSharingFields({
                   </div>
                 </div>
                 {costSharing.splitMode === "custom" ? (
-                  <div className="grid grid-cols-[minmax(0,1fr)_4.25rem] gap-1.5">
+                  <div className="grid grid-cols-[minmax(0,1fr)_5.5rem] gap-1.5">
                     <NumericInput
                       allowNegative={false}
                       allowedDecimalSeparators={[".", "。"]}
@@ -240,7 +240,7 @@ function CostSharingFields({
                       placeholder={t("subscription.placeholder.currency")}
                       searchPlaceholder={t("subscription.search.currency")}
                       emptyMessage={t("subscription.empty.currency")}
-                      className="h-9 border-border bg-secondary px-2 text-xs font-semibold"
+                      className="h-9 border-border bg-secondary px-2 text-sm font-semibold"
                       contentClassName="min-w-[16rem]"
                       aria-label={t("subscription.costSharing.memberCurrency")}
                       renderValue={(option) => (
