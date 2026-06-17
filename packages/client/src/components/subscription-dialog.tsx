@@ -44,6 +44,7 @@ import { createSubscriptionFormState, type SubscriptionFormState } from "@/types
 import { useI18n } from "@/i18n/I18nProvider";
 import { todayDateOnlyInTimeZone } from "@/lib/time/date-only";
 import { getSystemTimeZone } from "@/lib/time/time-zone";
+import { costSharingCustomTotalMatches } from "@renewlet/shared/cost-sharing";
 
 type CreateDialogProps = {
   mode: "create";
@@ -202,6 +203,7 @@ export function SubscriptionDialog(props: SubscriptionDialogProps) {
       repeatReminderEnabled: isDisabledReminder ? false : subscription.repeatReminderEnabled,
       repeatReminderInterval: subscription.repeatReminderInterval,
       repeatReminderWindow: subscription.repeatReminderWindow,
+      costSharing: subscription.costSharing,
       website: subscription.website ?? "",
       notes: subscription.notes ?? "",
       tags: subscription.tags ?? [],
@@ -265,6 +267,16 @@ export function SubscriptionDialog(props: SubscriptionDialogProps) {
     }
     if (!isOptionalHttpUrl(nextFormData.website)) {
       errors.website = t("subscription.validation.websiteInvalid");
+    }
+    if (nextFormData.costSharing?.enabled) {
+      const price = parseNonNegativeFiniteNumberInput(nextFormData.price);
+      if (
+        price === null ||
+        !nextFormData.costSharing.members.some((member) => member.included) ||
+        !costSharingCustomTotalMatches(nextFormData.costSharing, price)
+      ) {
+        errors.costSharing = t("subscription.validation.costSharingInvalid");
+      }
     }
     const tagsError = getTagsValidationError(nextFormData.tags);
     if (tagsError) {
@@ -374,7 +386,7 @@ export function SubscriptionDialog(props: SubscriptionDialogProps) {
 
       <DialogContent
         layout="frame"
-        className="h5-dialog-frame h5-subscription-dialog-panel border-border bg-card p-0 sm:max-w-lg"
+        className="h5-dialog-frame h5-subscription-dialog-panel border-border bg-card p-0 sm:max-w-2xl"
       >
         <DialogHeader data-subscription-dialog-header="" className="shrink-0 p-6 pb-0">
           <DialogTitle className="text-xl font-semibold">

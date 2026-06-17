@@ -73,6 +73,9 @@ func subscriptionAPIFromRecord(record *core.Record) map[string]interface{} {
 		"repeatReminderWindow":         normalizeRepeatReminderWindow(record.GetString("repeatReminderWindow")),
 		"extra":                        jsonValueForResponse(record.Get("extra"), map[string]interface{}{}),
 	}
+	if costSharing := jsonValueForResponse(record.Get("costSharing"), map[string]interface{}{}); nonEmptyJSONMap(costSharing) {
+		out["costSharing"] = costSharing
+	}
 	if value := strings.TrimSpace(record.GetString("logo")); value != "" {
 		out["logo"] = value
 	}
@@ -96,6 +99,11 @@ func subscriptionAPIFromRecord(record *core.Record) map[string]interface{} {
 		out["updatedAt"] = record.GetDateTime("updated").Time().UTC().Format(time.RFC3339Nano)
 	}
 	return out
+}
+
+func nonEmptyJSONMap(value interface{}) bool {
+	object, ok := value.(map[string]interface{})
+	return ok && len(object) > 0
 }
 
 func jsonValueForResponse(value interface{}, fallback interface{}) interface{} {

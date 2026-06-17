@@ -19,6 +19,7 @@ import { translate } from "@/i18n/messages";
 import type { CustomConfig } from "@/types/config";
 import type { Subscription } from "@/types/subscription";
 import { addBillingCycles } from "@renewlet/shared/subscription-renewal";
+import { calculateCostSharingSummary } from "@renewlet/shared/cost-sharing";
 import { isEffectivelyActiveSubscription, isEffectivelyInactiveSubscription } from "./subscription-status";
 
 /** 统计图表固定色板；保持跨图表颜色稳定，避免同一分类在不同渲染中频繁换色。 */
@@ -61,6 +62,7 @@ interface BuildStatisticsModelInput {
   now?: Date;
   timeZone?: string;
   locale?: Locale;
+  costBasis?: "total" | "personal";
 }
 
 function roundTrendAmount(amount: number): number {
@@ -152,13 +154,14 @@ function buildTrendData(
   today: DateOnly,
   locale: Locale,
   convertToDefault: (price: number, currency: string) => number,
+  amountForStats: (subscription: Subscription) => number,
   calculateMonthlyAmount: (subscription: Subscription) => number,
 ): StatisticsTrendDatum[] {
   const buckets = buildTrendBuckets(today, locale);
   const bucketsByMonth = new Map(buckets.map((bucket) => [bucket.monthKey, bucket]));
 
   for (const subscription of activeSubscriptions) {
-    const amountInDefault = convertToDefault(subscription.price, subscription.currency);
+    const amountInDefault = convertToDefault(amountForStats(subscription), subscription.currency);
     addCashflowTrend(bucketsByMonth, buckets, subscription, amountInDefault);
     addAmortizedTrend(buckets, subscription, calculateMonthlyAmount(subscription));
   }
@@ -181,6 +184,7 @@ export function buildStatisticsModel({
   now = new Date(),
   timeZone = "UTC",
   locale = "zh-CN",
+  costBasis = "total",
 }: BuildStatisticsModelInput) {
   const today = todayDateOnlyInTimeZone(now, timeZone);
   const categoryByValue = new Map(config.categories.map((category) => [category.value, category]));
@@ -189,10 +193,14 @@ export function buildStatisticsModel({
   const activeSubscriptions = subscriptions.filter((subscription) => isEffectivelyActiveSubscription(subscription, today));
   const inactiveSubscriptions = subscriptions.filter((subscription) => isEffectivelyInactiveSubscription(subscription, today));
 
+  const amountForStats = (subscription: Subscription): number =>
+    costBasis === "personal"
+      ? calculateCostSharingSummary(subscription.costSharing, subscription.price).yourShare
+      : subscription.price;
   const convertToDefault = (price: number, currency: string) => convert(price, currency, defaultCurrency);
   const calculateMonthlyAmount = (subscription: Subscription): number => {
     // 先换算币种再折算周期，保证所有图表都以用户当前统计货币为唯一口径。
-    const amountInDefault = convertToDefault(subscription.price, subscription.currency);
+    const amountInDefault = convertToDefault(amountForStats(subscription), subscription.currency);
     return toMonthlyAmount(
       amountInDefault,
       subscription.billingCycle,
@@ -214,7 +222,7 @@ export function buildStatisticsModel({
   }, null as Subscription | null);
   const thisMonthDue = activeSubscriptions
     .filter((subscription) => subscription.billingCycle !== "one-time" && isSameMonthDateOnly(subscription.nextBillingDate, today))
-    .reduce((sum, subscription) => sum + convertToDefault(subscription.price, subscription.currency), 0);
+    .reduce((sum, subscription) => sum + convertToDefault(amountForStats(subscription), subscription.currency), 0);
   const budgetUsedPercent = monthlyBudget > 0 ? (totalMonthly / monthlyBudget) * 100 : 0;
   const budgetRemaining = monthlyBudget - totalMonthly;
   const inactiveSavings = inactiveSubscriptions.reduce(
@@ -254,7 +262,7 @@ export function buildStatisticsModel({
     { name: translate(locale, "statistics.budgetUsed"), value: Math.min(totalMonthly, monthlyBudget), color: "hsl(350 75% 55%)" },
     { name: translate(locale, "statistics.budgetRemaining"), value: Math.max(budgetRemaining, 0), color: "hsl(200 80% 50%)" },
   ];
-  const trendData = buildTrendData(activeSubscriptions, today, locale, convertToDefault, calculateMonthlyAmount);
+  const trendData = buildTrendData(activeSubscriptions, today, locale, convertToDefault, amountForStats, calculateMonthlyAmount);
 
   // TODO：若未来支持多预算周期，可把 monthlyBudget 和 budgetChartData 抽成独立预算 domain。
   return {

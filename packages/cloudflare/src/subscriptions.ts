@@ -52,8 +52,8 @@ export async function createSubscription(request: Request, env: Env): Promise<Re
       id, user_id, name, logo, price, currency, billing_cycle, custom_days, custom_cycle_unit, one_time_term_count, one_time_term_unit,
       category, status, pinned, public_hidden, payment_method,
       start_date, next_billing_date, auto_renew, auto_calculate_next_billing_date, trial_end_date, website, notes, tags_json,
-      reminder_days, repeat_reminder_enabled, repeat_reminder_interval, repeat_reminder_window, extra_json, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      reminder_days, repeat_reminder_enabled, repeat_reminder_interval, repeat_reminder_window, cost_sharing_json, extra_json, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).bind(...subscriptionRowValues(row)).run();
   await refreshSubscriptionSchedulerState(env, auth.user.id, { resetAutoRenewCheck: true });
   return json({ subscription: toApiSubscription(row) }, { status: 201 });
@@ -76,7 +76,7 @@ export async function updateSubscription(request: Request, env: Env, id: string)
       one_time_term_count = ?, one_time_term_unit = ?, category = ?, status = ?,
       pinned = ?, public_hidden = ?, payment_method = ?, start_date = ?, next_billing_date = ?, auto_renew = ?, auto_calculate_next_billing_date = ?,
       trial_end_date = ?, website = ?, notes = ?, tags_json = ?, reminder_days = ?, repeat_reminder_enabled = ?,
-      repeat_reminder_interval = ?, repeat_reminder_window = ?, extra_json = ?, updated_at = ?
+      repeat_reminder_interval = ?, repeat_reminder_window = ?, cost_sharing_json = ?, extra_json = ?, updated_at = ?
     WHERE user_id = ? AND id = ?
   `).bind(
     merged.name,
@@ -105,6 +105,7 @@ export async function updateSubscription(request: Request, env: Env, id: string)
     merged.repeat_reminder_enabled,
     merged.repeat_reminder_interval,
     merged.repeat_reminder_window,
+    merged.cost_sharing_json,
     merged.extra_json,
     timestamp,
     auth.user.id,
@@ -221,6 +222,7 @@ function toBody(row: SubscriptionRow): SubscriptionBody {
     repeatReminderEnabled: row.repeat_reminder_enabled === 1,
     repeatReminderInterval: row.repeat_reminder_interval as SubscriptionBody["repeatReminderInterval"],
     repeatReminderWindow: row.repeat_reminder_window as SubscriptionBody["repeatReminderWindow"],
+    costSharing: Object.keys(parseJsonObject(row.cost_sharing_json ?? "{}")).length > 0 ? parseJsonObject(row.cost_sharing_json ?? "{}") as SubscriptionBody["costSharing"] : null,
     extra: parseJsonObject(row.extra_json),
   };
 }
@@ -267,6 +269,7 @@ export function toSubscriptionRow(
     repeat_reminder_enabled: boolToInt(body.repeatReminderEnabled),
     repeat_reminder_interval: body.repeatReminderInterval,
     repeat_reminder_window: body.repeatReminderWindow,
+    cost_sharing_json: JSON.stringify(body.costSharing ?? {}),
     // extra 不走 UI 展示；它给 seed/import 留稳定幂等键，编辑订阅时必须随原记录保留。
     extra_json: JSON.stringify(body.extra ?? {}),
     created_at: createdAt,
@@ -281,7 +284,7 @@ export function subscriptionRowValues(row: SubscriptionRow): unknown[] {
     row.category, row.status, row.pinned, row.public_hidden, row.payment_method, row.start_date, row.next_billing_date,
     row.auto_renew, row.auto_calculate_next_billing_date, row.trial_end_date, row.website, row.notes, row.tags_json,
     row.reminder_days, row.repeat_reminder_enabled, row.repeat_reminder_interval, row.repeat_reminder_window,
-    row.extra_json, row.created_at, row.updated_at,
+    row.cost_sharing_json, row.extra_json, row.created_at, row.updated_at,
   ];
 }
 

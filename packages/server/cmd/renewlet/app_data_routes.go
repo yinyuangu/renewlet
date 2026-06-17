@@ -94,6 +94,7 @@ type subscriptionWriteRequest struct {
 	RepeatReminderEnabled        optionalJSONField[bool]                   `json:"repeatReminderEnabled"`
 	RepeatReminderInterval       optionalJSONField[string]                 `json:"repeatReminderInterval"`
 	RepeatReminderWindow         optionalJSONField[string]                 `json:"repeatReminderWindow"`
+	CostSharing                  optionalJSONField[map[string]interface{}] `json:"costSharing"`
 	Extra                        optionalJSONField[map[string]interface{}] `json:"extra"`
 }
 
@@ -483,7 +484,7 @@ func (r subscriptionWriteRequest) HasChanges() bool {
 		r.Pinned.Set || r.PublicHidden.Set || r.PaymentMethod.Set || r.StartDate.Set || r.NextBillingDate.Set ||
 		r.AutoRenew.Set || r.AutoCalculateNextBillingDate.Set || r.TrialEndDate.Set || r.Website.Set || r.Notes.Set ||
 		r.Tags.Set || r.ReminderDays.Set || r.RepeatReminderEnabled.Set || r.RepeatReminderInterval.Set ||
-		r.RepeatReminderWindow.Set || r.Extra.Set
+		r.RepeatReminderWindow.Set || r.CostSharing.Set || r.Extra.Set
 }
 
 func applySubscriptionWriteRequest(record *core.Record, body subscriptionWriteRequest, create bool) error {
@@ -565,6 +566,9 @@ func applySubscriptionWriteRequest(record *core.Record, body subscriptionWriteRe
 	if err := setStringRecordField(record, "repeatReminderWindow", body.RepeatReminderWindow, create, false, true); err != nil {
 		return err
 	}
+	if err := setNullableMapRecordField(record, "costSharing", body.CostSharing, false); err != nil {
+		return err
+	}
 	if err := setMapRecordField(record, "extra", body.Extra, false); err != nil {
 		return err
 	}
@@ -574,6 +578,9 @@ func applySubscriptionWriteRequest(record *core.Record, body subscriptionWriteRe
 		}
 		if !body.Extra.Set {
 			record.Set("extra", emptyJSONPayload{})
+		}
+		if !body.CostSharing.Set {
+			record.Set("costSharing", emptyJSONPayload{})
 		}
 	}
 	return nil
@@ -670,6 +677,21 @@ func setMapRecordField(record *core.Record, name string, field optionalJSONField
 	}
 	if field.Null {
 		return fmt.Errorf("%s_REQUIRED", strings.ToUpper(name))
+	}
+	record.Set(name, field.Value)
+	return nil
+}
+
+func setNullableMapRecordField(record *core.Record, name string, field optionalJSONField[map[string]interface{}], required bool) error {
+	if !field.Set {
+		if required {
+			return fmt.Errorf("%s_REQUIRED", strings.ToUpper(name))
+		}
+		return nil
+	}
+	if field.Null {
+		record.Set(name, emptyJSONPayload{})
+		return nil
 	}
 	record.Set(name, field.Value)
 	return nil

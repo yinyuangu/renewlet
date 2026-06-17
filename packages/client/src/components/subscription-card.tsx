@@ -55,6 +55,7 @@ import { SubscriptionLogo } from '@/components/subscription-logo';
 import { SubscriptionStatusBadge } from '@/components/subscription-status-badge';
 import { formatBillingCycleLabel, isOneTimeBuyout, isOneTimeFixedTerm } from '@/lib/subscription-billing';
 import { isManualRenewEligible } from '@renewlet/shared/subscription-renewal';
+import { calculateCostSharingSummary } from '@renewlet/shared/cost-sharing';
 
 export type SubscriptionCardLookup = ReadonlyMap<string, ConfigItem>;
 
@@ -155,6 +156,7 @@ export function SubscriptionCard({
   const hasCalendarEvent = !isBuyout;
   const canManualRenew = Boolean(onRenew) && isManualRenewEligible(subscription);
   const billingCycleLabel = formatBillingCycleLabel(subscription, locale);
+  const costSharingSummary = calculateCostSharingSummary(subscription.costSharing, subscription.price);
   const renewalBadgeLabel = isOneTime
     ? localizedLabel(CYCLE_LABELS["one-time"], locale)
     : subscription.autoRenew
@@ -224,6 +226,14 @@ export function SubscriptionCard({
           text: paymentMethodLabel,
           tone: "muted" as const,
           truncate: true,
+        }]
+      : []),
+    ...(costSharingSummary.enabled
+      ? [{
+          key: "cost-sharing",
+          icon: <CreditCard className="h-3.5 w-3.5 shrink-0" />,
+          text: t("subscription.costSharing.yourShare") + " " + formatCurrency(costSharingSummary.yourShare, subscription.currency),
+          tone: "muted" as const,
         }]
       : []),
     ...(relativeBillingText

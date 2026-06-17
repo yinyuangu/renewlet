@@ -84,6 +84,7 @@ export interface SubscriptionRow {
   repeat_reminder_enabled: number;
   repeat_reminder_interval: string;
   repeat_reminder_window: string;
+  cost_sharing_json?: string;
   extra_json: string;
   created_at: string;
   updated_at: string;

@@ -310,6 +310,7 @@ func ensureSubscriptionsCollection(app core.App, users *core.Collection) error {
 			&core.URLField{Name: "website"},
 			&core.TextField{Name: "notes", Max: 5000},
 			&core.JSONField{Name: "tags", MaxSize: maxSubscriptionTagsFieldSize},
+			&core.JSONField{Name: "costSharing", MaxSize: 65536},
 			&core.JSONField{Name: "extra", MaxSize: 65536},
 			&core.NumberField{Name: "reminderDays", OnlyInt: true, Min: types.Pointer(float64(disabledReminderDays)), Max: types.Pointer(float64(maxReminderDays))},
 			&core.BoolField{Name: "repeatReminderEnabled"},

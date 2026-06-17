@@ -12,6 +12,7 @@ import {
   MAX_SUBSCRIPTION_TAGS,
   type SubscriptionDraft,
 } from "@/types/subscription";
+import { costSharingCustomTotalMatches } from "@renewlet/shared/cost-sharing";
 import type { SubscriptionFormState } from "@/types/subscription-form";
 import {
   DEFAULT_NOTIFICATION_REMINDER_DAYS,
@@ -178,6 +179,16 @@ export function getSubscriptionDraftValidationError(formData: SubscriptionFormSt
   if (formData.billingCycle === "one-time" && formData.oneTimeMode === "term" && parsePositiveIntegerInput(formData.oneTimeTermCount) === null) {
     return translate(locale, "subscription.validation.oneTimeTermInvalid");
   }
+  if (formData.costSharing?.enabled) {
+    const price = parseNonNegativeFiniteNumberInput(formData.price);
+    if (
+      price === null ||
+      !formData.costSharing.members.some((member) => member.included) ||
+      !costSharingCustomTotalMatches(formData.costSharing, price)
+    ) {
+      return translate(locale, "subscription.validation.costSharingInvalid");
+    }
+  }
   if (!isOptionalHttpUrl(formData.website)) return translate(locale, "subscription.validation.websiteInvalid");
   const tagsError = getTagsValidationError(formData.tags);
   if (tagsError) return tagsError;
@@ -239,6 +250,7 @@ export function toSubscriptionDraft(formData: SubscriptionFormState): Subscripti
     repeatReminderEnabled,
     repeatReminderInterval: formData.repeatReminderInterval,
     repeatReminderWindow: formData.repeatReminderWindow,
+    costSharing: formData.costSharing?.enabled ? formData.costSharing : undefined,
     website: formData.website || undefined,
     notes: formData.notes || undefined,
     tags: normalizeTagsArray(formData.tags),

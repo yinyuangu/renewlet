@@ -29,6 +29,7 @@
     "./built-in-icons": "./src/built-in-icons.ts",
     "./built-in-icon-index-builder": "./src/built-in-icon-index-builder.ts",
     "./calendar-events": "./src/calendar-events.ts",
+    "./cost-sharing": "./src/cost-sharing.ts",
     "./contract-fixtures": "./src/contract-fixtures.ts",
     "./favicon-domains": "./src/favicon-domains.ts",
     "./media-resolver": "./src/media-resolver.ts",

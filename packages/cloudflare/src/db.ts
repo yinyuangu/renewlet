@@ -59,6 +59,7 @@ const subscriptionColumnNames = [
   "repeat_reminder_enabled",
   "repeat_reminder_interval",
   "repeat_reminder_window",
+  "cost_sharing_json",
   "extra_json",
   "created_at",
   "updated_at",
@@ -234,6 +235,7 @@ export async function putCustomConfig(env: Env, userId: string, config: unknown)
 /** 将 D1 订阅行转换为公开 API 形状；这是 Worker 订阅响应的唯一出站契约门。 */
 export function toApiSubscription(row: SubscriptionRow): ApiSubscription {
   const tags = parseStringArray(row.tags_json);
+  const costSharing = parseJsonObject(row.cost_sharing_json ?? "{}");
   const extra = parseJsonObject(row.extra_json);
   // D1 行使用 snake_case/整数布尔；所有出站数据都在这里重新过 shared schema，避免前端和 Worker 分叉。
   const normalized = {
@@ -263,6 +265,7 @@ export function toApiSubscription(row: SubscriptionRow): ApiSubscription {
     repeatReminderEnabled: intToBool(row.repeat_reminder_enabled),
     repeatReminderInterval: row.repeat_reminder_interval,
     repeatReminderWindow: row.repeat_reminder_window,
+    ...(Object.keys(costSharing).length > 0 ? { costSharing } : {}),
     ...(Object.keys(extra).length > 0 ? { extra } : {}),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
