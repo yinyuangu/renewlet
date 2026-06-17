@@ -104,22 +104,29 @@ function CostSharingFields({
   update,
   error,
   currencyOptions,
+  currencyConvert,
 }: {
   id: (name: string) => string;
   formData: SubscriptionFormState;
   update: <K extends keyof SubscriptionFormState>(key: K, value: SubscriptionFormState[K]) => void;
   error?: string | undefined;
   currencyOptions: SearchableSelectOption[];
+  currencyConvert?: ((amount: number, fromCurrency: string, toCurrency: string) => number) | undefined;
 }) {
   const { t, formatCurrency } = useI18n();
   const costSharing = formData.costSharing;
   const price = Number(formData.price);
   const total = Number.isFinite(price) && price >= 0 ? price : 0;
-  const summary = calculateCostSharingSummary(costSharing, total);
+  const summary = calculateCostSharingSummary(costSharing, total, { baseCurrency: formData.currency, convert: currencyConvert });
 
   const setCostSharing = (next: CostSharing | undefined) => update("costSharing", next ? normalizeCostSharingSelection(next) : undefined);
   const enabled = Boolean(costSharing?.enabled);
   const members = costSharing?.members ?? [];
+  const memberShareInCurrency = (member: CostSharingMember) => {
+    const memberCurrency = member.currency ?? formData.currency;
+    const baseShare = members.length > 0 ? total / members.length : 0;
+    return currencyConvert ? currencyConvert(baseShare, formData.currency, memberCurrency) : baseShare;
+  };
 
   const updateMember = (memberId: string, patch: Partial<CostSharingMember>) => {
     if (!costSharing) return;
@@ -233,31 +240,31 @@ function CostSharingFields({
                       className="h-9 border-border bg-secondary px-2 font-semibold sm:text-right"
                       aria-label={t("subscription.costSharing.customAmount")}
                     />
-                    <SearchableSelect
+                    <MemberCurrencySelect
                       value={member.currency ?? formData.currency}
                       onValueChange={(value) => updateMember(member.id, { currency: value })}
                       options={currencyOptions}
+                      ariaLabel={t("subscription.costSharing.memberCurrency")}
                       placeholder={t("subscription.placeholder.currency")}
                       searchPlaceholder={t("subscription.search.currency")}
                       emptyMessage={t("subscription.empty.currency")}
-                      className="h-9 border-border bg-secondary px-2 text-sm font-semibold"
-                      contentClassName="min-w-[16rem]"
-                      aria-label={t("subscription.costSharing.memberCurrency")}
-                      renderValue={(option) => (
-                        <span className="block text-center tracking-wide">{option?.value ?? formData.currency}</span>
-                      )}
-                      renderOption={(option) => (
-                        <span className="flex min-w-0 items-center gap-2">
-                          <span className="shrink-0 font-medium">{option.value}</span>
-                          <span className="min-w-0 truncate text-muted-foreground">{option.label}</span>
-                        </span>
-                      )}
                     />
                   </div>
                 ) : (
-                  <span className="rounded-md bg-secondary px-2.5 py-2 text-sm font-semibold text-foreground sm:text-right">
-                    {members.length > 0 ? formatCurrency(total / members.length, formData.currency) : formatCurrency(0, formData.currency)}
-                  </span>
+                  <div className="grid grid-cols-[minmax(0,1fr)_5.5rem] gap-1.5">
+                    <span className="truncate rounded-md bg-secondary px-2.5 py-2 text-sm font-semibold text-foreground sm:text-right">
+                      {formatCurrency(memberShareInCurrency(member), member.currency ?? formData.currency)}
+                    </span>
+                    <MemberCurrencySelect
+                      value={member.currency ?? formData.currency}
+                      onValueChange={(value) => updateMember(member.id, { currency: value })}
+                      options={currencyOptions}
+                      ariaLabel={t("subscription.costSharing.memberCurrency")}
+                      placeholder={t("subscription.placeholder.currency")}
+                      searchPlaceholder={t("subscription.search.currency")}
+                      emptyMessage={t("subscription.empty.currency")}
+                    />
+                  </div>
                 )}
                 <Button
                   type="button"
@@ -299,6 +306,47 @@ function CostSharingFields({
   );
 }
 
+function MemberCurrencySelect({
+  value,
+  onValueChange,
+  options,
+  ariaLabel,
+  placeholder,
+  searchPlaceholder,
+  emptyMessage,
+}: {
+  value: string;
+  onValueChange: (value: string) => void;
+  options: SearchableSelectOption[];
+  ariaLabel: string;
+  placeholder: string;
+  searchPlaceholder: string;
+  emptyMessage: string;
+}) {
+  return (
+    <SearchableSelect
+      value={value}
+      onValueChange={onValueChange}
+      options={options}
+      placeholder={placeholder}
+      searchPlaceholder={searchPlaceholder}
+      emptyMessage={emptyMessage}
+      className="h-9 border-border bg-secondary px-2 text-sm font-semibold"
+      contentClassName="min-w-[16rem]"
+      aria-label={ariaLabel}
+      renderValue={(option) => (
+        <span className="block text-center tracking-wide">{option?.value ?? value}</span>
+      )}
+      renderOption={(option) => (
+        <span className="flex min-w-0 items-center gap-2">
+          <span className="shrink-0 font-medium">{option.value}</span>
+          <span className="min-w-0 truncate text-muted-foreground">{option.label}</span>
+        </span>
+      )}
+    />
+  );
+}
+
 export const SubscriptionFormFields = memo(function SubscriptionFormFields({
   idPrefix,
   config,
@@ -311,6 +359,7 @@ export const SubscriptionFormFields = memo(function SubscriptionFormFields({
   errors = {},
   onClearFieldError,
   notificationReminderDays,
+  costSharingCurrencyConvert,
 }: SubscriptionFormFieldsProps) {
   const { t, locale, label } = useI18n();
 
@@ -858,6 +907,7 @@ export const SubscriptionFormFields = memo(function SubscriptionFormFields({
         update={update}
         error={errors.costSharing}
         currencyOptions={currencyOptions}
+        currencyConvert={costSharingCurrencyConvert}
       />
 
       <div className="flex items-center justify-between gap-4 rounded-lg border border-border bg-secondary/30 p-3">

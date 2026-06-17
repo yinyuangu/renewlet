@@ -16,6 +16,7 @@ export interface SubscriptionFormFieldsProps {
   errors?: SubscriptionFormErrors | undefined;
   onClearFieldError?: ((field: keyof SubscriptionFormErrors) => void) | undefined;
   notificationReminderDays: number;
+  costSharingCurrencyConvert?: ((amount: number, fromCurrency: string, toCurrency: string) => number) | undefined;
 }
 
 /** 表单错误按 UI 区块聚合，而不是逐 DTO 字段暴露，避免跨字段日期和提醒规则在不同输入上重复显示。 */

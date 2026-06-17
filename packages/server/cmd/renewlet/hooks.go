@@ -347,7 +347,7 @@ func normalizeSubscriptionRecord(record *core.Record) error {
 	}
 	record.Set("tags", tags)
 
-	costSharing, err := normalizeCostSharing(record.Get("costSharing"), price)
+	costSharing, err := normalizeCostSharing(record.Get("costSharing"), price, currency)
 	if err != nil {
 		return err
 	}
@@ -621,7 +621,7 @@ type costSharingMember struct {
 	CustomAmount *float64 `json:"customAmount,omitempty"`
 }
 
-func normalizeCostSharing(value interface{}, price float64) (interface{}, error) {
+func normalizeCostSharing(value interface{}, price float64, baseCurrency string) (interface{}, error) {
 	data, err := jsonBytesFromValue(value)
 	if err != nil || len(bytes.TrimSpace(data)) == 0 || string(bytes.TrimSpace(data)) == "{}" {
 		return emptyJSONPayload{}, err
@@ -644,6 +644,7 @@ func normalizeCostSharing(value interface{}, price float64) (interface{}, error)
 	ids := map[string]struct{}{}
 	includedCount := 0
 	customTotal := 0.0
+	canValidateCustomTotal := true
 	for index := range payload.Members {
 		member := &payload.Members[index]
 		member.ID = strings.TrimSpace(member.ID)
@@ -658,6 +659,9 @@ func normalizeCostSharing(value interface{}, price float64) (interface{}, error)
 		}
 		if member.Currency != "" && !currencyCodeRe.MatchString(member.Currency) {
 			return nil, errors.New("COST_SHARING_MEMBER_CURRENCY_INVALID")
+		}
+		if member.Currency != "" && member.Currency != baseCurrency {
+			canValidateCustomTotal = false
 		}
 		if _, exists := ids[member.ID]; exists {
 			return nil, errors.New("COST_SHARING_MEMBER_DUPLICATE")
@@ -683,7 +687,7 @@ func normalizeCostSharing(value interface{}, price float64) (interface{}, error)
 	if _, ok := ids[payload.SelfMemberID]; !ok {
 		return nil, errors.New("COST_SHARING_SELF_INVALID")
 	}
-	if payload.SplitMode == "custom" && math.Abs(roundMoney(customTotal)-roundMoney(price)) > 0.01 {
+	if payload.SplitMode == "custom" && canValidateCustomTotal && math.Abs(roundMoney(customTotal)-roundMoney(price)) > 0.01 {
 		return nil, errors.New("COST_SHARING_CUSTOM_TOTAL_INVALID")
 	}
 	return payload, nil

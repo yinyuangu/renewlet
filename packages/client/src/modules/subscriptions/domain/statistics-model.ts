@@ -195,7 +195,10 @@ export function buildStatisticsModel({
 
   const amountForStats = (subscription: Subscription): number =>
     costBasis === "personal"
-      ? calculateCostSharingSummary(subscription.costSharing, subscription.price).yourShare
+      ? calculateCostSharingSummary(subscription.costSharing, subscription.price, {
+          baseCurrency: subscription.currency,
+          convert,
+        }).yourShare
       : subscription.price;
   const convertToDefault = (price: number, currency: string) => convert(price, currency, defaultCurrency);
   const calculateMonthlyAmount = (subscription: Subscription): number => {

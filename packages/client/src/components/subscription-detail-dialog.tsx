@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useCustomConfig } from "@/contexts/CustomConfigContext";
+import { useExchangeRates } from "@/hooks/use-exchange-rates";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { useSettings } from "@/hooks/use-settings";
 import { useI18n } from "@/i18n/I18nProvider";
@@ -78,6 +79,7 @@ function SubscriptionDetailContent({
   const { config } = useCustomConfig();
   const { data: settings } = useSettings();
   const { t, locale, label, formatDateOnly, formatCurrency } = useI18n();
+  const { convert } = useExchangeRates(settings?.exchangeRateProvider);
   const category = config.categories.find((item) => item.value === subscription.category);
   const paymentMethod = subscription.paymentMethod
     ? config.paymentMethods.find((item) => item.value === subscription.paymentMethod)
@@ -89,7 +91,10 @@ function SubscriptionDetailContent({
   const isFixedTermOneTime = isOneTimeFixedTerm(subscription);
   const isOneTime = subscription.billingCycle === "one-time";
   const canManualRenew = Boolean(onRenewSubscription) && isManualRenewEligible(subscription);
-  const costSharingSummary = calculateCostSharingSummary(subscription.costSharing, subscription.price);
+  const costSharingSummary = calculateCostSharingSummary(subscription.costSharing, subscription.price, {
+    baseCurrency: subscription.currency,
+    convert,
+  });
   const renewalLabel = isOneTime
     ? t("subscription.renewal.oneTime")
     : subscription.autoRenew

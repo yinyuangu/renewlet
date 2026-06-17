@@ -36,6 +36,7 @@ import {
 } from "@/lib/subscription-form";
 import { useCustomConfig } from "@/contexts/CustomConfigContext";
 import { useDeferredDialogCleanup } from "@/hooks/use-deferred-dialog-cleanup";
+import { useExchangeRates } from "@/hooks/use-exchange-rates";
 import { useSubscriptionFormAutoDates } from "@/hooks/use-subscription-form-auto-dates";
 import { useSettings } from "@/hooks/use-settings";
 import type { Subscription, SubscriptionDraft } from "@/types/subscription";
@@ -84,6 +85,7 @@ export function SubscriptionDialog(props: SubscriptionDialogProps) {
   const { t } = useI18n();
   const statisticCurrency = settings?.defaultCurrency ?? "CNY";
   const notificationReminderDays = settings?.notificationReminderDays ?? DEFAULT_NOTIFICATION_REMINDER_DAYS;
+  const { convert: convertCurrency } = useExchangeRates(settings?.exchangeRateProvider);
 
   // 新建订阅时默认货币：
   // - 优先使用“统计货币”（Settings.defaultCurrency）
@@ -273,7 +275,7 @@ export function SubscriptionDialog(props: SubscriptionDialogProps) {
       if (
         price === null ||
         !nextFormData.costSharing.members.some((member) => member.included) ||
-        !costSharingCustomTotalMatches(nextFormData.costSharing, price)
+        !costSharingCustomTotalMatches(nextFormData.costSharing, price, { baseCurrency: nextFormData.currency, convert: convertCurrency })
       ) {
         errors.costSharing = t("subscription.validation.costSharingInvalid");
       }
@@ -284,7 +286,7 @@ export function SubscriptionDialog(props: SubscriptionDialogProps) {
     }
 
     return errors;
-  }, [t]);
+  }, [convertCurrency, t]);
 
   const clearFieldError = useCallback((field: keyof SubscriptionFormErrors) => {
     setSubmitError(null);
@@ -317,7 +319,7 @@ export function SubscriptionDialog(props: SubscriptionDialogProps) {
     }
 
     setFormErrors({});
-    const draft = toSubscriptionDraft(submissionFormData);
+    const draft = toSubscriptionDraft(submissionFormData, { costSharingCurrencyConvert: convertCurrency });
     if (!draft) {
       setSubmitError(t("subscription.formIncomplete"));
       return;
@@ -419,8 +421,9 @@ export function SubscriptionDialog(props: SubscriptionDialogProps) {
               onFieldChange={handleFieldChange}
               errors={formErrors}
               onClearFieldError={clearFieldError}
-              notificationReminderDays={notificationReminderDays}
-            />
+            notificationReminderDays={notificationReminderDays}
+            costSharingCurrencyConvert={convertCurrency}
+          />
           </div>
 
           <div
