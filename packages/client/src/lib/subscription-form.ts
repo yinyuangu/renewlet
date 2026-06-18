@@ -12,7 +12,7 @@ import {
   MAX_SUBSCRIPTION_TAGS,
   type SubscriptionDraft,
 } from "@/types/subscription";
-import { costSharingCustomTotalMatches } from "@renewlet/shared/cost-sharing";
+import { costSharingCustomAmountsAreValid } from "@renewlet/shared/cost-sharing";
 import type { SubscriptionFormState } from "@/types/subscription-form";
 import {
   DEFAULT_NOTIFICATION_REMINDER_DAYS,
@@ -32,10 +32,6 @@ type SubscriptionDraftBase = Omit<
   SubscriptionDraft,
   "billingCycle" | "customDays" | "customCycleUnit" | "oneTimeTermCount" | "oneTimeTermUnit"
 >;
-
-export interface SubscriptionFormConversionOptions {
-  costSharingCurrencyConvert?: ((amount: number, fromCurrency: string, toCurrency: string) => number) | undefined;
-}
 
 /** 严格解析非负有限数，拒绝 `1e3` 等浏览器/后端口径可能不一致的写法。 */
 export function parseNonNegativeFiniteNumberInput(input: string, max = MAX_PRICE): number | null {
@@ -154,10 +150,7 @@ export function isRenewalDateBeforeStartDate(
 }
 
 /** 返回订阅草稿的首个阻塞性校验错误；用于提交前给用户明确反馈。 */
-export function getSubscriptionDraftValidationError(
-  formData: SubscriptionFormState,
-  options: SubscriptionFormConversionOptions = {},
-): string | null {
+export function getSubscriptionDraftValidationError(formData: SubscriptionFormState): string | null {
   const locale = getApiLocale();
   if (!formData.name.trim()) return translate(locale, "subscription.validation.nameRequired");
   if (!formData.startDate || (formData.billingCycle !== "one-time" && !formData.nextBillingDate)) {
@@ -191,10 +184,7 @@ export function getSubscriptionDraftValidationError(
     if (
       price === null ||
       !formData.costSharing.members.some((member) => member.included) ||
-      !costSharingCustomTotalMatches(formData.costSharing, price, {
-        baseCurrency: formData.currency,
-        convert: options.costSharingCurrencyConvert,
-      })
+      !costSharingCustomAmountsAreValid(formData.costSharing)
     ) {
       return translate(locale, "subscription.validation.costSharingInvalid");
     }
@@ -212,11 +202,8 @@ export function getSubscriptionDraftValidationError(
  * - 非一次性购买若 startDate/nextBillingDate 缺失则返回 null（由调用方决定如何处理）
  * - 该函数不关心“是否允许提交”（例如上传中、必填校验），只负责数据形态转换
  */
-export function toSubscriptionDraft(
-  formData: SubscriptionFormState,
-  options: SubscriptionFormConversionOptions = {},
-): SubscriptionDraft | null {
-  if (getSubscriptionDraftValidationError(formData, options)) return null;
+export function toSubscriptionDraft(formData: SubscriptionFormState): SubscriptionDraft | null {
+  if (getSubscriptionDraftValidationError(formData)) return null;
 
   const price = parseNonNegativeFiniteNumberInput(formData.price);
   const reminderDays = formData.billingCycle === "one-time" && formData.oneTimeMode === "buyout"

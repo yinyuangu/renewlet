@@ -65,7 +65,7 @@ export const messages = [
   msg({ id: "subscription.validation.reminderInvalid", message: "提醒天数必须是不提醒、继承默认值或 0 到 3650 之间的整数" }),
   msg({ id: "subscription.validation.customCycleInvalid", message: "自定义扣费周期必须是 1 到 3650 之间的整数" }),
   msg({ id: "subscription.validation.oneTimeTermInvalid", message: "服务时长必须是 1 到 3650 之间的整数" }),
-  msg({ id: "subscription.validation.costSharingInvalid", message: "请检查共享成员，并确保自定义金额合计等于订阅价格。" }),
+  msg({ id: "subscription.validation.costSharingInvalid", message: "请检查共享成员和自定义金额。" }),
   msg({ id: "subscription.validation.websiteInvalid", message: "网站地址必须使用 http:// 或 https://" }),
   msg({ id: "subscription.validation.tagsTooMany", message: "每个订阅最多支持 {count} 个标签" }),
   msg({ id: "subscription.validation.tagTooLong", message: "单个标签不能超过 {count} 个字符" }),

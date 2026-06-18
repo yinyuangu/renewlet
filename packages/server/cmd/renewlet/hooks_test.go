@@ -361,7 +361,7 @@ func TestNormalizeSubscriptionRecordValidatesCostSharing(t *testing.T) {
 		t.Fatalf("unexpected normalized cost sharing payload: %#v", payload)
 	}
 
-	invalidTotal := base(100, `{
+	flexibleTotal := base(100, `{
 		"enabled": true,
 		"payerMemberId": "me",
 		"selfMemberId": "me",
@@ -371,8 +371,8 @@ func TestNormalizeSubscriptionRecordValidatesCostSharing(t *testing.T) {
 			{"id": "partner", "name": "Partner", "currency": "USD", "included": true, "customAmount": 50}
 		]
 	}`)
-	if err := normalizeSubscriptionRecord(invalidTotal); err == nil || !strings.Contains(err.Error(), "COST_SHARING_CUSTOM_TOTAL_INVALID") {
-		t.Fatalf("expected invalid custom total to fail, got %v", err)
+	if err := normalizeSubscriptionRecord(flexibleTotal); err != nil {
+		t.Fatalf("expected flexible custom total to be accepted: %v", err)
 	}
 }
 

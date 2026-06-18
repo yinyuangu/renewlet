@@ -45,7 +45,7 @@ import { createSubscriptionFormState, type SubscriptionFormState } from "@/types
 import { useI18n } from "@/i18n/I18nProvider";
 import { todayDateOnlyInTimeZone } from "@/lib/time/date-only";
 import { getSystemTimeZone } from "@/lib/time/time-zone";
-import { costSharingCustomTotalMatches } from "@renewlet/shared/cost-sharing";
+import { costSharingCustomAmountsAreValid } from "@renewlet/shared/cost-sharing";
 
 type CreateDialogProps = {
   mode: "create";
@@ -275,7 +275,7 @@ export function SubscriptionDialog(props: SubscriptionDialogProps) {
       if (
         price === null ||
         !nextFormData.costSharing.members.some((member) => member.included) ||
-        !costSharingCustomTotalMatches(nextFormData.costSharing, price, { baseCurrency: nextFormData.currency, convert: convertCurrency })
+        !costSharingCustomAmountsAreValid(nextFormData.costSharing)
       ) {
         errors.costSharing = t("subscription.validation.costSharingInvalid");
       }
@@ -319,7 +319,7 @@ export function SubscriptionDialog(props: SubscriptionDialogProps) {
     }
 
     setFormErrors({});
-    const draft = toSubscriptionDraft(submissionFormData, { costSharingCurrencyConvert: convertCurrency });
+    const draft = toSubscriptionDraft(submissionFormData);
     if (!draft) {
       setSubmitError(t("subscription.formIncomplete"));
       return;

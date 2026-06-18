@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { COST_SHARING_SPLIT_MODES, costSharingCustomTotalMatches } from "../cost-sharing";
+import { COST_SHARING_SPLIT_MODES, costSharingCustomAmountsAreValid } from "../cost-sharing";
 import {
   BILLING_CYCLES,
   CUSTOM_CYCLE_UNITS,
@@ -97,6 +97,9 @@ export const costSharingSchema = z.object({
 }).refine((value) => !value.enabled || value.members.some((member) => member.included), {
   path: ["members"],
   message: "At least one member must be included",
+}).refine((value) => !value.enabled || costSharingCustomAmountsAreValid(value), {
+  path: ["members"],
+  message: "Invalid custom cost sharing amounts",
 });
 export const reminderDaysSchema = z
   .number()
@@ -118,15 +121,6 @@ function oneTimeTermFieldsAreConsistent(value: {
   // 固定服务期必须 count/unit 成对出现；非 one-time 周期带服务期字段会污染统计摊销和到期提醒。
   if (value.billingCycle !== "one-time") return !hasCount && !hasUnit;
   return hasCount === hasUnit;
-}
-
-function costSharingFieldsAreConsistent(value: {
-  price?: number | undefined;
-  costSharing?: z.infer<typeof costSharingSchema> | null | undefined;
-}): boolean {
-  if (!value.costSharing?.enabled || value.price === undefined) return true;
-  // shared schema 不读取用户汇率设置；跨币种 custom 总额只能在前端转换器或后端同币种场景下被严格证明。
-  return costSharingCustomTotalMatches(value.costSharing, value.price);
 }
 
 /**
@@ -173,10 +167,6 @@ export const subscriptionCreateBodySchema = z.object(subscriptionWriteBodyShape)
   .refine(oneTimeTermFieldsAreConsistent, {
     path: ["oneTimeTermCount"],
     message: "Invalid one-time term",
-  })
-  .refine(costSharingFieldsAreConsistent, {
-    path: ["costSharing"],
-    message: "Invalid cost sharing",
   });
 
 export const subscriptionUpdateBodySchema = z.object(subscriptionWriteBodyShape)
@@ -192,10 +182,6 @@ export const subscriptionUpdateBodySchema = z.object(subscriptionWriteBodyShape)
   }, {
     path: ["oneTimeTermCount"],
     message: "Invalid one-time term",
-  })
-  .refine(costSharingFieldsAreConsistent, {
-    path: ["costSharing"],
-    message: "Invalid cost sharing",
   })
   .refine((obj) => Object.keys(obj).length > 0, { message: "Empty payload" });
 

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"math"
 	"strings"
 )
 
@@ -26,7 +25,7 @@ type costSharingMember struct {
 }
 
 // normalizeCostSharing 是 Docker 持久层的 costSharing 契约门；API、SDK 和 Admin UI 写入都必须收敛到 shared wire shape。
-func normalizeCostSharing(value interface{}, price float64, baseCurrency string) (interface{}, error) {
+func normalizeCostSharing(value interface{}) (interface{}, error) {
 	data, err := jsonBytesFromValue(value)
 	if err != nil || len(bytes.TrimSpace(data)) == 0 || string(bytes.TrimSpace(data)) == "{}" {
 		return emptyJSONPayload{}, err
@@ -48,8 +47,6 @@ func normalizeCostSharing(value interface{}, price float64, baseCurrency string)
 	}
 	ids := map[string]struct{}{}
 	includedCount := 0
-	customTotal := 0.0
-	canValidateCustomTotal := true
 	for index := range payload.Members {
 		member := &payload.Members[index]
 		member.ID = strings.TrimSpace(member.ID)
@@ -65,9 +62,6 @@ func normalizeCostSharing(value interface{}, price float64, baseCurrency string)
 		if member.Currency != "" && !currencyCodeRe.MatchString(member.Currency) {
 			return nil, errors.New("COST_SHARING_MEMBER_CURRENCY_INVALID")
 		}
-		if member.Currency != "" && member.Currency != baseCurrency {
-			canValidateCustomTotal = false
-		}
 		if _, exists := ids[member.ID]; exists {
 			return nil, errors.New("COST_SHARING_MEMBER_DUPLICATE")
 		}
@@ -80,7 +74,6 @@ func normalizeCostSharing(value interface{}, price float64, baseCurrency string)
 			if member.CustomAmount == nil || *member.CustomAmount < 0 || *member.CustomAmount > maxSubscriptionPrice {
 				return nil, errors.New("COST_SHARING_CUSTOM_AMOUNT_INVALID")
 			}
-			customTotal += *member.CustomAmount
 		}
 	}
 	if includedCount == 0 {
@@ -92,13 +85,5 @@ func normalizeCostSharing(value interface{}, price float64, baseCurrency string)
 	if _, ok := ids[payload.SelfMemberID]; !ok {
 		return nil, errors.New("COST_SHARING_SELF_INVALID")
 	}
-	// Go hook 没有用户汇率上下文；含异币种成员时只做结构校验，严格总额校验交给有转换器的前端和同币种写入。
-	if payload.SplitMode == "custom" && canValidateCustomTotal && math.Abs(roundMoney(customTotal)-roundMoney(price)) > 0.01 {
-		return nil, errors.New("COST_SHARING_CUSTOM_TOTAL_INVALID")
-	}
 	return payload, nil
-}
-
-func roundMoney(value float64) float64 {
-	return math.Round((value+1e-9)*100) / 100
 }

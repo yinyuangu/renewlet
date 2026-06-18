@@ -37,8 +37,6 @@ export interface CostSharingCalculationOptions {
   convert?: CostSharingCurrencyConverter | undefined;
 }
 
-const MONEY_EPSILON = 0.01;
-
 function roundMoney(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100;
 }
@@ -107,17 +105,10 @@ export function calculateCostSharingSummary(
   };
 }
 
-export function costSharingCustomTotalMatches(
-  costSharing: CostSharing,
-  total: number,
-  options?: CostSharingCalculationOptions,
-): boolean {
+export function costSharingCustomAmountsAreValid(costSharing: CostSharing): boolean {
   if (costSharing.splitMode !== "custom") return true;
-  // 无基础币种时无法证明多币种 custom 总额等于订阅价格；写入层只能校验同币种总额，跨币种由前端带汇率转换器兜住。
-  if (!options?.baseCurrency && costSharing.members.some((member) => member.included && member.currency)) return true;
-  const customTotal = costSharing.members.reduce((sum, member) => {
-    if (!member.included) return sum;
-    return sum + convertMemberAmountToBase(member.customAmount ?? 0, member, options);
-  }, 0);
-  return Math.abs(roundMoney(customTotal) - roundMoney(total)) <= MONEY_EPSILON;
+  return costSharing.members.every((member) => {
+    if (!member.included) return true;
+    return member.customAmount !== undefined && Number.isFinite(member.customAmount) && member.customAmount >= 0;
+  });
 }

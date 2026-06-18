@@ -2871,4 +2871,4 @@ msgstr "Custom amount"
 #. js-lingui-explicit-id
 #: src/i18n/descriptors/subscription.ts:68
 msgid "subscription.validation.costSharingInvalid"
-msgstr "Check sharing members and make sure custom amounts equal the subscription price."
+msgstr "Check sharing members and custom amounts."

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   calculateCostSharingMemberAmount,
   calculateCostSharingSummary,
-  costSharingCustomTotalMatches,
+  costSharingCustomAmountsAreValid,
   type CostSharing,
 } from "./cost-sharing";
 
@@ -58,7 +58,7 @@ describe("cost sharing calculation", () => {
       return amount;
     };
 
-    expect(costSharingCustomTotalMatches(customSharing, 100, { baseCurrency: "USD", convert })).toBe(true);
+    expect(costSharingCustomAmountsAreValid(customSharing)).toBe(true);
     expect(calculateCostSharingSummary(customSharing, 100, { baseCurrency: "USD", convert })).toMatchObject({
       yourShare: 40,
       familyContribution: 60,
@@ -66,25 +66,25 @@ describe("cost sharing calculation", () => {
     });
   });
 
-  it("rejects mismatched same-currency custom totals", () => {
-    expect(costSharingCustomTotalMatches({
+  it("allows custom totals to differ from the subscription price", () => {
+    expect(costSharingCustomAmountsAreValid({
       ...equalSharing,
       splitMode: "custom",
       members: [
         { id: "me", name: "Me", currency: "USD", included: true, customAmount: 40 },
         { id: "partner", name: "Partner", currency: "USD", included: true, customAmount: 50 },
       ],
-    }, 100, { baseCurrency: "USD" })).toBe(false);
+    })).toBe(true);
   });
 
-  it("skips multi-currency custom total checks when no base currency is available", () => {
-    expect(costSharingCustomTotalMatches({
+  it("rejects missing custom amounts for included members", () => {
+    expect(costSharingCustomAmountsAreValid({
       ...equalSharing,
       splitMode: "custom",
       members: [
         { id: "me", name: "Me", currency: "USD", included: true, customAmount: 40 },
-        { id: "partner", name: "Partner", currency: "CNY", included: true, customAmount: 50 },
+        { id: "partner", name: "Partner", currency: "CNY", included: true },
       ],
-    }, 100)).toBe(true);
+    })).toBe(false);
   });
 });

@@ -288,7 +288,7 @@ describe("subscription-form", () => {
     });
   });
 
-  it("keeps valid cost sharing drafts after currency conversion", () => {
+  it("keeps valid custom cost sharing drafts with member currencies", () => {
     const form = createSubscriptionFormState({
       name: "Family Plan",
       price: "100",
@@ -306,16 +306,12 @@ describe("subscription-form", () => {
         ],
       },
     });
-    const costSharingCurrencyConvert = (amount: number, fromCurrency: string, toCurrency: string) => {
-      if (fromCurrency === "CNY" && toCurrency === "USD") return amount / 7;
-      return amount;
-    };
 
-    expect(getSubscriptionDraftValidationError(form, { costSharingCurrencyConvert })).toBeNull();
-    expect(toSubscriptionDraft(form, { costSharingCurrencyConvert })?.costSharing).toEqual(form.costSharing);
+    expect(getSubscriptionDraftValidationError(form)).toBeNull();
+    expect(toSubscriptionDraft(form)?.costSharing).toEqual(form.costSharing);
   });
 
-  it("rejects custom cost sharing totals that do not match the subscription price", () => {
+  it("allows custom cost sharing totals to differ from the subscription price", () => {
     const form = createSubscriptionFormState({
       name: "Broken Family Plan",
       price: "100",
@@ -334,7 +330,7 @@ describe("subscription-form", () => {
       },
     });
 
-    expect(getSubscriptionDraftValidationError(form)).not.toBeNull();
-    expect(toSubscriptionDraft(form)).toBeNull();
+    expect(getSubscriptionDraftValidationError(form)).toBeNull();
+    expect(toSubscriptionDraft(form)?.costSharing).toEqual(form.costSharing);
   });
 });

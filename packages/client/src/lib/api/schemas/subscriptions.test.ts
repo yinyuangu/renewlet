@@ -138,7 +138,7 @@ describe("subscription API schemas", () => {
     }
   });
 
-  it("accepts equal and matching custom cost sharing payloads", () => {
+  it("accepts equal and custom cost sharing payloads", () => {
     const equalSharing = {
       enabled: true,
       payerMemberId: "self",
@@ -179,7 +179,7 @@ describe("subscription API schemas", () => {
     }).success).toBe(false);
   });
 
-  it("rejects invalid cost sharing members and custom totals", () => {
+  it("rejects invalid cost sharing members and custom amount shapes", () => {
     const baseSharing = {
       enabled: true,
       payerMemberId: "self",
@@ -208,11 +208,22 @@ describe("subscription API schemas", () => {
         ...baseSharing,
         splitMode: "custom",
         members: [
-          { id: "self", name: "Me", included: true, customAmount: 0.1 },
+          { id: "self", name: "Me", included: true },
           { id: "partner", name: "Partner", included: true, customAmount: 0.1 },
         ],
       },
     }).success).toBe(false);
+    expect(subscriptionCreateBodySchema.safeParse({
+      ...validSubscriptionCreateBody,
+      costSharing: {
+        ...baseSharing,
+        splitMode: "custom",
+        members: [
+          { id: "self", name: "Me", included: true, customAmount: 0.1 },
+          { id: "partner", name: "Partner", included: true, customAmount: 0.1 },
+        ],
+      },
+    }).success).toBe(true);
   });
 
   it("accepts expired as a first-class subscription status", () => {

@@ -2871,4 +2871,4 @@ msgstr "自定义金额"
 #. js-lingui-explicit-id
 #: src/i18n/descriptors/subscription.ts:68
 msgid "subscription.validation.costSharingInvalid"
-msgstr "请检查共享成员，并确保自定义金额合计等于订阅价格。"
+msgstr "请检查共享成员和自定义金额。"

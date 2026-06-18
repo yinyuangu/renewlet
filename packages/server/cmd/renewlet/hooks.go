@@ -346,7 +346,7 @@ func normalizeSubscriptionRecord(record *core.Record) error {
 	}
 	record.Set("tags", tags)
 
-	costSharing, err := normalizeCostSharing(record.Get("costSharing"), price, currency)
+	costSharing, err := normalizeCostSharing(record.Get("costSharing"))
 	if err != nil {
 		return err
 	}
