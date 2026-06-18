@@ -354,12 +354,9 @@ describe("subscription statistics models", () => {
       nextBillingDate: assertDateOnly("2026-01-05"),
       costSharing: {
         enabled: true,
-        payerMemberId: "me",
-        selfMemberId: "me",
         splitMode: "custom",
         members: [
-          { id: "me", name: "Me", currency: "USD", included: true, customAmount: 40 },
-          { id: "partner", name: "Partner", currency: "USD", included: true, customAmount: 60 },
+          { id: "partner", name: "Partner", currency: "USD", customAmount: 60 },
         ],
       },
     });

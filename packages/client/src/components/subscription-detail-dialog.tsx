@@ -154,8 +154,8 @@ function SubscriptionDetailContent({
             <DetailRow label={t("subscription.field.price")}>
               <span className="font-semibold">{formatCurrency(costSharingSummary.total, subscription.currency)}</span>
             </DetailRow>
-            <DetailRow label={t("subscription.costSharing.familyContribution")}>
-              <span className="font-semibold text-warning">{formatCurrency(costSharingSummary.familyContribution, subscription.currency)}</span>
+            <DetailRow label={t("subscription.costSharing.memberTotal")}>
+              <span className="font-semibold text-warning">{formatCurrency(costSharingSummary.memberTotal, subscription.currency)}</span>
             </DetailRow>
             <DetailRow label={t("subscription.costSharing.yourShare")}>
               <span className="font-semibold text-primary">{formatCurrency(costSharingSummary.yourShare, subscription.currency)}</span>

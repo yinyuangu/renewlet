@@ -107,6 +107,7 @@ type SubscriptionGridProps = {
   viewMode: "grid" | "list";
   timeZone: string;
   inheritedReminderDays: number;
+  costSharingCurrencyConvert: (amount: number, fromCurrency: string, toCurrency: string) => number;
   categoryByValue: SubscriptionCardLookup;
   paymentMethodByValue: SubscriptionCardLookup;
   onEdit: (id: string) => void;
@@ -122,6 +123,7 @@ function SubscriptionGrid({
   viewMode,
   timeZone,
   inheritedReminderDays,
+  costSharingCurrencyConvert,
   categoryByValue,
   paymentMethodByValue,
   onEdit,
@@ -160,6 +162,7 @@ function SubscriptionGrid({
               viewMode={viewMode}
               timeZone={timeZone}
               inheritedReminderDays={inheritedReminderDays}
+              costSharingCurrencyConvert={costSharingCurrencyConvert}
               categoryByValue={categoryByValue}
               paymentMethodByValue={paymentMethodByValue}
               onEdit={onEdit}
@@ -233,7 +236,7 @@ function SubscriptionGrid({
   } = useSubscriptionFilters(subscriptions, { defaultCurrency, convert, locale, timeZone });
   const settings = settingsQuery.data ?? DEFAULT_SETTINGS;
   const { exportToJSON, exportToJSONWithSecrets, exportToCSV } =
-    useSubscriptionExport(filteredSubscriptions, subscriptions, config, settings, locale, timeZone);
+    useSubscriptionExport(filteredSubscriptions, subscriptions, config, settings, locale, timeZone, convert);
   const selectedDetailSubscription = useMemo(
     () => subscriptions.find((item) => item.id === detailSubscriptionId) ?? null,
     [detailSubscriptionId, subscriptions],
@@ -587,6 +590,7 @@ function SubscriptionGrid({
               viewMode={viewMode}
               timeZone={timeZone}
               inheritedReminderDays={inheritedReminderDays}
+              costSharingCurrencyConvert={convert}
               categoryByValue={categoryByValue}
               paymentMethodByValue={paymentMethodByValue}
               onEdit={handleEditSubscription}

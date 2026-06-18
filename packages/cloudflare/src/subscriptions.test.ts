@@ -170,12 +170,10 @@ describe("Cloudflare subscription mapper", () => {
   it("round-trips cost sharing through the D1 row mapper", () => {
     const costSharing = {
       enabled: true,
-      payerMemberId: "me",
-      selfMemberId: "me",
       splitMode: "custom" as const,
       members: [
-        { id: "me", name: "Me", currency: "USD", included: true, customAmount: 40 },
-        { id: "partner", name: "Partner", currency: "USD", included: true, customAmount: 60 },
+        { id: "partner", name: "Partner", currency: "USD", customAmount: 40 },
+        { id: "child", name: "Child", currency: "USD", customAmount: 60 },
       ],
     };
     const row = toSubscriptionRow("sub_shared", "usr_custom", subscriptionBody({
@@ -255,6 +253,7 @@ describe("Cloudflare subscription mapper", () => {
     const notificationIndexesMigration = readFileSync(resolve("migrations/0016_notification_scheduler_indexes.sql"), "utf8");
     const schedulerStateMigration = readFileSync(resolve("migrations/0017_subscription_scheduler_state.sql"), "utf8");
     const costSharingMigration = readFileSync(resolve("migrations/0018_subscription_cost_sharing.sql"), "utf8");
+    const costSharingCurrentUserPayerMigration = readFileSync(resolve("migrations/0019_subscription_cost_sharing_current_user_payer.sql"), "utf8");
 
     expect(initialMigration).not.toContain("custom_cycle_unit");
     expect(initialMigration).not.toContain("one_time_term");
@@ -289,5 +288,8 @@ describe("Cloudflare subscription mapper", () => {
     expect(schedulerStateMigration).not.toContain("_v2");
     expect(schedulerStateMigration).not.toContain("legacy");
     expect(costSharingMigration.trim()).toBe("ALTER TABLE subscriptions ADD COLUMN cost_sharing_json TEXT NOT NULL DEFAULT '{}';");
+    expect(costSharingCurrentUserPayerMigration).toContain("json_remove(cost_sharing_json, '$.payerMemberId', '$.selfMemberId')");
+    expect(costSharingCurrentUserPayerMigration).toContain("json_remove(value, '$.included')");
+    expect(costSharingCurrentUserPayerMigration).toContain("json_extract(value, '$.id') != json_extract(cost_sharing_json, '$.selfMemberId')");
   });
 });

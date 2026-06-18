@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { COST_SHARING_SPLIT_MODES, costSharingCustomTotalMatches } from "../cost-sharing";
+import { COST_SHARING_SPLIT_MODES, costSharingCustomAmountsAreValid } from "../cost-sharing";
 import {
   BILLING_CYCLES,
   CUSTOM_CYCLE_UNITS,
@@ -72,31 +72,28 @@ const optionalLogoReferenceSchema = logoReferenceSchema.nullable().optional();
 
 const tagsSchema = z.array(z.string().trim().min(1).max(40)).max(100).optional();
 const extraSchema = z.record(z.string(), z.unknown()).optional();
-// costSharing 是 shared wire shape：前端表单、Go hook 和 Worker D1 mapper 都必须按这组字段持久化。
+// costSharing 是“当前用户默认付款、成员只代表其他人”的 shared wire shape；旧身份字段必须在迁移层清理，写入层拒绝。
 const costSharingMemberSchema = z.object({
   id: z.string().trim().min(1).max(80),
   name: z.string().trim().min(1).max(80),
   note: z.string().trim().max(500).optional(),
   currency: z.string().trim().regex(/^[A-Z]{3}$/).optional(),
-  included: z.boolean(),
   customAmount: z.number().finite().nonnegative().max(1_000_000_000).optional(),
 }).strict();
 export const costSharingSchema = z.object({
   enabled: z.boolean(),
-  payerMemberId: z.string().trim().min(1).max(80),
-  selfMemberId: z.string().trim().min(1).max(80),
   splitMode: z.enum(COST_SHARING_SPLIT_MODES),
   members: z.array(costSharingMemberSchema).min(1).max(20),
 }).strict().refine((value) => {
   if (!value.enabled) return true;
   const ids = new Set(value.members.map((member) => member.id));
-  return ids.size === value.members.length && ids.has(value.selfMemberId) && ids.has(value.payerMemberId);
+  return ids.size === value.members.length;
 }, {
   path: ["members"],
   message: "Invalid cost sharing members",
-}).refine((value) => !value.enabled || value.members.some((member) => member.included), {
+}).refine((value) => !value.enabled || costSharingCustomAmountsAreValid(value), {
   path: ["members"],
-  message: "At least one member must be included",
+  message: "Invalid custom cost sharing amounts",
 });
 export const reminderDaysSchema = z
   .number()
@@ -118,15 +115,6 @@ function oneTimeTermFieldsAreConsistent(value: {
   // 固定服务期必须 count/unit 成对出现；非 one-time 周期带服务期字段会污染统计摊销和到期提醒。
   if (value.billingCycle !== "one-time") return !hasCount && !hasUnit;
   return hasCount === hasUnit;
-}
-
-function costSharingFieldsAreConsistent(value: {
-  price?: number | undefined;
-  costSharing?: z.infer<typeof costSharingSchema> | null | undefined;
-}): boolean {
-  if (!value.costSharing?.enabled || value.price === undefined) return true;
-  // shared schema 不读取用户汇率设置；跨币种 custom 总额只能在前端转换器或后端同币种场景下被严格证明。
-  return costSharingCustomTotalMatches(value.costSharing, value.price);
 }
 
 /**
@@ -173,10 +161,6 @@ export const subscriptionCreateBodySchema = z.object(subscriptionWriteBodyShape)
   .refine(oneTimeTermFieldsAreConsistent, {
     path: ["oneTimeTermCount"],
     message: "Invalid one-time term",
-  })
-  .refine(costSharingFieldsAreConsistent, {
-    path: ["costSharing"],
-    message: "Invalid cost sharing",
   });
 
 export const subscriptionUpdateBodySchema = z.object(subscriptionWriteBodyShape)
@@ -192,10 +176,6 @@ export const subscriptionUpdateBodySchema = z.object(subscriptionWriteBodyShape)
   }, {
     path: ["oneTimeTermCount"],
     message: "Invalid one-time term",
-  })
-  .refine(costSharingFieldsAreConsistent, {
-    path: ["costSharing"],
-    message: "Invalid cost sharing",
   })
   .refine((obj) => Object.keys(obj).length > 0, { message: "Empty payload" });
 

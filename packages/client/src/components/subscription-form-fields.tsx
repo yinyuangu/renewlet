@@ -70,6 +70,8 @@ export const SubscriptionFormFields = memo(function SubscriptionFormFields({
   onClearFieldError,
   notificationReminderDays,
   costSharingCurrencyConvert,
+  onManageCostSharingMembers,
+  costSharingManageMembersButtonRef,
 }: SubscriptionFormFieldsProps) {
   const { t, locale, label } = useI18n();
 
@@ -618,6 +620,8 @@ export const SubscriptionFormFields = memo(function SubscriptionFormFields({
         error={errors.costSharing}
         currencyOptions={currencyOptions}
         currencyConvert={costSharingCurrencyConvert}
+        onManageMembers={onManageCostSharingMembers}
+        manageMembersButtonRef={costSharingManageMembersButtonRef}
       />
 
       <div className="flex items-center justify-between gap-4 rounded-lg border border-border bg-secondary/30 p-3">

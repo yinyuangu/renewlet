@@ -176,6 +176,7 @@ export default function Index() {
                     subscription={sub}
                     timeZone={timeZone}
                     inheritedReminderDays={inheritedReminderDays}
+                    costSharingCurrencyConvert={convert}
                     categoryByValue={categoryByValue}
                     paymentMethodByValue={paymentMethodByValue}
                     onEdit={handleEditSubscription}

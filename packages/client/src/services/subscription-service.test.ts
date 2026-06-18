@@ -126,24 +126,21 @@ describe("subscription service normalization", () => {
     });
   });
 
-  it("normalizes cost sharing participation at the service boundary", () => {
+  it("passes the current-user-payer cost sharing shape through the service boundary", () => {
     const subscription = fromApiSubscription({
       ...apiSubscription,
       price: 100,
       costSharing: {
         enabled: true,
-        payerMemberId: "me",
-        selfMemberId: "me",
         splitMode: "custom",
         members: [
-          { id: "me", name: "Me", included: true, customAmount: 40 },
-          { id: "partner", name: "Partner", included: false, customAmount: 60 },
+          { id: "partner", name: "Partner", customAmount: 40 },
+          { id: "child", name: "Child", customAmount: 60 },
         ],
       },
     });
     const payload = toSubscriptionWritePayload(subscription);
 
-    expect(subscription.costSharing?.members.map((member) => member.included)).toEqual([true, true]);
     expect(payload.costSharing).toEqual(subscription.costSharing);
     expect(toSubscriptionWritePayload(fromApiSubscription(apiSubscription)).costSharing).toBeNull();
   });

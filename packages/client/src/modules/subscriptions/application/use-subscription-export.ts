@@ -16,6 +16,7 @@ import type { CustomConfig } from "@/types/config";
 import type { AppSettings, Subscription } from "@/types/subscription";
 import { exportRenewletBackup } from "@/modules/import-export/domain/renewlet-export";
 import { buildSubscriptionsCsv } from "../domain/subscription-export";
+import type { CostSharingCurrencyConverter } from "@renewlet/shared/cost-sharing";
 
 /** 订阅导出控制器。 */
 export function useSubscriptionExport(
@@ -25,6 +26,7 @@ export function useSubscriptionExport(
   settings: AppSettings,
   locale: Locale,
   timeZone = "UTC",
+  costSharingCurrencyConvert?: CostSharingCurrencyConverter | undefined,
 ) {
   const categoryLabelByValue = useMemo(
     () => new Map(config.categories.map((category) => [category.value, localizedLabel(category.labels, locale)])),
@@ -50,6 +52,7 @@ export function useSubscriptionExport(
       statusLabelByValue,
       locale,
       today,
+      costSharingCalculation: { convert: costSharingCurrencyConvert },
     });
     const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8" });
     downloadFile(blob, "subscriptions.csv");
