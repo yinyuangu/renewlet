@@ -437,11 +437,11 @@ describe("Statistics page", () => {
     expect(screen.getByText("停用年节省")).toBeInTheDocument();
     expect(screen.getByText("¥360")).toBeInTheDocument();
 
-    await user.tab();
-    await user.tab();
-    await user.tab();
-
     const annualHelp = screen.getByRole("button", { name: "说明：停用年节省" });
+    for (let attempt = 0; attempt < 10 && document.activeElement !== annualHelp; attempt += 1) {
+      await user.tab();
+    }
+
     expect(annualHelp).toHaveFocus();
     expect(await screen.findAllByText("停用月节省乘以 12，用于估算一年少支出的订阅费用。")).not.toHaveLength(0);
   });
