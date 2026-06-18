@@ -69,6 +69,36 @@ describe("subscription-export", () => {
     expect(csv).toContain('"每 3 年"');
     expect(csv).not.toContain('"自定义"');
   });
+
+  it("exports cost sharing amounts converted to each subscription currency", () => {
+    const csv = buildSubscriptionsCsv([makeSubscription({
+      price: 50,
+      currency: "CNY",
+      costSharing: {
+        enabled: true,
+        splitMode: "custom",
+        members: [
+          { id: "eur", name: "EUR member", currency: "EUR", customAmount: 10 },
+          { id: "usd", name: "USD member", currency: "USD", customAmount: 10 },
+        ],
+      },
+    })], {
+      categoryLabelByValue: new Map([["productivity", "生产力"]]),
+      statusLabelByValue: new Map([["active", "活跃"]]),
+      locale: "zh-CN",
+      today: assertDateOnly("2026-01-01"),
+      costSharingCalculation: {
+        convert: (amount, from, to) => {
+          if (to !== "CNY") return amount;
+          if (from === "EUR") return amount * 8;
+          if (from === "USD") return amount * 7;
+          return amount;
+        },
+      },
+    });
+
+    expect(csv).toContain('"0","150"');
+  });
 });
 
 function makeSubscription(overrides: Partial<Subscription> = {}): Subscription {

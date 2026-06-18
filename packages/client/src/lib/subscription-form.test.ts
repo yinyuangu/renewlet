@@ -297,12 +297,10 @@ describe("subscription-form", () => {
       nextBillingDate: assertDateOnly("2026-02-01"),
       costSharing: {
         enabled: true,
-        payerMemberId: "me",
-        selfMemberId: "me",
         splitMode: "custom",
         members: [
-          { id: "me", name: "Me", currency: "USD", included: true, customAmount: 40 },
-          { id: "partner", name: "Partner", currency: "CNY", included: true, customAmount: 420 },
+          { id: "partner", name: "Partner", currency: "USD", customAmount: 40 },
+          { id: "child", name: "Child", currency: "CNY", customAmount: 420 },
         ],
       },
     });
@@ -320,12 +318,10 @@ describe("subscription-form", () => {
       nextBillingDate: assertDateOnly("2026-02-01"),
       costSharing: {
         enabled: true,
-        payerMemberId: "me",
-        selfMemberId: "me",
         splitMode: "custom",
         members: [
-          { id: "me", name: "Me", currency: "USD", included: true, customAmount: 40 },
-          { id: "partner", name: "Partner", currency: "USD", included: true, customAmount: 50 },
+          { id: "partner", name: "Partner", currency: "USD", customAmount: 40 },
+          { id: "child", name: "Child", currency: "USD", customAmount: 50 },
         ],
       },
     });

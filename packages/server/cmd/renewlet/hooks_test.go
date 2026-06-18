@@ -338,12 +338,10 @@ func TestNormalizeSubscriptionRecordValidatesCostSharing(t *testing.T) {
 
 	valid := base(100, `{
 		"enabled": true,
-		"payerMemberId": "me",
-		"selfMemberId": "me",
 		"splitMode": "custom",
 		"members": [
-			{"id": "me", "name": "Me", "currency": "USD", "included": true, "customAmount": 40},
-			{"id": "partner", "name": "Partner", "currency": "USD", "included": true, "customAmount": 60}
+			{"id": "partner", "name": "Partner", "currency": "USD", "customAmount": 40},
+			{"id": "child", "name": "Child", "currency": "USD", "customAmount": 60}
 		]
 	}`)
 	if err := normalizeSubscriptionRecord(valid); err != nil {
@@ -363,16 +361,27 @@ func TestNormalizeSubscriptionRecordValidatesCostSharing(t *testing.T) {
 
 	flexibleTotal := base(100, `{
 		"enabled": true,
-		"payerMemberId": "me",
-		"selfMemberId": "me",
 		"splitMode": "custom",
 		"members": [
-			{"id": "me", "name": "Me", "currency": "USD", "included": true, "customAmount": 40},
-			{"id": "partner", "name": "Partner", "currency": "USD", "included": true, "customAmount": 50}
+			{"id": "partner", "name": "Partner", "currency": "USD", "customAmount": 40},
+			{"id": "child", "name": "Child", "currency": "USD", "customAmount": 50}
 		]
 	}`)
 	if err := normalizeSubscriptionRecord(flexibleTotal); err != nil {
 		t.Fatalf("expected flexible custom total to be accepted: %v", err)
+	}
+
+	legacyIdentityFields := base(100, `{
+		"enabled": true,
+		"payerMemberId": "me",
+		"selfMemberId": "me",
+		"splitMode": "custom",
+		"members": [
+			{"id": "partner", "name": "Partner", "currency": "USD", "included": true, "customAmount": 40}
+		]
+	}`)
+	if err := normalizeSubscriptionRecord(legacyIdentityFields); err == nil || !strings.Contains(err.Error(), "COST_SHARING_JSON_INVALID") {
+		t.Fatalf("expected legacy cost sharing identity fields to fail, got %v", err)
 	}
 }
 

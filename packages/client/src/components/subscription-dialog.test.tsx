@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { assertDateOnly } from "@/lib/time/date-only";
-import type { Subscription } from "@/types/subscription";
+import type { CostSharingMember, Subscription, SubscriptionDraft } from "@/types/subscription";
 import { SubscriptionDialog } from "./subscription-dialog";
 
 const mocks = vi.hoisted(() => ({
@@ -79,7 +79,7 @@ function makeSubscription(overrides: Partial<Subscription> = {}): Subscription {
 describe("SubscriptionDialog", () => {
   it("shows field errors on empty create submit instead of relying on native validation", async () => {
     const user = userEvent.setup();
-    const onSubmit = vi.fn();
+    const onSubmit = vi.fn<(subscription: SubscriptionDraft) => void>();
 
     render(
       <TooltipProvider delayDuration={0}>
@@ -142,6 +142,158 @@ describe("SubscriptionDialog", () => {
     expect(scrollRegion).not.toHaveClass("pb-[calc(10rem+env(safe-area-inset-bottom))]");
     expect(footer).toHaveClass("shrink-0");
     expect(footer).not.toHaveClass("absolute");
+  });
+
+  it("keeps cost sharing member rows in a bounded manager view", async () => {
+    const user = userEvent.setup();
+    const onOpenChange = vi.fn();
+    let submittedMembers: CostSharingMember[] = [];
+    const onSubmit = vi.fn<(subscription: Subscription) => void>((subscription) => {
+      submittedMembers = subscription.costSharing?.members ?? [];
+    });
+
+    render(
+      <TooltipProvider delayDuration={0}>
+        <SubscriptionDialog
+          mode="edit"
+          open
+          onOpenChange={onOpenChange}
+          onSubmit={onSubmit}
+          subscription={makeSubscription({
+            price: 50,
+            currency: "CNY",
+            costSharing: {
+              enabled: true,
+              splitMode: "custom",
+              members: [
+                { id: "partner", name: "伴侣", currency: "CNY", customAmount: 10 },
+                { id: "friend", name: "朋友", currency: "CNY", customAmount: 10 },
+              ],
+            },
+          })}
+        />
+      </TooltipProvider>,
+    );
+
+    expect(screen.getByRole("dialog", { name: "编辑订阅" })).toBeInTheDocument();
+    const form = document.querySelector("form");
+    if (!form) throw new Error("Subscription dialog form was not rendered");
+    const nameInput = screen.getByLabelText("服务名称");
+    expect(screen.queryByLabelText("成员名称")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "管理成员" })).toBeInTheDocument();
+    expect(screen.getByTestId("cost-sharing-summary")).toHaveTextContent(/成员合计\s*¥20/);
+    expect(screen.getByTestId("cost-sharing-summary")).toHaveTextContent(/你的份额\s*¥30/);
+    expect(screen.getByTestId("cost-sharing-summary")).toHaveTextContent(/可回收金额\s*¥20/);
+    const formScrollRegion = document.querySelector<HTMLElement>("[data-subscription-dialog-scroll]");
+    if (!formScrollRegion) throw new Error("Subscription dialog scroll region was not rendered");
+    formScrollRegion.scrollTop = 320;
+
+    await user.click(screen.getByRole("button", { name: "管理成员" }));
+    await new Promise((resolve) => window.setTimeout(resolve, 0));
+
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
+    const subscriptionHeader = document.querySelector("[data-subscription-dialog-header]");
+    expect(subscriptionHeader).toHaveTextContent("编辑订阅");
+    expect(subscriptionHeader?.closest('[role="dialog"]')).toHaveAttribute("data-state", "open");
+    const memberDialog = screen.getByRole("dialog", { name: "管理共享成员" });
+    expect(memberDialog).toBeInTheDocument();
+    expect(screen.getAllByRole("dialog", { hidden: true })).toHaveLength(2);
+    expect(form).toContainElement(nameInput);
+    expect(formScrollRegion.scrollTop).toBe(320);
+    expect(within(memberDialog).getByTestId("cost-sharing-members-scroll")).toHaveClass("min-h-0", "flex-1", "overflow-y-auto");
+    const manager = within(memberDialog).getByTestId("cost-sharing-members-view");
+    expect(within(manager).getAllByLabelText("成员名称")).toHaveLength(2);
+    const memberNameInputs = within(manager).getAllByLabelText("成员名称");
+    expect(within(manager).queryByRole("button", { name: "设为我" })).not.toBeInTheDocument();
+    expect(within(manager).queryByRole("button", { name: "设为付款人" })).not.toBeInTheDocument();
+    expect(memberNameInputs[0]!).toHaveFocus();
+    await user.click(memberNameInputs[1]!);
+    expect(memberNameInputs[1]).toHaveFocus();
+    await user.clear(memberNameInputs[1]!);
+    await user.type(memberNameInputs[1]!, "队友");
+    expect(memberNameInputs[1]).toHaveValue("队友");
+    const amountInputs = within(manager).getAllByLabelText("应收金额");
+    await user.clear(amountInputs[1]!);
+    await user.type(amountInputs[1]!, "15");
+    await user.click(within(memberDialog).getByRole("button", { name: "完成" }));
+
+    expect(screen.getByRole("dialog", { name: "编辑订阅" })).toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "管理共享成员" })).not.toBeInTheDocument();
+    expect(formScrollRegion.scrollTop).toBe(320);
+    expect(form).not.toHaveAttribute("inert");
+    expect(form).not.toHaveAttribute("aria-hidden");
+    expect(screen.getByRole("button", { name: "管理成员" })).toHaveFocus();
+    expect(screen.queryByLabelText("成员名称")).not.toBeInTheDocument();
+    expect(screen.getByTestId("cost-sharing-summary")).toHaveTextContent(/成员合计\s*¥25/);
+    expect(screen.getByTestId("cost-sharing-summary")).toHaveTextContent(/你的份额\s*¥25/);
+    expect(screen.getByTestId("cost-sharing-summary")).toHaveTextContent(/可回收金额\s*¥25/);
+
+    await user.click(screen.getByRole("button", { name: "管理成员" }));
+    const reopenedMemberDialog = screen.getByRole("dialog", { name: "管理共享成员" });
+    expect(reopenedMemberDialog).toBeInTheDocument();
+    await user.click(within(reopenedMemberDialog).getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("dialog", { name: "管理共享成员" })).not.toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "编辑订阅" })).toBeInTheDocument();
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
+
+    await user.click(screen.getByRole("button", { name: "管理成员" }));
+    expect(screen.getByRole("dialog", { name: "管理共享成员" })).toBeInTheDocument();
+    const overlays = document.querySelectorAll<HTMLElement>("[data-dialog-overlay]");
+    const topOverlay = overlays.item(overlays.length - 1);
+    if (!topOverlay) throw new Error("Member dialog overlay was not rendered");
+    await user.click(topOverlay);
+    expect(screen.queryByRole("dialog", { name: "管理共享成员" })).not.toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "编辑订阅" })).toBeInTheDocument();
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
+
+    await user.click(screen.getByRole("button", { name: "管理成员" }));
+    expect(screen.getByRole("dialog", { name: "管理共享成员" })).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog", { name: "管理共享成员" })).not.toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "编辑订阅" })).toBeInTheDocument();
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
+
+    await user.click(screen.getByRole("button", { name: "保存修改" }));
+    expect(submittedMembers).toEqual([
+      expect.objectContaining({ id: "partner", customAmount: 10 }),
+      expect.objectContaining({ id: "friend", name: "队友", customAmount: 15 }),
+    ]);
+  });
+
+  it("closes the member manager when the parent subscription dialog closes", async () => {
+    const user = userEvent.setup();
+    const dialogProps = {
+      mode: "edit" as const,
+      onOpenChange: vi.fn(),
+      onSubmit: vi.fn(),
+      subscription: makeSubscription({
+        costSharing: {
+          enabled: true,
+          splitMode: "equal",
+          members: [
+            { id: "partner", name: "伴侣", currency: "CNY" },
+            { id: "friend", name: "朋友", currency: "CNY" },
+          ],
+        },
+      }),
+    };
+    const { rerender } = render(
+      <TooltipProvider delayDuration={0}>
+        <SubscriptionDialog {...dialogProps} open />
+      </TooltipProvider>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "管理成员" }));
+    expect(screen.getByRole("dialog", { name: "管理共享成员" })).toBeInTheDocument();
+
+    rerender(
+      <TooltipProvider delayDuration={0}>
+        <SubscriptionDialog {...dialogProps} open={false} />
+      </TooltipProvider>,
+    );
+
+    expect(screen.queryByRole("dialog", { name: "管理共享成员" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "编辑订阅" })).not.toBeInTheDocument();
   });
 
   it("keeps a manually selected create currency instead of syncing back to the default", async () => {

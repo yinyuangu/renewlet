@@ -183,7 +183,7 @@ export function getSubscriptionDraftValidationError(formData: SubscriptionFormSt
     const price = parseNonNegativeFiniteNumberInput(formData.price);
     if (
       price === null ||
-      !formData.costSharing.members.some((member) => member.included) ||
+      formData.costSharing.members.length === 0 ||
       !costSharingCustomAmountsAreValid(formData.costSharing)
     ) {
       return translate(locale, "subscription.validation.costSharingInvalid");

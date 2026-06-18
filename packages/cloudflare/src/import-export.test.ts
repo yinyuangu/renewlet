@@ -227,12 +227,10 @@ describe("Cloudflare import", () => {
     const { env, db, statements } = envFixture();
     const costSharing = {
       enabled: true,
-      payerMemberId: "self",
-      selfMemberId: "self",
       splitMode: "custom",
       members: [
-        { id: "self", name: "Me", included: true, customAmount: 7 },
-        { id: "partner", name: "Partner", included: true, customAmount: 5 },
+        { id: "partner", name: "Partner", customAmount: 7 },
+        { id: "child", name: "Child", customAmount: 5 },
       ],
     };
     const response = await applyImport(requestFor("/api/app/import/apply", importPayload([

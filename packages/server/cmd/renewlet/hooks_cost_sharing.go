@@ -4,15 +4,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"io"
 	"strings"
 )
 
 type costSharingPayload struct {
-	Enabled       bool                `json:"enabled"`
-	PayerMemberID string              `json:"payerMemberId"`
-	SelfMemberID  string              `json:"selfMemberId"`
-	SplitMode     string              `json:"splitMode"`
-	Members       []costSharingMember `json:"members"`
+	Enabled   bool                `json:"enabled"`
+	SplitMode string              `json:"splitMode"`
+	Members   []costSharingMember `json:"members"`
 }
 
 type costSharingMember struct {
@@ -20,33 +19,34 @@ type costSharingMember struct {
 	Name         string   `json:"name"`
 	Note         string   `json:"note,omitempty"`
 	Currency     string   `json:"currency,omitempty"`
-	Included     bool     `json:"included"`
 	CustomAmount *float64 `json:"customAmount,omitempty"`
 }
 
-// normalizeCostSharing 是 Docker 持久层的 costSharing 契约门；API、SDK 和 Admin UI 写入都必须收敛到 shared wire shape。
+// normalizeCostSharing 是 Docker 持久层的 costSharing 契约门：当前用户固定付款，members 只保存其他人的应收金额。
 func normalizeCostSharing(value interface{}) (interface{}, error) {
 	data, err := jsonBytesFromValue(value)
 	if err != nil || len(bytes.TrimSpace(data)) == 0 || string(bytes.TrimSpace(data)) == "{}" {
 		return emptyJSONPayload{}, err
 	}
 	var payload costSharingPayload
-	if err := json.Unmarshal(data, &payload); err != nil {
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&payload); err != nil {
+		return nil, errors.New("COST_SHARING_JSON_INVALID")
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
 		return nil, errors.New("COST_SHARING_JSON_INVALID")
 	}
 	if !payload.Enabled {
 		return emptyJSONPayload{}, nil
 	}
-	payload.PayerMemberID = strings.TrimSpace(payload.PayerMemberID)
-	payload.SelfMemberID = strings.TrimSpace(payload.SelfMemberID)
 	if payload.SplitMode != "equal" && payload.SplitMode != "custom" {
 		return nil, errors.New("COST_SHARING_SPLIT_MODE_INVALID")
 	}
-	if payload.PayerMemberID == "" || payload.SelfMemberID == "" || len(payload.Members) == 0 || len(payload.Members) > 20 {
+	if len(payload.Members) == 0 || len(payload.Members) > 20 {
 		return nil, errors.New("COST_SHARING_MEMBERS_INVALID")
 	}
 	ids := map[string]struct{}{}
-	includedCount := 0
 	for index := range payload.Members {
 		member := &payload.Members[index]
 		member.ID = strings.TrimSpace(member.ID)
@@ -66,24 +66,11 @@ func normalizeCostSharing(value interface{}) (interface{}, error) {
 			return nil, errors.New("COST_SHARING_MEMBER_DUPLICATE")
 		}
 		ids[member.ID] = struct{}{}
-		if !member.Included {
-			continue
-		}
-		includedCount++
 		if payload.SplitMode == "custom" {
 			if member.CustomAmount == nil || *member.CustomAmount < 0 || *member.CustomAmount > maxSubscriptionPrice {
 				return nil, errors.New("COST_SHARING_CUSTOM_AMOUNT_INVALID")
 			}
 		}
-	}
-	if includedCount == 0 {
-		return nil, errors.New("COST_SHARING_INCLUDED_REQUIRED")
-	}
-	if _, ok := ids[payload.PayerMemberID]; !ok {
-		return nil, errors.New("COST_SHARING_PAYER_INVALID")
-	}
-	if _, ok := ids[payload.SelfMemberID]; !ok {
-		return nil, errors.New("COST_SHARING_SELF_INVALID")
 	}
 	return payload, nil
 }
