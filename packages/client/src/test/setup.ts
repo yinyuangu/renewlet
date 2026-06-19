@@ -1,6 +1,7 @@
 import "@testing-library/jest-dom/vitest";
 import { cleanup } from "@testing-library/react";
 import { afterEach, vi } from "vitest";
+import { EXPLICIT_LOCALE_PREFERENCE_KEY } from "@/i18n/locales";
 
 class ResizeObserverMock {
   observe() {}
@@ -50,7 +51,7 @@ function installStorage(name: "localStorage" | "sessionStorage") {
 vi.stubGlobal("ResizeObserver", ResizeObserverMock);
 installStorage("localStorage");
 installStorage("sessionStorage");
-localStorage.setItem("renewlet_locale", "zh-CN");
+localStorage.setItem(EXPLICIT_LOCALE_PREFERENCE_KEY, "zh-CN");
 Element.prototype.scrollIntoView = vi.fn();
 
 afterEach(() => {
@@ -60,6 +61,6 @@ afterEach(() => {
   installStorage("localStorage");
   installStorage("sessionStorage");
   localStorage.clear();
-  localStorage.setItem("renewlet_locale", "zh-CN");
+  localStorage.setItem(EXPLICIT_LOCALE_PREFERENCE_KEY, "zh-CN");
   sessionStorage.clear();
 });

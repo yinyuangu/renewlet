@@ -38,7 +38,7 @@ import {
 } from "./db";
 import { requireAuth } from "./auth";
 import { HttpError, json, readJson, requestLocale, type AppLocale } from "./http";
-import { serverText } from "./server-i18n";
+import { DEFAULT_SERVER_I18N_LOCALE, serverText } from "./server-i18n";
 import { createStoredZip } from "./zip-store";
 import {
   CloudBackupRemoteError,
@@ -333,7 +333,7 @@ export async function runDueCloudBackups(env: Env, now = new Date()): Promise<vo
 }
 
 function requestLocaleFromDefault(): AppLocale {
-  return "zh-CN";
+  return DEFAULT_SERVER_I18N_LOCALE;
 }
 
 async function configuredCloudBackupTargets(env: Env, userId: string, locale: AppLocale): Promise<{

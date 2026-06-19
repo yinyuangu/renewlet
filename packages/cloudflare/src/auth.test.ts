@@ -1,14 +1,17 @@
 // Worker 认证测试保护账号生命周期边界；D1 细节用 mock 固定，测试只关心 route 安全决策。
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { adminPatchUser, appStatus } from "./auth";
+import { adminPatchUser, appStatus, createInitialAdmin, login } from "./auth";
 import type { Env, UserRow } from "./types";
 
 const mocks = vi.hoisted(() => ({
   enabledAdminCount: vi.fn(),
+  ensureSettings: vi.fn(),
+  findUserByEmail: vi.fn(),
   findUserById: vi.fn(),
   hashPassword: vi.fn(),
   nowIso: vi.fn(),
   sha256: vi.fn(),
+  verifyPassword: vi.fn(),
 }));
 
 vi.mock("./db", async (importOriginal) => {
@@ -16,6 +19,8 @@ vi.mock("./db", async (importOriginal) => {
   return {
     ...actual,
     enabledAdminCount: mocks.enabledAdminCount,
+    ensureSettings: mocks.ensureSettings,
+    findUserByEmail: mocks.findUserByEmail,
     findUserById: mocks.findUserById,
     nowIso: mocks.nowIso,
   };
@@ -27,16 +32,20 @@ vi.mock("./crypto", async (importOriginal) => {
     ...actual,
     hashPassword: mocks.hashPassword,
     sha256: mocks.sha256,
+    verifyPassword: mocks.verifyPassword,
   };
 });
 
 describe("Cloudflare admin password reset boundary", () => {
   beforeEach(() => {
     mocks.enabledAdminCount.mockReset().mockResolvedValue(2);
+    mocks.ensureSettings.mockReset().mockResolvedValue(undefined);
+    mocks.findUserByEmail.mockReset();
     mocks.findUserById.mockReset();
     mocks.hashPassword.mockReset().mockResolvedValue("hashed-new-password");
     mocks.nowIso.mockReset().mockReturnValue("2026-06-03T00:00:00.000Z");
     mocks.sha256.mockReset().mockResolvedValue("token-hash");
+    mocks.verifyPassword.mockReset().mockResolvedValue(true);
   });
 
   it("rejects resetting the current admin through admin patch", async () => {
@@ -65,9 +74,58 @@ describe("Cloudflare admin password reset boundary", () => {
   });
 });
 
+describe("Cloudflare auth settings initialization", () => {
+  beforeEach(() => {
+    mocks.enabledAdminCount.mockReset().mockResolvedValue(0);
+    mocks.ensureSettings.mockReset().mockResolvedValue(undefined);
+    mocks.findUserByEmail.mockReset();
+    mocks.findUserById.mockReset();
+    mocks.hashPassword.mockReset().mockResolvedValue("hashed-password");
+    mocks.nowIso.mockReset().mockReturnValue("2026-06-03T00:00:00.000Z");
+    mocks.sha256.mockReset().mockResolvedValue("token-hash");
+    mocks.verifyPassword.mockReset().mockResolvedValue(true);
+  });
+
+  it("creates initial admin settings from the setup request locale", async () => {
+    const run = vi.fn().mockResolvedValue({});
+
+    const response = await createInitialAdmin(jsonRequest("/api/app/setup", "POST", {
+      name: "Admin",
+      email: "admin@example.com",
+      password: "password123",
+    }, { "x-renewlet-locale": "zh-CN" }), envFixture(run));
+
+    expect(response.status).toBe(201);
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(mocks.ensureSettings).toHaveBeenCalledWith(expect.anything(), expect.stringMatching(/^usr_/), "zh-CN");
+  });
+
+  it("ensures settings before returning a login session", async () => {
+    const run = vi.fn().mockResolvedValue({});
+    mocks.findUserByEmail.mockResolvedValue(userRow({ id: "usr_login", email: "login@example.com" }));
+
+    const response = await login(jsonRequest("/api/app/auth/login", "POST", {
+      email: "login@example.com",
+      password: "password123",
+    }, { "x-renewlet-locale": "zh-CN" }), envFixture(run));
+
+    expect(response.status).toBe(200);
+    expect(mocks.verifyPassword).toHaveBeenCalledWith("password123", "old-hash");
+    expect(mocks.ensureSettings).toHaveBeenCalledWith(expect.anything(), "usr_login", "zh-CN");
+    expect(run).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("Cloudflare app status", () => {
   beforeEach(() => {
     mocks.enabledAdminCount.mockReset().mockResolvedValue(0);
+    mocks.ensureSettings.mockReset().mockResolvedValue(undefined);
+    mocks.findUserByEmail.mockReset();
+    mocks.findUserById.mockReset();
+    mocks.hashPassword.mockReset().mockResolvedValue("hashed-new-password");
+    mocks.nowIso.mockReset().mockReturnValue("2026-06-03T00:00:00.000Z");
+    mocks.sha256.mockReset().mockResolvedValue("token-hash");
+    mocks.verifyPassword.mockReset().mockResolvedValue(true);
   });
 
   it("returns setup capability with demo mode fixed off", async () => {
@@ -81,6 +139,18 @@ describe("Cloudflare app status", () => {
     });
   });
 });
+
+function jsonRequest(path: string, method: string, body: unknown, headers: Record<string, string> = {}): Request {
+  return new Request(`https://renewlet.example${path}`, {
+    method,
+    headers: {
+      "accept-language": "en-US",
+      "content-type": "application/json",
+      ...headers,
+    },
+    body: JSON.stringify(body),
+  });
+}
 
 function requestFixture(body: unknown): Request {
   return new Request("https://renewlet.example/api/app/admin/users/usr_user", {

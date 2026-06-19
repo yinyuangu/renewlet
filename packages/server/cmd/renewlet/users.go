@@ -46,14 +46,19 @@ func normalizeRole(role string) string {
 	return "user"
 }
 
-// createInitialAdmin 在事务内创建首个管理员和 PocketBase superuser。
+// createInitialAdmin 在事务内创建首个管理员、账号设置和 PocketBase superuser。
 // 事务用于避免并发 setup 请求同时通过 hasEnabledAdmin 检查。
-func createInitialAdmin(app core.App, name string, email string, password string) error {
+func createInitialAdmin(app core.App, name string, email string, password string, locale appLocale) error {
 	return app.RunInTransaction(func(txApp core.App) error {
 		if hasEnabledAdmin(txApp) {
 			return errSetupAlreadyInitialized
 		}
-		if _, err := createUser(txApp, name, email, password, "admin"); err != nil {
+		user, err := createUser(txApp, name, email, password, "admin")
+		if err != nil {
+			return err
+		}
+		// setup 同步创建 settings，避免首个通知/备份后台任务先看到空账号语言。
+		if _, err := createSettingsRecord(txApp, user.Id, defaultAppSettingsForLocale(locale)); err != nil {
 			return err
 		}
 		return createInitialSuperuserIfMissing(txApp, email, password)

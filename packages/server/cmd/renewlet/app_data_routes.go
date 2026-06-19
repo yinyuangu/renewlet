@@ -116,12 +116,10 @@ func (f *optionalJSONField[T]) UnmarshalJSON(data []byte) error {
 }
 
 func handleSettingsRead(app core.App, e *core.RequestEvent) error {
-	settings := defaultAppSettings()
-	record, err := app.FindFirstRecordByFilter("settings", "user = {:user}", dbx.Params{"user": e.Auth.Id})
-	if err == nil && record != nil {
-		settings = settingsFromRecord(record)
-	} else if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return e.InternalServerError(serverText(requestLocale(e.Request), "common.internalError"), err)
+	locale := requestLocale(e.Request)
+	_, settings, err := ensureSettingsRecord(app, e.Auth.Id, locale)
+	if err != nil {
+		return e.InternalServerError(serverText(locale, "common.internalError"), err)
 	}
 	return e.JSON(http.StatusOK, settingsResponse{Settings: settings})
 }
@@ -133,15 +131,12 @@ func handleSettingsUpdate(app core.App, e *core.RequestEvent) error {
 		return e.BadRequestError(validationErrorMessage(locale, "common.invalidRequestBody", err), err)
 	}
 
-	current := defaultAppSettings()
-	record, err := app.FindFirstRecordByFilter("settings", "user = {:user}", dbx.Params{"user": e.Auth.Id})
-	if err == nil && record != nil {
-		current = settingsFromRecord(record)
-	} else if err != nil && !errors.Is(err, sql.ErrNoRows) {
+	record, current, err := settingsRecordOrDefault(app, e.Auth.Id, locale)
+	if err != nil {
 		return e.InternalServerError(serverText(locale, "common.internalError"), err)
 	}
 
-	next, err := mergeSettings(current, raw)
+	next, err := mergeSettingsForWrite(current, raw)
 	if err != nil {
 		return e.BadRequestError(validationErrorMessage(locale, "common.invalidRequestBody", err), err)
 	}
@@ -149,12 +144,11 @@ func handleSettingsUpdate(app core.App, e *core.RequestEvent) error {
 		return err
 	}
 	if record == nil {
-		collection, err := app.FindCollectionByNameOrId("settings")
+		record, err = createSettingsRecord(app, e.Auth.Id, next)
 		if err != nil {
 			return e.InternalServerError(serverText(locale, "common.internalError"), err)
 		}
-		record = core.NewRecord(collection)
-		record.Set("user", e.Auth.Id)
+		return e.JSON(http.StatusOK, settingsResponse{Settings: settingsFromRecord(record)})
 	}
 	record.Set("settings", next)
 	if err := app.Save(record); err != nil {

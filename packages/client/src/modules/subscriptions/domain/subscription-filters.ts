@@ -5,7 +5,7 @@
  * - 页面和 hook 管理筛选/排序状态，domain 只关心“给定状态如何得到结果”。
  * - 纯函数便于后续补单测，避免搜索/标签/排序逻辑散落在列表页 JSX 中。
  */
-import type { Locale } from "@/i18n/locales";
+import { DEFAULT_LOCALE, type Locale } from "@/i18n/locales";
 import { toMonthlyAmount } from "@/lib/subscription-billing";
 import { compareDateOnly, type DateOnly } from "@/lib/time/date-only";
 import type { Category, Subscription, SubscriptionStatus } from "@/types/subscription";
@@ -141,7 +141,7 @@ function comparePinnedFirst(left: Subscription, right: Subscription): number {
 /** 按指定选项对订阅排序；置顶分组永远优先，相同排序值保持传入顺序，避免列表无意义跳动。 */
 export function sortSubscriptions(
   subscriptions: readonly Subscription[],
-  { sortOption, defaultCurrency, convert, locale = "zh-CN" }: SubscriptionSortContext,
+  { sortOption, defaultCurrency, convert, locale = DEFAULT_LOCALE }: SubscriptionSortContext,
 ): Subscription[] {
   if (sortOption === "default") {
     return Array.from(subscriptions).sort((left, right) => comparePinnedFirst(left, right));

@@ -14,7 +14,7 @@
  */
 import { toMonthlyAmount } from "@/lib/subscription-billing";
 import { compareDateOnly, fromPlainDate, isSameMonthDateOnly, todayDateOnlyInTimeZone, toPlainDate, type DateOnly } from "@/lib/time/date-only";
-import { localizedLabel, type Locale } from "@/i18n/locales";
+import { DEFAULT_LOCALE, localizedLabel, type Locale } from "@/i18n/locales";
 import { translate } from "@/i18n/messages";
 import type { CustomConfig } from "@/types/config";
 import type { Subscription } from "@/types/subscription";
@@ -183,7 +183,7 @@ export function buildStatisticsModel({
   convert,
   now = new Date(),
   timeZone = "UTC",
-  locale = "zh-CN",
+  locale = DEFAULT_LOCALE,
   costBasis = "total",
 }: BuildStatisticsModelInput) {
   const today = todayDateOnlyInTimeZone(now, timeZone);

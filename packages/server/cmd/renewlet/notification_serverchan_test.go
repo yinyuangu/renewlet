@@ -54,6 +54,7 @@ func TestBuildServerChanEndpoint(t *testing.T) {
 
 func TestSendServerChanRequiresSendKey(t *testing.T) {
 	settings := defaultAppSettings()
+	settings.Locale = string(localeZhCN)
 	err := sendServerChan(settings, notificationMessage{Title: "title", Content: "content", Timestamp: "time"})
 	if err == nil {
 		t.Fatal("expected missing SendKey error")

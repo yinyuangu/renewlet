@@ -6,6 +6,7 @@ import { bearerToken, HttpError, json, ok, readJson, requestLocale, type AppLoca
 import { serverText } from "./server-i18n";
 import {
   enabledAdminCount,
+  ensureSettings,
   findUserByEmail,
   findUserById,
   hasEnabledAdmin,
@@ -62,11 +63,13 @@ export async function createInitialAdmin(request: Request, env: Env): Promise<Re
   if (await hasEnabledAdmin(env)) throw new HttpError(403, serverText(locale, "auth.setupAlreadyInitialized"));
   const body = await readJson(request, setupCreateBodySchema, locale);
   const timestamp = nowIso();
+  const userId = newId("usr");
   // email 唯一索引是初始化竞态的最后闸门；并发首装失败必须暴露为创建失败，而不是补兼容重试。
   await env.DB.prepare(`
     INSERT INTO users (id, email, name, role, banned, ban_reason, password_hash, created_at, updated_at)
     VALUES (?, ?, ?, 'admin', 0, '', ?, ?, ?)
-  `).bind(newId("usr"), body.email.trim(), body.name.trim(), await hashPassword(body.password), timestamp, timestamp).run();
+  `).bind(userId, body.email.trim(), body.name.trim(), await hashPassword(body.password), timestamp, timestamp).run();
+  await ensureSettings(env, userId, locale);
   return ok(201);
 }
 
@@ -85,6 +88,7 @@ export async function login(request: Request, env: Env): Promise<Response> {
   if (user.banned === 1) {
     throw new HttpError(403, serverText(locale, "auth.accountDisabled"));
   }
+  await ensureSettings(env, user.id, locale);
   const token = randomToken();
   const timestamp = nowIso();
   const expires = new Date(Date.now() + sessionTtlDays(env) * 24 * 60 * 60 * 1000).toISOString();

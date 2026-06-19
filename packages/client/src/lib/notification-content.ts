@@ -21,7 +21,7 @@ import type {
 import { effectiveReminderDays, isDisabledReminderDays } from "@renewlet/shared/runtime";
 import { daysBetweenDateOnly, isValidDateOnly, todayDateOnlyInTimeZone, type DateOnly } from "@/lib/time/date-only";
 import { isValidTimeZone } from "@/lib/time/time-zone";
-import { normalizeLocale, type Locale } from "@/i18n/locales";
+import { DEFAULT_LOCALE, normalizeLocale, type Locale } from "@/i18n/locales";
 import { translateStaticMessage, type MessageKey, type MessageParams } from "@/i18n/static-catalogs";
 
 /**
@@ -100,7 +100,7 @@ function getDateTimePart(parts: Intl.DateTimeFormatPart[], type: Intl.DateTimeFo
 }
 
 /** 按用户选择的 IANA 时区格式化通知中展示给人的时间。 */
-export function formatNotificationDisplayTime(now: Date, timeZone: string, locale: Locale = "zh-CN"): string {
+export function formatNotificationDisplayTime(now: Date, timeZone: string, locale: Locale = DEFAULT_LOCALE): string {
   const displayTimeZone = resolveDisplayTimeZone(timeZone);
   const parts = new Intl.DateTimeFormat(locale, {
     timeZone: displayTimeZone,
@@ -199,7 +199,7 @@ function buildNotificationContentFromItems(
 }
 
 /** 构造固定测试通知，用于验证单个渠道配置。 */
-export function buildTestNotification(now: Date, timeZone: string, locale: Locale = "zh-CN"): NotificationContent {
+export function buildTestNotification(now: Date, timeZone: string, locale: Locale = DEFAULT_LOCALE): NotificationContent {
   return {
     title: translateNotification(locale, "notification.content.testTitle"),
     content: translateNotification(locale, "notification.content.testBody"),

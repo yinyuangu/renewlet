@@ -25,12 +25,15 @@ func TestRequestLocalePrefersExplicitHeader(t *testing.T) {
 	}
 
 	req.Header.Set("X-Renewlet-Locale", "fr-FR")
-	if got := requestLocale(req); got != localeZhCN {
+	if got := requestLocale(req); got != localeEnUS {
 		t.Fatalf("expected invalid explicit header to fall back to default locale, got %s", got)
 	}
 }
 
 func TestAcceptLanguageLocaleUsesHighestQualitySupportedLanguage(t *testing.T) {
+	if got := acceptLanguageLocale(""); got != localeEnUS {
+		t.Fatalf("expected empty Accept-Language to fall back to en-US, got %s", got)
+	}
 	if got := acceptLanguageLocale("en-US;q=0.7, zh-CN;q=0.9"); got != localeZhCN {
 		t.Fatalf("expected zh-CN, got %s", got)
 	}

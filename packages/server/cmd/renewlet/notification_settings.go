@@ -8,6 +8,7 @@ package main
 // 注意： sanitizeSettings 只做可恢复兜底；route body 的未知字段和非法类型仍应在 strict decoder 阶段失败。
 import (
 	"bytes"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -20,6 +21,57 @@ import (
 )
 
 var settingsCurrencyRe = regexp.MustCompile(`^[A-Z]{3}$`)
+
+func defaultAppSettingsForLocale(locale appLocale) appSettings {
+	settings := defaultAppSettings()
+	settings.Locale = string(locale)
+	return settings
+}
+
+func findSettingsRecord(app core.App, userID string) (*core.Record, error) {
+	return app.FindFirstRecordByFilter("settings", "user = {:user}", dbx.Params{"user": userID})
+}
+
+func settingsRecordOrDefault(app core.App, userID string, locale appLocale) (*core.Record, appSettings, error) {
+	record, err := findSettingsRecord(app, userID)
+	if err == nil && record != nil {
+		return record, settingsFromRecord(record), nil
+	}
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return nil, appSettings{}, err
+	}
+	return nil, defaultAppSettingsForLocale(locale), nil
+}
+
+func createSettingsRecord(app core.App, userID string, settings appSettings) (*core.Record, error) {
+	collection, err := app.FindCollectionByNameOrId("settings")
+	if err != nil {
+		return nil, err
+	}
+	record := core.NewRecord(collection)
+	record.Set("user", userID)
+	record.Set("settings", settings)
+	if err := app.Save(record); err != nil {
+		return nil, err
+	}
+	return record, nil
+}
+
+func ensureSettingsRecord(app core.App, userID string, locale appLocale) (*core.Record, appSettings, error) {
+	record, settings, err := settingsRecordOrDefault(app, userID, locale)
+	if err != nil || record != nil {
+		return record, settings, err
+	}
+	// 首次读取设置会落账号语言；之后 settings 行是唯一真相源，不能再被请求 header 覆盖。
+	record, err = createSettingsRecord(app, userID, settings)
+	if err != nil {
+		if existing, findErr := findSettingsRecord(app, userID); findErr == nil && existing != nil {
+			return existing, settingsFromRecord(existing), nil
+		}
+		return nil, appSettings{}, err
+	}
+	return record, settingsFromRecord(record), nil
+}
 
 // currentUserSettings 读取当前用户设置，并合并请求级临时 patch。
 // 注意： 该函数服务于通知测试/手动运行；不要在这里持久化 patch。
@@ -35,7 +87,7 @@ func currentUserSettings(app core.App, user *core.Record, patch json.RawMessage)
 	if len(bytes.TrimSpace(patch)) == 0 {
 		return settings, nil
 	}
-	return mergeSettings(settings, patch)
+	return mergeSettingsForWrite(settings, patch)
 }
 
 // settingsFromRecord 从 PocketBase settings 记录读取强类型设置。
@@ -60,6 +112,14 @@ func settingsFromValue(value interface{}) (appSettings, error) {
 // mergeSettings 将 patch 严格解码到默认/当前设置上。
 // 使用完整 appSettings 目标而非 map，是为了让未知字段和非法类型在边界失败。
 func mergeSettings(base appSettings, patch json.RawMessage) (appSettings, error) {
+	return mergeSettingsWithOptions(base, patch, false)
+}
+
+func mergeSettingsForWrite(base appSettings, patch json.RawMessage) (appSettings, error) {
+	return mergeSettingsWithOptions(base, patch, true)
+}
+
+func mergeSettingsWithOptions(base appSettings, patch json.RawMessage, rejectUnsupportedLocale bool) (appSettings, error) {
 	if len(bytes.TrimSpace(patch)) == 0 {
 		return base, nil
 	}
@@ -71,11 +131,35 @@ func mergeSettings(base appSettings, patch json.RawMessage) (appSettings, error)
 	if err := decodeStrictJSONBytesInto(patch, &settings, normalizeAppLocale(base.Locale), false); err != nil {
 		return base, err
 	}
+	if rejectUnsupportedLocale {
+		// settings.locale 是跨 Go/Worker/shared schema 的账号契约；写入边界拒绝未知值，坏库值才交给 sanitizeSettings 恢复。
+		if locale, ok, err := explicitSettingsLocalePatch(patch); err != nil {
+			return base, err
+		} else if ok && !isSupportedAppLocale(locale) {
+			return base, errors.New("APP_LOCALE_UNSUPPORTED")
+		}
+	}
 	settings.BuiltInIconSources = mergeBuiltInIconSourceSettings(base.BuiltInIconSources, sourcePatch)
 	if !hasEnabledBuiltInIconSource(settings.BuiltInIconSources) {
 		return base, errors.New("BUILT_IN_ICON_SOURCE_REQUIRED")
 	}
 	return sanitizeSettings(settings), nil
+}
+
+func explicitSettingsLocalePatch(raw json.RawMessage) (string, bool, error) {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		return "", false, err
+	}
+	value, ok := fields["locale"]
+	if !ok {
+		return "", false, nil
+	}
+	var locale string
+	if err := json.Unmarshal(value, &locale); err != nil {
+		return "", true, err
+	}
+	return locale, true, nil
 }
 
 // sanitizeSettings 对可恢复的设置值做保守归一。

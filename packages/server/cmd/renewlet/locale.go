@@ -4,7 +4,7 @@ package main
 //
 // 架构位置：
 //   - 前端会发送 X-Renewlet-Locale，后端 route 和 Validate 使用 requestLocale 输出本地化错误。
-//   - 没有显式 header 时回退到 Accept-Language，最后默认中文。
+//   - 没有显式 header 时回退到 Accept-Language，最后默认英文。
 import (
 	"net/http"
 	"strings"
