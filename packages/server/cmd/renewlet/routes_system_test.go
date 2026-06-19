@@ -63,6 +63,7 @@ func TestSystemVersionRouteIsReadableBySignedInUsers(t *testing.T) {
 		defaultSystemUpdateService = oldService
 		Version, BuildType = oldVersion, oldBuildType
 	})
+	readOnlyReason := serverText(defaultAppLocale, "auth.adminRequiredShort")
 
 	cases := []struct {
 		name     string
@@ -89,7 +90,7 @@ func TestSystemVersionRouteIsReadableBySignedInUsers(t *testing.T) {
 				if !body.HasUpdate || body.LatestVersion != "1.1.0" {
 					t.Fatalf("expected admin version response to keep release facts, got %#v", body)
 				}
-				if !body.UpdateSupported && body.UnsupportedReason == serverText(localeZhCN, "auth.adminRequiredShort") {
+				if !body.UpdateSupported && body.UnsupportedReason == readOnlyReason {
 					t.Fatalf("expected admin version response not to be projected as read-only, got %#v", body)
 				}
 			}
@@ -98,7 +99,7 @@ func TestSystemVersionRouteIsReadableBySignedInUsers(t *testing.T) {
 				if err := json.Unmarshal(res.Body.Bytes(), &body); err != nil {
 					t.Fatalf("expected version response to decode: %v", err)
 				}
-				if body.UpdateSupported || body.UnsupportedReason != serverText(localeZhCN, "auth.adminRequiredShort") || body.ErrorDetails != nil {
+				if body.UpdateSupported || body.UnsupportedReason != readOnlyReason || body.ErrorDetails != nil {
 					t.Fatalf("expected non-admin version response to be read-only, got %#v", body)
 				}
 			}
@@ -151,7 +152,7 @@ func TestSystemVersionRouteHidesRawDetailsFromNonAdmins(t *testing.T) {
 	if err := json.Unmarshal(user.Body.Bytes(), &userBody); err != nil {
 		t.Fatalf("expected non-admin version response to decode: %v", err)
 	}
-	if userBody.ErrorDetails != nil || userBody.UpdateSupported || userBody.UnsupportedReason != serverText(localeZhCN, "auth.adminRequiredShort") {
+	if userBody.ErrorDetails != nil || userBody.UpdateSupported || userBody.UnsupportedReason != serverText(defaultAppLocale, "auth.adminRequiredShort") {
 		t.Fatalf("expected non-admin version response to hide raw details and update ability, got %#v", userBody)
 	}
 }

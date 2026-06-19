@@ -10,9 +10,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Link from '@/components/router-link';
 import { useI18n } from '@/i18n/I18nProvider';
-import { cn } from '@/lib/utils';
 import { ExternalLink } from 'lucide-react';
 import { PasswordChangeDialog } from './password-change-dialog';
+import { getSettingsSectionClassName } from './settings-layout';
 
 export interface AccountSettingsSectionProps {
   id?: string;
@@ -59,7 +59,7 @@ export function AccountSettingsSection({
 
   return (
     <>
-                  <section id={id} className={cn("rounded-xl border border-border bg-card p-6", className)}>
+                  <section id={id} className={getSettingsSectionClassName(className)}>
                     <h2 className="mb-6 text-lg font-semibold text-foreground">{t("settings.account")}</h2>
                     <div className="grid gap-6 sm:grid-cols-2">
                       <div className="grid gap-2">

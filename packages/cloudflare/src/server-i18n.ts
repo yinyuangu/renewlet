@@ -21,7 +21,7 @@ for (const locale of SERVER_I18N_LOCALES) {
   const normalized = normalizeLocaleTag(locale);
   localeLookup.set(normalized, locale);
   if (locale !== DEFAULT_SERVER_I18N_LOCALE) {
-    // 只给非默认语言注册主语言别名，避免未来默认 zh-CN 抢走 zh-Hant 这类独立 catalog。
+    // 只给非默认语言注册主语言别名，避免默认语言抢走未来独立 catalog。
     localeLookup.set(normalized.split("-")[0] ?? normalized, locale);
   }
 }

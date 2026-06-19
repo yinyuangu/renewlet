@@ -14,12 +14,12 @@ import { useRouter } from '@/lib/router';
 import { LayoutDashboard, List, CalendarDays, BarChart3, Settings, Sun, Moon, LogOut } from 'lucide-react';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
-import { cn } from '@/lib/utils';
 import type { SubscriptionDraft } from '@/types/subscription';
 import { Button } from '@/components/ui/button';
 import { useTheme } from '@/lib/theme-provider';
 import { useToast } from '@/hooks/use-toast';
-import { RenewletLogo } from '@/components/icons/renewlet-logo';
+import { RenewletBrandMark } from '@/components/brand/renewlet-brand-mark';
+import { getHeaderDesktopNavLinkClass, getHeaderMobileNavLinkClass, headerLayout } from '@/components/header-layout';
 import { authClient } from '@/lib/auth-client';
 import { AddSubscriptionDialog } from '@/components/add-subscription-dialog';
 import { SystemUpdateDialog } from '@/components/system-update-dialog';
@@ -98,23 +98,17 @@ export function Header({ onAddSubscription, availableTags, subscriptionActions }
   };
 
   return (
-    <header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-xl" data-testid="app-header">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 sm:py-4">
-        <div className="flex min-w-0 items-center gap-4 lg:gap-8">
-          <div className="flex min-w-0 items-center gap-3">
-            <Link
-              href="/"
-              aria-label="Renewlet"
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#111720] text-[#f8fafc] shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_14px_30px_-20px_rgba(0,0,0,0.8)] ring-1 ring-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-            >
-              <RenewletLogo className="h-5 w-5" />
-            </Link>
-            <div className="grid min-w-0 gap-1">
+    <header className={headerLayout.shell} data-testid="app-header">
+      <div className={headerLayout.inner} data-testid="app-header-inner">
+        <div className={headerLayout.primaryCluster}>
+          <div className={headerLayout.brandCluster}>
+            <RenewletBrandMark size="sm" href="/" data-testid="app-header-brand-mark" />
+            <div className={headerLayout.brandTextGroup}>
               <Link
                 href="/"
-                className="block min-w-0 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                className={headerLayout.brandTitleLink}
               >
-                <h1 className="truncate text-xl font-extrabold tracking-tight text-foreground">Renewlet</h1>
+                <h1 className={headerLayout.brandTitle}>Renewlet</h1>
               </Link>
               {isAuthenticated ? (
                 <SystemUpdateDialog
@@ -128,27 +122,23 @@ export function Header({ onAddSubscription, availableTags, subscriptionActions }
             </div>
           </div>
 
-          <nav className="hidden items-center gap-1 lg:flex">
+          <nav className={headerLayout.desktopNav} data-testid="app-header-desktop-nav">
             {navItems.map((item) => (
               <NavLink
                 key={item.path}
                 href={item.path}
                 end={item.path === "/"}
-                className={({ isActive }) => cn(
-                  "flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors",
-                  isActive
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:bg-secondary hover:text-foreground"
-                )}
+                title={t(item.labelKey)}
+                className={({ isActive }) => getHeaderDesktopNavLinkClass(isActive)}
               >
-                {renderNavIcon(item.icon, "h-4 w-4")}
-                {t(item.labelKey)}
+                {renderNavIcon(item.icon, headerLayout.desktopNavIcon)}
+                <span className={headerLayout.desktopNavLabel}>{t(item.labelKey)}</span>
               </NavLink>
             ))}
           </nav>
         </div>
 
-        <div className="flex shrink-0 items-center gap-2">
+        <div className={headerLayout.actions} data-testid="app-header-actions">
           <Button
             variant="ghost"
             size="icon"
@@ -181,20 +171,15 @@ export function Header({ onAddSubscription, availableTags, subscriptionActions }
       </div>
 
       {/* 移动端导航 */}
-      <nav className="flex border-t border-border lg:hidden">
+      <nav className={headerLayout.mobileNav} data-testid="app-header-mobile-nav">
         {navItems.map((item) => (
           <NavLink
             key={item.path}
             href={item.path}
             end={item.path === "/"}
-            className={({ isActive }) => cn(
-              "flex flex-1 flex-col items-center gap-1 py-3 text-xs font-medium transition-colors",
-              isActive
-                ? "text-primary"
-                : "text-muted-foreground"
-            )}
+            className={({ isActive }) => getHeaderMobileNavLinkClass(isActive)}
           >
-            {renderNavIcon(item.icon, "h-5 w-5")}
+            {renderNavIcon(item.icon, headerLayout.mobileNavIcon)}
             {t(item.labelKey)}
           </NavLink>
         ))}

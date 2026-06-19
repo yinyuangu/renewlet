@@ -1,5 +1,7 @@
 import { Skeleton } from "@/components/ui/skeleton";
+import { getHeaderDesktopNavSkeletonItemClass, headerLayout } from "@/components/header-layout";
 import { cn } from "@/lib/utils";
+import { SETTINGS_SECTION_FRAME_CLASS, settingsLayout } from "@/modules/settings/presentation/settings-layout";
 
 type PageSkeletonProps = {
   withPageShell?: boolean;
@@ -15,32 +17,32 @@ function SkeletonBox({ className }: { className: string }) {
 
 function HeaderSkeleton({ showAddAction = false }: { showAddAction?: boolean }) {
   return (
-    <header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-xl" data-testid="app-header-skeleton">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 sm:py-4">
-        <div className="flex min-w-0 items-center gap-4 lg:gap-8">
-          <div className="flex min-w-0 items-center gap-3">
+    <header className={headerLayout.shell} data-testid="app-header-skeleton">
+      <div className={headerLayout.inner} data-testid="app-header-skeleton-inner">
+        <div className={headerLayout.primaryCluster}>
+          <div className={headerLayout.brandCluster}>
             <SkeletonBox className="h-10 w-10 shrink-0 rounded-xl" />
-            <div className="grid min-w-0 gap-1">
+            <div className={headerLayout.brandTextGroup}>
               <SkeletonBox className="h-6 w-28" />
               <SkeletonBox className="h-6 w-[5.75rem] rounded-lg min-[380px]:w-32 sm:h-7" />
             </div>
           </div>
-          <nav className="hidden items-center gap-1 lg:flex">
+          <nav className={headerLayout.desktopNav} data-testid="app-header-desktop-nav-skeleton">
             {range(5).map((index) => (
-              <div key={index} className="flex items-center gap-2 rounded-lg px-4 py-2">
+              <div key={index} className={getHeaderDesktopNavSkeletonItemClass()}>
                 <SkeletonBox className="h-4 w-4 rounded" />
-                <SkeletonBox className="h-4 w-16" />
+                <SkeletonBox className={headerLayout.desktopNavSkeletonLabel} />
               </div>
             ))}
           </nav>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className={headerLayout.actions} data-testid="app-header-actions-skeleton">
           <SkeletonBox className="h-9 w-9 rounded-md" />
           {showAddAction ? <SkeletonBox className="h-9 w-9 rounded-md sm:w-28" /> : null}
           <SkeletonBox className="h-9 w-9 rounded-md" />
         </div>
       </div>
-      <nav className="flex border-t border-border lg:hidden">
+      <nav className={headerLayout.mobileNav} data-testid="app-header-mobile-nav-skeleton">
         {range(5).map((index) => (
           <div key={index} className="flex flex-1 flex-col items-center gap-1 py-3">
             <SkeletonBox className="h-5 w-5 rounded" />
@@ -294,33 +296,33 @@ function CalendarContentSkeleton() {
 
 function SettingsContentSkeleton() {
   return (
-    <div className="grid gap-8 lg:grid-cols-[14rem_minmax(0,1fr)]" data-testid="settings-page-skeleton-grid">
+    <div className={settingsLayout.pageGrid} data-testid="settings-page-skeleton-grid">
       <aside className="hidden lg:block">
-        <div className="sticky top-28 max-h-[calc(100vh-8rem)] overflow-y-auto rounded-xl border border-border bg-card/70 p-3 backdrop-blur">
+        <div className={settingsLayout.desktopNav} data-testid="settings-page-skeleton-desktop-nav">
           <div className="grid gap-1">
             {range(10).map((index) => <SkeletonBox key={index} className="h-9 w-full rounded-lg" />)}
           </div>
         </div>
       </aside>
 
-      <div className="grid min-w-0 gap-8">
-        <div className="sticky top-[calc(8.25rem+env(safe-area-inset-top))] z-20 border-b border-border bg-background/90 py-3 backdrop-blur lg:hidden">
-          <div className="flex items-center justify-between gap-3">
-            <div className="grid min-w-0 gap-1">
+      <div className={settingsLayout.content}>
+        <div className={settingsLayout.mobileHeader} data-testid="settings-page-skeleton-mobile-header">
+          <div className={settingsLayout.mobileHeaderRow}>
+            <div className={settingsLayout.mobileHeaderText}>
               <SkeletonBox className="h-6 w-28" />
               <SkeletonBox className="h-4 w-40" />
             </div>
-            <SkeletonBox className="h-9 w-9 rounded-lg" />
+            <SkeletonBox className="h-9 w-9 shrink-0 rounded-lg" />
           </div>
         </div>
 
-        <div className="hidden lg:block">
+        <div className={settingsLayout.desktopHeader}>
           <SkeletonBox className="h-8 w-32" />
           <SkeletonBox className="mt-2 h-4 w-56" />
         </div>
 
         {range(8).map((index) => (
-          <section key={index} className="rounded-xl border border-border bg-card p-6">
+          <section key={index} className={SETTINGS_SECTION_FRAME_CLASS}>
             <SkeletonBox className="mb-6 h-6 w-32" />
             <div className="grid gap-4">
               <SkeletonBox className="h-10 w-full max-w-md rounded-md" />

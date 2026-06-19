@@ -401,12 +401,13 @@ function formatAmount(amount: number): string {
 
 function normalizeEmailLocale(value: string): Locale {
   const normalized = value.trim().replaceAll("_", "-").toLowerCase();
+  if (normalized === "zh" || normalized === "zh-cn") return "zh-CN";
   if (normalized === "en" || normalized === "en-us") return "en-US";
-  return "zh-CN";
+  return "en-US";
 }
 
 function serverText(locale: Locale, key: string): string {
-  return SERVER_CATALOGS[locale]?.[key] ?? SERVER_CATALOGS["zh-CN"][key] ?? key;
+  return SERVER_CATALOGS[locale]?.[key] ?? SERVER_CATALOGS["en-US"][key] ?? key;
 }
 
 function utf8ByteLength(value: string): number {

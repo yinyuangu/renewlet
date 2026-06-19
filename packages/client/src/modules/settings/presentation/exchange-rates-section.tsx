@@ -19,6 +19,7 @@ import type { RawErrorResponseDetails } from "@/lib/raw-error-response";
 import { cn } from '@/lib/utils';
 import type { CustomConfig } from '@/types/config';
 import type { AppSettings } from '@/types/subscription';
+import { getSettingsSectionClassName } from './settings-layout';
 import {
   getDirectExchangeRateQuote,
   getExchangeRatePreviewCurrencies,
@@ -74,7 +75,7 @@ export function ExchangeRatesSection({
       : null;
 
   return (
-            <section id={id} className={cn("rounded-xl border border-border bg-card p-6", className)}>
+            <section id={id} className={getSettingsSectionClassName(className)}>
                 <div className="flex items-center justify-between mb-6">
                   <div className="flex items-center gap-2">
                     <TrendingUp className="h-5 w-5 text-primary" />

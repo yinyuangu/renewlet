@@ -25,6 +25,7 @@ import type { UploadedAsset, UploadKind } from "@/lib/api/schemas/media";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n/I18nProvider";
 import { LoadingButtonContent } from "./settings-shared-controls";
+import { getSettingsSectionClassName } from "./settings-layout";
 import type { UploadedAssetsManagerController } from "../application/use-uploaded-assets-manager";
 
 interface UploadedIconsSectionProps {
@@ -49,7 +50,7 @@ export function UploadedIconsSection({ id, className, controller }: UploadedIcon
   };
 
   return (
-    <section id={id} className={cn("rounded-xl border border-border bg-card p-6", className)}>
+    <section id={id} className={getSettingsSectionClassName(className)}>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex min-w-0 gap-3">
           <Images className="mt-0.5 h-5 w-5 shrink-0 text-primary" />

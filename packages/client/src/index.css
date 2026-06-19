@@ -43,6 +43,8 @@
   --color-card: hsl(var(--card));
   --color-card-foreground: hsl(var(--card-foreground));
   --color-card-hover: hsl(var(--card-hover));
+  --color-brand-mark: hsl(var(--brand-mark));
+  --color-brand-mark-foreground: hsl(var(--brand-mark-foreground));
   --color-category-productivity: hsl(var(--category-productivity));
   --color-category-entertainment: hsl(var(--category-entertainment));
   --color-category-lifestyle: hsl(var(--category-lifestyle));

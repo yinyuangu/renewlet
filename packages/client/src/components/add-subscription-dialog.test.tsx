@@ -39,10 +39,13 @@ describe("AddSubscriptionDialog trigger", () => {
     render(<AddSubscriptionDialog onAdd={vi.fn()} />);
 
     const button = screen.getByRole("button", { name: /添加订阅/ });
-    expect(button).toHaveClass("h-12", "w-12", "px-0", "sm:h-10", "sm:w-auto", "sm:px-4");
+    expect(button).toHaveClass("h-12", "w-12", "px-0", "sm:h-10", "sm:w-10", "sm:px-0", "xl:w-auto", "xl:px-4");
+    const visibleLabel = Array.from(button.querySelectorAll("span")).find((span) => span.className.includes("xl:inline"));
+    if (!visibleLabel) throw new Error("Expected the desktop add shortcut label to appear only at xl and above.");
+    expect(visibleLabel).toHaveClass("hidden", "xl:inline");
     const screenReaderLabel = button.querySelector<HTMLElement>("span.sr-only");
     if (!screenReaderLabel) throw new Error("Expected the mobile add shortcut to keep a screen-reader label.");
-    expect(screenReaderLabel).toHaveClass("sr-only", "sm:hidden");
+    expect(screenReaderLabel).toHaveClass("sr-only", "xl:hidden");
     expect(screen.getByTestId("add-subscription-dialog-open")).toHaveTextContent("false");
 
     await user.click(button);

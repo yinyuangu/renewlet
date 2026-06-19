@@ -133,7 +133,7 @@ export function LogoPicker({
     <>
     <div className="grid gap-2">
       <Label>{t("media.logo")}</Label>
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3" data-testid="logo-picker-control-row">
         {/* Logo 预览/上传区域 */}
         <div
           className={cn(
@@ -186,7 +186,7 @@ export function LogoPicker({
         </div>
 
         {/* 操作按钮 */}
-        <div className="grid min-w-0 flex-1 max-w-52 gap-2">
+        <div className="grid min-w-0 w-fit max-w-full gap-2">
           <Button
             type="button"
             variant="outline"
@@ -204,17 +204,17 @@ export function LogoPicker({
             {t("media.uploadLogo")}
           </Button>
 
-          <div className="grid grid-cols-3 gap-2">
+          <div className="flex w-max max-w-full flex-wrap items-center justify-start gap-2" data-testid="logo-picker-secondary-actions">
             <Popover open={uploadedLogosOpen} onOpenChange={handleUploadedLogosOpenChange}>
               <PopoverTrigger asChild>
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="h-8 w-full gap-1.5 border-border px-2 text-xs"
+                  className="h-8 w-fit max-w-full shrink-0 gap-1.5 overflow-hidden border-border px-3 text-xs"
                 >
                   <Images className="w-3.5 h-3.5" />
-                  {t("media.uploaded")}
+                  <span className="min-w-0 truncate">{t("media.uploaded")}</span>
                 </Button>
               </PopoverTrigger>
               <PopoverContent
@@ -340,10 +340,10 @@ export function LogoPicker({
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="h-8 w-full gap-1.5 border-border px-2 text-xs"
+                  className="h-8 w-fit max-w-full shrink-0 gap-1.5 overflow-hidden border-border px-3 text-xs"
                 >
                   <Search className="w-3.5 h-3.5" />
-                  {t("media.search")}
+                  <span className="min-w-0 truncate">{t("media.search")}</span>
                 </Button>
               </PopoverTrigger>
               <PopoverContent
@@ -383,10 +383,10 @@ export function LogoPicker({
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="h-8 w-full gap-1.5 border-border px-2 text-xs"
+                  className="h-8 w-fit max-w-full shrink-0 gap-1.5 overflow-hidden border-border px-3 text-xs"
                 >
                   <Link className="w-3.5 h-3.5" />
-                  {t("media.link")}
+                  <span className="min-w-0 truncate">{t("media.link")}</span>
                 </Button>
               </PopoverTrigger>
               <PopoverContent

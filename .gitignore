@@ -28,6 +28,8 @@ wrangler.generated.jsonc
 /playwright-report/
 /test-results/
 /e2e/.auth/
+# 官网视觉截图只作为本地人工基线，默认测试不再要求提交二进制 golden。
+/apps/website/tests/__screenshots__/
 /tmp/
 
 # Editor directories and files

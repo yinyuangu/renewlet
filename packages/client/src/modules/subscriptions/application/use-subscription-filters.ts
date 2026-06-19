@@ -8,7 +8,7 @@
  * PERF： 订阅量很大时，可把搜索字段预先标准化成索引，避免每次输入都遍历原始字符串。
  */
 import { useMemo, useState } from "react";
-import type { Locale } from "@/i18n/locales";
+import { DEFAULT_LOCALE, type Locale } from "@/i18n/locales";
 import { todayDateOnlyInTimeZone } from "@/lib/time/date-only";
 import type { Category, Subscription, SubscriptionStatus } from "@/types/subscription";
 import {
@@ -37,7 +37,7 @@ export function useSubscriptionFilters(
   {
     defaultCurrency = "CNY",
     convert = IDENTITY_CONVERT,
-    locale = "zh-CN",
+    locale = DEFAULT_LOCALE,
     timeZone = "UTC",
   }: UseSubscriptionFiltersOptions = {},
 ) {

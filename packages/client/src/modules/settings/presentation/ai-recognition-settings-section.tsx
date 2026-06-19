@@ -26,6 +26,7 @@ import { getAIRecognitionSettingsBlocker } from "@/modules/ai-recognition/domain
 import { aiRecognitionService } from "@/services/ai-recognition-service";
 import { AIModelCombobox, AIModelModeSwitch } from "./ai-model-combobox";
 import { LoadingButtonContent } from "./settings-shared-controls";
+import { getSettingsSectionClassName } from "./settings-layout";
 
 const AI_PROVIDER_TYPES = ["openai", "anthropic", "gemini", "openai-compatible"] as const satisfies readonly AiRecognitionProviderType[];
 const MODEL_DEFAULT_THINKING_ID = "model-default";
@@ -219,7 +220,7 @@ export function AIRecognitionSettingsSection({
   };
 
   return (
-    <section id={id} className={cn("rounded-xl border border-border bg-card p-6", className)}>
+    <section id={id} className={getSettingsSectionClassName(className)}>
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <div className="flex items-center gap-2">

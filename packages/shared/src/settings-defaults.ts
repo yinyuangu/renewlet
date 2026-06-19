@@ -18,7 +18,7 @@ export function createDefaultAppSettings(options: DefaultSettingsOptions = {}): 
     themeMode: "dark",
     themeVariant: "emerald",
     themeCustomColor: DEFAULT_CUSTOM_THEME_COLOR,
-    locale: options.locale ?? "zh-CN",
+    locale: options.locale ?? "en-US",
     showExpired: true,
     defaultCurrency: "CNY",
     publicStatusCurrency: "inherit",

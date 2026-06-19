@@ -159,12 +159,33 @@ export async function enabledAdminCount(env: Env): Promise<number> {
   return row?.count ?? 0;
 }
 
-/** getSettings 返回完整设置契约，调用方不需要知道 D1 中是否存在 settings 行。 */
+/** getSettings 只做后台/二级读取兜底；带请求 locale 的首次初始化必须走 ensureSettings。 */
 export async function getSettings(env: Env, userId: string): Promise<ApiAppSettings> {
   const row = await env.DB.prepare("SELECT settings_json FROM settings WHERE user_id = ? LIMIT 1").bind(userId).first<{ settings_json: string }>();
-  // 空库用户按当前 shared defaults 启动；不要写回 D1，否则首次访问会制造隐式迁移副作用。
+  // 后台任务没有可信请求语言，空库时只返回默认设置，不能替账号落语言。
   if (!row) return createDefaultAppSettings();
   return normalizeSettingsJson(row.settings_json);
+}
+
+/**
+ * ensureSettings 只用于带请求 locale 的首次账号初始化入口。
+ *
+ * 请求 header 只影响缺行时的初始 settings；已有 settings 是账号真相源，不能被浏览器语言或代理 header 覆盖。
+ */
+export async function ensureSettings(env: Env, userId: string, locale: ApiAppSettings["locale"]): Promise<ApiAppSettings> {
+  const existing = await env.DB.prepare("SELECT settings_json FROM settings WHERE user_id = ? LIMIT 1").bind(userId).first<{ settings_json: string }>();
+  if (existing) return normalizeSettingsJson(existing.settings_json);
+
+  const defaults = createDefaultAppSettings({ locale });
+  const timestamp = nowIso();
+  await env.DB.prepare(`
+    INSERT INTO settings (user_id, settings_json, created_at, updated_at)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(user_id) DO NOTHING
+  `).bind(userId, JSON.stringify(defaults), timestamp, timestamp).run();
+
+  const stored = await env.DB.prepare("SELECT settings_json FROM settings WHERE user_id = ? LIMIT 1").bind(userId).first<{ settings_json: string }>();
+  return stored ? normalizeSettingsJson(stored.settings_json) : defaults;
 }
 
 /** 保存设置前重跑完整 shared schema，确保 D1 写入后的数据仍可被 Go/前端同一契约消费。 */

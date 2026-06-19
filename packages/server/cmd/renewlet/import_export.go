@@ -409,7 +409,7 @@ func applyImportedSettings(app core.App, user *core.Record, raw json.RawMessage)
 	} else if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return err
 	}
-	next, err := mergeSettings(current, raw)
+	next, err := mergeSettingsForWrite(current, raw)
 	if err != nil {
 		return err
 	}

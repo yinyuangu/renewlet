@@ -370,7 +370,7 @@ export function useSettingsFormController(): SettingsFormController {
   );
 
   const syncSavedPreviewState = useCallback(
-    (nextSettings: AppSettings, options: { syncAppearance: boolean }) => {
+    (nextSettings: AppSettings, options: { syncAppearance: boolean; rememberLocalePreference?: boolean }) => {
       if (options.syncAppearance) {
         clearThemeModeOverride();
         setTheme(nextSettings.themeMode, { localOverride: false });
@@ -379,7 +379,11 @@ export function useSettingsFormController(): SettingsFormController {
         writeCustomThemeColorToStorage(nextSettings.themeCustomColor);
         clearSettingsAppearanceDraftFromStorage();
       }
-      setLocale(nextSettings.locale, { persist: false, markAsSaved: true });
+      setLocale(nextSettings.locale, {
+        persist: false,
+        markAsSaved: true,
+        ...(options.rememberLocalePreference ? { rememberPreference: true } : {}),
+      });
     },
     [setLocale, setTheme],
   );
@@ -399,6 +403,7 @@ export function useSettingsFormController(): SettingsFormController {
     const shouldSaveSettings = settingsDirty;
     const shouldSaveCustomConfig = customConfigDirty;
     const providerChanged = settings.exchangeRateProvider !== savedSettings.exchangeRateProvider;
+    const localeChanged = settings.locale !== savedSettings.locale;
     const appearanceChanged = settings.themeMode !== savedSettings.themeMode
       || settings.themeVariant !== savedSettings.themeVariant
       || !areJsonSnapshotsEqual(settings.themeCustomColor, savedSettings.themeCustomColor);
@@ -426,7 +431,7 @@ export function useSettingsFormController(): SettingsFormController {
         setSettings(saved);
         setMonthlyBudgetInput(String(saved.monthlyBudget));
         setMonthlyBudgetError(null);
-        syncSavedPreviewState(saved, { syncAppearance: appearanceChanged });
+        syncSavedPreviewState(saved, { syncAppearance: appearanceChanged, rememberLocalePreference: localeChanged });
         void refetchNotificationHistory();
         if (providerChanged) {
           try {
@@ -485,6 +490,7 @@ export function useSettingsFormController(): SettingsFormController {
     refreshRates,
     saveConfig,
     savedSettings.exchangeRateProvider,
+    savedSettings.locale,
     savedSettings.themeCustomColor,
     savedSettings.themeMode,
     savedSettings.themeVariant,

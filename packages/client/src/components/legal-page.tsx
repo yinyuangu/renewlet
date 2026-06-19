@@ -10,7 +10,7 @@ import type { ReactNode } from "react";
 import { ArrowLeft, Home } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { RenewletLogo } from "@/components/icons/renewlet-logo";
+import { RenewletBrandLockup } from "@/components/brand/renewlet-brand-mark";
 import { useI18n } from "@/i18n/I18nProvider";
 
 /**
@@ -35,15 +35,12 @@ export function LegalPageShell({
     <div className="auth-page theme-gradient">
       <div className="w-full max-w-2xl">
         <div className="rounded-2xl border border-border bg-card p-6 shadow-card grid gap-6 sm:p-8">
-          <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#111720] text-[#f8fafc] shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_16px_32px_-22px_rgba(0,0,0,0.8)] ring-1 ring-white/10">
-              <RenewletLogo className="h-6 w-6" />
-            </div>
-            <div className="flex-1">
-              <h1 className="text-xl font-bold text-foreground">{title}</h1>
-              {subtitle ? <p className="text-xs text-muted-foreground">{subtitle}</p> : null}
-            </div>
-          </div>
+          <RenewletBrandLockup
+            title={title}
+            subtitle={subtitle}
+            textClassName="flex-1"
+            titleClassName="text-xl"
+          />
 
           <div className="text-sm text-muted-foreground leading-relaxed">
             {children}

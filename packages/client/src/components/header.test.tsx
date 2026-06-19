@@ -1,6 +1,6 @@
 // Header 测试守住全局导航、会话菜单和新增订阅入口，避免路由重排时破坏主要工作流入口。
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactElement } from "react";
 import { MemoryRouter } from "react-router-dom";
@@ -245,5 +245,46 @@ describe("Header system version entry", () => {
 
     expect(mocks.setTheme).toHaveBeenCalledWith("light");
     expect(mocks.writeAppearancePendingToStorage).not.toHaveBeenCalled();
+  });
+
+  it("uses the shared responsive header layout contract", () => {
+    mocks.useSession.mockReturnValue(adminSession("user"));
+
+    renderHeader();
+
+    expect(screen.getByTestId("app-header")).toHaveClass("sticky", "top-0", "z-50", "bg-card/80");
+    expect(screen.getByTestId("app-header-inner")).toHaveClass("max-w-7xl", "justify-between", "gap-3");
+    expect(screen.getByTestId("app-header-actions")).toHaveClass("min-w-0", "shrink-0", "justify-end");
+
+    const desktopNav = screen.getByTestId("app-header-desktop-nav");
+    const mobileNav = screen.getByTestId("app-header-mobile-nav");
+    expect(desktopNav).toHaveClass("hidden", "min-w-0", "lg:flex");
+    expect(mobileNav).toHaveClass("flex", "border-t", "lg:hidden");
+
+    const subscriptionLink = within(desktopNav).getByRole("link", { name: "订阅" });
+    expect(subscriptionLink).toHaveAttribute("title", "订阅");
+    expect(subscriptionLink).toHaveClass("h-10", "w-auto", "justify-start", "gap-2", "px-3", "xl:px-4");
+    expect(subscriptionLink).not.toHaveClass("lg:w-10", "lg:px-0");
+    const subscriptionLabel = within(subscriptionLink).getByText("订阅");
+    expect(subscriptionLabel).toHaveClass("whitespace-nowrap");
+    expect(subscriptionLabel).not.toHaveClass("sr-only", "xl:not-sr-only");
+  });
+
+  it("uses the shared brand mark contract in the header", () => {
+    mocks.useSession.mockReturnValue(adminSession("user"));
+
+    renderHeader();
+
+    const mark = screen.getByTestId("app-header-brand-mark");
+    expect(mark).toHaveClass(
+      "h-10",
+      "w-10",
+      "bg-brand-mark",
+      "text-brand-mark-foreground",
+      "focus-visible:ring-2",
+      "focus-visible:ring-ring",
+    );
+    expect(mark.className).not.toContain("bg-[");
+    expect(mark.className).not.toContain("text-[");
   });
 });

@@ -252,7 +252,7 @@ describe("Cloudflare notifications", () => {
       windowMinutes: 2,
       triggeredAtUtc: "2026-01-09T08:00:00Z",
       schedule,
-      settings: settings(),
+      settings: settings({ locale: "zh-CN" }),
       message: {
         title: "Renewlet 订阅提醒",
         content: "今天没有需要提醒的订阅。",
@@ -647,7 +647,7 @@ describe("Cloudflare notifications", () => {
   it("builds ServerChan endpoints for Turbo and ServerChan 3 SendKeys", () => {
     expect(serverChanEndpoint("SCT123456")).toBe("https://sctapi.ftqq.com/SCT123456.send");
     expect(serverChanEndpoint("sctp123tabcdef")).toBe("https://123.push.ft07.com/send/sctp123tabcdef.send");
-    expect(() => serverChanEndpoint("sctpabcdef")).toThrow("Server酱 SendKey 格式无效");
+    expect(() => serverChanEndpoint("sctpabcdef", "zh-CN")).toThrow("Server酱 SendKey 格式无效");
   });
 
   it("sends ServerChan JSON payloads and requires code zero", async () => {

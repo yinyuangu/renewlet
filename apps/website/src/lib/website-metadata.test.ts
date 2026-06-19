@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  latestStableReleaseVersionFromFileNames,
+} from './release-version'
+import {
   renderRobotsTxt,
   renderSitemapXml,
   replaceWebsiteMetadataPlaceholders,
@@ -87,6 +90,7 @@ describe('website metadata rendering', () => {
 
     expect(sitemap).toContain('<loc>https://renewlet.olyq.org/</loc>')
     expect(sitemap).toContain('<loc>https://renewlet.olyq.org/en/</loc>')
+    expect(sitemap).toContain('<lastmod>2026-06-19</lastmod>')
     expect(sitemap).not.toContain('zhiyingzzhou.github.io/renewlet')
   })
 
@@ -98,16 +102,31 @@ describe('website metadata rendering', () => {
       '%RENEWLET_WEBSITE_LOGO_URL%',
       '%RENEWLET_WEBSITE_DASHBOARD_ZH_URL%',
       '%RENEWLET_WEBSITE_DASHBOARD_EN_URL%',
+      '%RENEWLET_WEBSITE_SOFTWARE_VERSION%',
     ].join('\n')
 
-    expect(replaceWebsiteMetadataPlaceholders(html, customDomainDeployment)).toBe(
+    expect(replaceWebsiteMetadataPlaceholders(html, customDomainDeployment, { softwareVersion: '0.1.9' })).toBe(
       [
         'https://renewlet.olyq.org/',
         'https://renewlet.olyq.org/en/',
         'https://renewlet.olyq.org/assets/renewlet/logo.svg',
         'https://renewlet.olyq.org/assets/renewlet/images/dashboard-zh.png',
         'https://renewlet.olyq.org/assets/renewlet/images/dashboard-en.png',
+        '0.1.9',
       ].join('\n'),
     )
+  })
+})
+
+describe('release note version selection', () => {
+  it('uses the highest stable release note version and ignores RC files', () => {
+    expect(
+      latestStableReleaseVersionFromFileNames([
+        'v0.1.8-zh.md',
+        'v0.1.9-en.md',
+        'v0.1.9-zh.md',
+        'v0.2.0-rc.1-zh.md',
+      ]),
+    ).toBe('0.1.9')
   })
 })

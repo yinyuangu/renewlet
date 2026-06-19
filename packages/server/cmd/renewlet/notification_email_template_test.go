@@ -12,6 +12,7 @@ import (
 func TestBuildEmailHTMLMessageRendersCompatibleReminderTemplate(t *testing.T) {
 	t.Setenv("APP_URL", "")
 	settings := defaultAppSettings()
+	settings.Locale = string(localeZhCN)
 	settings.ShowExpired = true
 	settings.Timezone = "Asia/Shanghai"
 	settings.ThemeVariant = "ocean"
@@ -106,6 +107,7 @@ func TestBuildEmailHTMLMessageRendersEnglishTestNotification(t *testing.T) {
 func TestBuildEmailHTMLMessageOmitsVisibleStatusTitleHero(t *testing.T) {
 	t.Setenv("APP_URL", "")
 	settings := defaultAppSettings()
+	settings.Locale = string(localeZhCN)
 	message := buildTestNotification(time.Date(2026, 5, 14, 1, 2, 3, 0, time.UTC), settings)
 	body := mustBuildEmailHTML(t, settings, message)
 
@@ -119,6 +121,7 @@ func TestBuildEmailHTMLMessageOmitsVisibleStatusTitleHero(t *testing.T) {
 func TestBuildEmailHTMLMessageRendersReminderCTAFromAppURL(t *testing.T) {
 	t.Setenv("APP_URL", "https://renewlet.example/app/")
 	settings := defaultAppSettings()
+	settings.Locale = string(localeZhCN)
 	message := buildDueNotificationForLocalDate("2026-05-14", time.Date(2026, 5, 14, 1, 2, 3, 0, time.UTC), settings, []notificationSubscription{
 		{ID: "renewal", Name: "Renewal", Price: 18, Currency: "CNY", Status: "active", NextBillingDate: "2026-05-17", ReminderDays: 3},
 	}, true)
@@ -150,6 +153,7 @@ func TestBuildEmailHTMLMessageRendersSettingsCTAForTestNotification(t *testing.T
 func TestBuildEmailHTMLMessageOmitsCTAForInvalidAppURL(t *testing.T) {
 	t.Setenv("APP_URL", "javascript:alert(1)")
 	settings := defaultAppSettings()
+	settings.Locale = string(localeZhCN)
 	message := buildTestNotification(time.Date(2026, 5, 14, 1, 2, 3, 0, time.UTC), settings)
 
 	body := mustBuildEmailHTML(t, settings, message)
@@ -160,6 +164,7 @@ func TestBuildEmailHTMLMessageOmitsCTAForInvalidAppURL(t *testing.T) {
 func TestBuildEmailHTMLMessageEscapesUserContentAndOmitsLogoURL(t *testing.T) {
 	t.Setenv("APP_URL", "")
 	settings := defaultAppSettings()
+	settings.Locale = string(localeZhCN)
 	message := notificationMessage{
 		Title:     `<script>alert("title")</script>`,
 		Content:   "Line <b>one</b>\nLine two",
@@ -227,6 +232,7 @@ func TestBuildEmailHTMLMessageRendersEmptyNotificationContent(t *testing.T) {
 func TestBuildEmailHTMLMessageCapsLargeHTMLBody(t *testing.T) {
 	t.Setenv("APP_URL", "")
 	settings := defaultAppSettings()
+	settings.Locale = string(localeZhCN)
 	// 邮件客户端常按体积截断 HTML；超长通知必须降级到 compact 视图，而不是继续膨胀完整列表。
 	items := make([]notificationContentItem, 0, 800)
 	for i := 0; i < 800; i++ {

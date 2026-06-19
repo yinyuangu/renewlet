@@ -1,6 +1,6 @@
 import { customConfigResponseSchema } from "@renewlet/shared/schemas/custom-config";
 import { settingsUpdateBodySchema } from "@renewlet/shared/schemas/settings";
-import { getCustomConfig, getSettings, mergeSettingsPatch, putCustomConfig, putSettings } from "./db";
+import { ensureSettings, getCustomConfig, mergeSettingsPatch, putCustomConfig, putSettings } from "./db";
 import { json, readJson, requestLocale } from "./http";
 import { requireAuth } from "./auth";
 import type { Env } from "./types";
@@ -12,7 +12,7 @@ import type { Env } from "./types";
  */
 export async function readSettings(request: Request, env: Env): Promise<Response> {
   const auth = await requireAuth(request, env);
-  return json({ settings: await getSettings(env, auth.user.id) });
+  return json({ settings: await ensureSettings(env, auth.user.id, requestLocale(request)) });
 }
 
 /**
@@ -23,8 +23,8 @@ export async function readSettings(request: Request, env: Env): Promise<Response
 export async function updateSettings(request: Request, env: Env): Promise<Response> {
   const locale = requestLocale(request);
   const auth = await requireAuth(request, env);
-  const current = await getSettings(env, auth.user.id);
   const patch = await readJson(request, settingsUpdateBodySchema, locale);
+  const current = await ensureSettings(env, auth.user.id, locale);
   // PATCH 语义由“当前设置 + 局部字段”合成，最终仍过完整 schema，防止删除隐式默认项。
   const next = mergeSettingsPatch(current, patch);
   return json({ settings: await putSettings(env, auth.user.id, next) });

@@ -67,10 +67,14 @@ import {
   DesktopSettingsSectionNav,
   MobileSettingsPageHeader,
   MobileSettingsSectionDrawer,
-  SETTINGS_SECTION_SCROLL_CLASS,
   useSettingsSectionNavigation,
   useUnsavedChangesGuard,
 } from './settings-section-navigation';
+import {
+  SETTINGS_SECTION_FRAME_CLASS,
+  SETTINGS_SECTION_SCROLL_CLASS,
+  settingsLayout,
+} from './settings-layout';
 
 /** 设置页 screen：只负责布局与展示，业务状态由 controller 提供。 */
 export function SettingsScreen() {
@@ -208,15 +212,15 @@ export function SettingsScreen() {
 
       <main className={cn("flex-1", hasUnsavedChanges && "h5-bottom-bar-space")} data-testid="settings-main">
         <div className="app-main mx-auto max-w-7xl">
-          <div className="grid gap-8 lg:grid-cols-[14rem_minmax(0,1fr)]">
+          <div className={settingsLayout.pageGrid} data-testid="settings-page-layout">
             <aside className="hidden lg:block" data-testid="settings-section-nav-aside">
               <DesktopSettingsSectionNav activeSectionId={activeSectionId} onSectionClick={handleSectionClick} />
             </aside>
 
-            <div className="grid min-w-0 gap-8" data-testid="settings-section-content">
+            <div className={settingsLayout.content} data-testid="settings-section-content">
               <MobileSettingsPageHeader onOpen={() => setMobileSectionNavOpen(true)} />
 
-              <div className="hidden lg:block">
+              <div className={settingsLayout.desktopHeader}>
                 <h1 className="text-2xl font-bold text-foreground">{t("settings.title")}</h1>
                 <p className="mt-1 text-sm text-muted-foreground">{t("settings.subtitle")}</p>
               </div>
@@ -243,7 +247,7 @@ export function SettingsScreen() {
               />
 
               {/* 外观设置 */}
-              <section id="settings-appearance" className={cn("rounded-xl border border-border bg-card p-6", SETTINGS_SECTION_SCROLL_CLASS)}>
+              <section id="settings-appearance" className={SETTINGS_SECTION_FRAME_CLASS}>
                 <div className="flex items-center gap-2 mb-6">
                   <Palette className="h-5 w-5 text-primary" />
                   <h2 className="text-lg font-semibold text-foreground">{t("settings.appearance")}</h2>
@@ -259,7 +263,7 @@ export function SettingsScreen() {
               </section>
 
               {/* 显示设置 */}
-              <section id="settings-display" className={cn("rounded-xl border border-border bg-card p-6", SETTINGS_SECTION_SCROLL_CLASS)}>
+              <section id="settings-display" className={SETTINGS_SECTION_FRAME_CLASS}>
                 <h2 className="mb-6 text-lg font-semibold text-foreground">{t("settings.display")}</h2>
                 <div className="grid gap-6">
                   <div className="grid gap-2">
@@ -308,7 +312,7 @@ export function SettingsScreen() {
               />
 
               {/* 预算设置 */}
-              <section id="settings-budget" className={cn("rounded-xl border border-border bg-card p-6", SETTINGS_SECTION_SCROLL_CLASS)}>
+              <section id="settings-budget" className={SETTINGS_SECTION_FRAME_CLASS}>
                 <h2 className="mb-6 text-lg font-semibold text-foreground">{t("settings.budget")}</h2>
                 <div className="grid gap-4">
                   <div className="grid gap-2">
@@ -344,7 +348,7 @@ export function SettingsScreen() {
               </section>
 
               {/* 数据配置 */}
-              <section id="settings-data-config" className={cn("rounded-xl border border-border bg-card p-6", SETTINGS_SECTION_SCROLL_CLASS)}>
+              <section id="settings-data-config" className={SETTINGS_SECTION_FRAME_CLASS}>
                 <div className="flex items-center gap-2 mb-4">
                   <Settings2 className="h-5 w-5 text-primary" />
                   <h2 className="text-lg font-semibold text-foreground">{t("settings.dataConfig")}</h2>
@@ -484,7 +488,7 @@ export function SettingsScreen() {
               />
 
               {/* 时区设置 */}
-              <section id="settings-timezone" className={cn("rounded-xl border border-border bg-card p-6", SETTINGS_SECTION_SCROLL_CLASS)}>
+              <section id="settings-timezone" className={SETTINGS_SECTION_FRAME_CLASS}>
                 <h2 className="mb-6 text-lg font-semibold text-foreground">{t("settings.timezone")}</h2>
                 <div className="grid gap-2">
                   <Label htmlFor="timezone">{t("settings.timezoneSelect")}</Label>
@@ -506,7 +510,7 @@ export function SettingsScreen() {
               </section>
 
               {/* 通知设置 */}
-              <section id="settings-notifications" className={cn("rounded-xl border border-border bg-card p-6", SETTINGS_SECTION_SCROLL_CLASS)}>
+              <section id="settings-notifications" className={SETTINGS_SECTION_FRAME_CLASS}>
                 <h2 className="mb-6 text-lg font-semibold text-foreground">{t("settings.notifications")}</h2>
 
                 <div className="grid gap-6">

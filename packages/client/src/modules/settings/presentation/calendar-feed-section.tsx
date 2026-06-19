@@ -14,9 +14,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useI18n } from "@/i18n/I18nProvider";
-import { cn } from "@/lib/utils";
 import type { ClipboardCopyTarget } from "@/shared/browser/clipboard";
 import { LoadingButtonContent } from "./settings-shared-controls";
+import { getSettingsSectionClassName } from "./settings-layout";
 
 interface CalendarFeedSectionProps {
   id?: string;
@@ -62,7 +62,7 @@ export function CalendarFeedSection({
   const feedUrlInputRef = useRef<HTMLInputElement>(null);
   const busy = isLoading || isCreating || isDeleting;
   return (
-    <section id={id} className={cn("rounded-xl border border-border bg-card p-6", className)}>
+    <section id={id} className={getSettingsSectionClassName(className)}>
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex min-w-0 items-start gap-3">
           <CalendarDays className="mt-0.5 h-5 w-5 shrink-0 text-primary" />

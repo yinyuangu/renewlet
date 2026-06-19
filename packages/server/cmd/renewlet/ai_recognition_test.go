@@ -561,6 +561,7 @@ func TestAIRecognitionPromptUsesSharedJSONContract(t *testing.T) {
 		"Do not return Markdown",
 		"Do generate useful service and website metadata",
 		"Examples show output shape and decision patterns only",
+		"do not copy example natural-language output when it conflicts with User locale",
 	} {
 		if !strings.Contains(systemPrompt, want) {
 			t.Fatalf("system prompt missing %q:\n%s", want, systemPrompt)
@@ -586,6 +587,9 @@ func TestAIRecognitionPromptUsesSharedJSONContract(t *testing.T) {
 		"notes must always be an object",
 		"notes.value must be non-null for describable services",
 		"dynamic evidence from this request",
+		"Generated user-facing metadata must follow User locale",
+		"use English for en-US and Simplified Chinese for zh-CN",
+		"Do not translate source=input text, Existing user tags",
 		"Prefer Existing user tags when they fit.",
 		"stable and reusable across multiple subscriptions",
 		"Do not use one-off order attributes as tags",

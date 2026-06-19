@@ -40,6 +40,10 @@ func servePocketBaseTestRequest(t *testing.T, app core.App, method string, targe
 }
 
 func serveTestRequest(t *testing.T, app core.App, method string, target string, body string, token string) *httptest.ResponseRecorder {
+	return serveTestRequestWithHeaders(t, app, method, target, body, token, nil)
+}
+
+func serveTestRequestWithHeaders(t *testing.T, app core.App, method string, target string, body string, token string, headers map[string]string) *httptest.ResponseRecorder {
 	t.Helper()
 	router, err := apis.NewRouter(app)
 	if err != nil {
@@ -55,6 +59,9 @@ func serveTestRequest(t *testing.T, app core.App, method string, target string, 
 	req.Header.Set("content-type", "application/json")
 	if token != "" {
 		req.Header.Set("Authorization", token)
+	}
+	for key, value := range headers {
+		req.Header.Set(key, value)
 	}
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
@@ -301,6 +308,27 @@ func TestSetupRouteHonorsSetupEnabledAndCreatedStatus(t *testing.T) {
 	}
 	if !superuser.ValidatePassword("password123") {
 		t.Fatal("expected setup superuser password to match setup password")
+	}
+}
+
+func TestSetupRouteCreatesInitialSettingsFromRequestLocale(t *testing.T) {
+	app := newSchemaTestApp(t)
+	if err := ensureSchema(app); err != nil {
+		t.Fatal(err)
+	}
+
+	res := serveTestRequestWithHeaders(t, app, http.MethodPost, "/api/app/setup", `{"name":"Admin","email":"admin@example.com","password":"password123"}`, "", map[string]string{
+		"X-Renewlet-Locale": "zh-CN",
+	})
+	if res.Code != http.StatusCreated {
+		t.Fatalf("expected setup create status 201, got %d: %s", res.Code, res.Body.String())
+	}
+	admin, err := app.FindAuthRecordByEmail("users", "admin@example.com")
+	if err != nil {
+		t.Fatalf("expected setup admin user: %v", err)
+	}
+	if got := settingsRecordLocale(t, app, admin.Id); got != string(localeZhCN) {
+		t.Fatalf("expected setup settings locale zh-CN, got %q", got)
 	}
 }
 

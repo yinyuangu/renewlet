@@ -87,14 +87,14 @@ function envFixture(): Env {
   return { DB: {} as D1Database, ASSETS: {} as Fetcher, ASSETS_BUCKET: {} as R2Bucket };
 }
 
-function requestForText(text: string): Request {
+function requestForText(text: string, locale = "zh-CN"): Request {
   const form = new FormData();
   form.set("text", text);
   return new Request("https://renewlet.test/api/app/ai/subscriptions/recognize", {
     method: "POST",
     headers: {
       authorization: "Bearer test",
-      "x-renewlet-locale": "zh-CN",
+      "x-renewlet-locale": locale,
       "x-client-time-zone": "Asia/Shanghai",
     },
     body: form,
@@ -287,6 +287,31 @@ describe("Cloudflare AI recognition", () => {
     expect(body.diagnostics.output.rawObjectJson?.value).toContain("\"name\": \"dmit\"");
     expect(body.diagnostics.request).toMatchObject({ providerType: "openai", transportProtocol: "openai-chat", model: "gpt-5.1", textCharCount: 12, images: [] });
     expect(body.diagnostics.response.finishReason).toBe("stop");
+  });
+
+  it("includes locale-first language rules in English recognition diagnostics", async () => {
+    aiMocks.generateObject.mockResolvedValue({
+      object: {
+        subscriptions: [generatedDraft({
+          currency: "USD",
+          notes: { value: "DMIT is a hosting provider for VPS and cloud server services.", source: "suggested" },
+          tags: ["VPS", "Cloud hosting"],
+        })],
+        warnings: [],
+      },
+      finishReason: "stop",
+    });
+
+    const response = await recognizeSubscriptions(requestForText("dmit 2 months 15dollar", "en-US"), envFixture());
+    const body = await response.json() as {
+      diagnostics: { prompt: { user: { value: string } } };
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.diagnostics.prompt.user.value).toContain("- User locale: en-US");
+    expect(body.diagnostics.prompt.user.value).toContain("Generated user-facing metadata must follow User locale");
+    expect(body.diagnostics.prompt.user.value).toContain("use English for en-US and Simplified Chinese for zh-CN");
+    expect(body.diagnostics.prompt.user.value).toContain("Do not translate source=input text, Existing user tags");
   });
 
   it("does not apply saved default thinking when the multipart field is absent", async () => {

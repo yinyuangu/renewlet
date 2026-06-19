@@ -11,7 +11,7 @@ import { formatTimeZoneOffset } from "@/lib/time/time-zone";
 import { getIntlCurrencyIdentityLabel } from "@/lib/currency-data";
 import type { ConfigItem } from "@/types/config";
 import type { CurrencyOption, CurrencyRegion } from "@/types/subscription";
-import { localizedLabel, type Locale } from "@/i18n/locales";
+import { DEFAULT_LOCALE, localizedLabel, type Locale } from "@/i18n/locales";
 import { translateStaticMessage } from "@/i18n/static-catalogs";
 
 /** 可搜索 Select/Command 组件使用的通用选项结构。 */
@@ -134,7 +134,7 @@ export function createCurrencySelectOptions(params: {
   includeDisabledCurrent?: string;
   locale?: Locale;
 }): SearchableSelectOption[] {
-  const locale = params.locale ?? "zh-CN";
+  const locale = params.locale ?? DEFAULT_LOCALE;
   const optionByValue = new Map(params.currencyOptions.map((option) => [option.value, option]));
   const enabled = params.currencies.filter((currency) => currency.enabled !== false);
   const selected = params.includeDisabledCurrent

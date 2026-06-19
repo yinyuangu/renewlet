@@ -12,7 +12,7 @@ import (
 	"golang.org/x/text/language"
 )
 
-const defaultAppLocale = localeZhCN
+const defaultAppLocale = localeEnUS
 
 // 服务端 catalog 是 Go/Worker 的唯一文案源；前端错误展示只共享 code，不共享这里的翻译文本。
 //

@@ -8,7 +8,7 @@
  */
 import { Temporal } from "@js-temporal/polyfill";
 import { translate } from "@/i18n/messages";
-import type { Locale } from "@/i18n/locales";
+import { DEFAULT_LOCALE, type Locale } from "@/i18n/locales";
 
 /** `YYYY-MM-DD` 业务日期品牌类型，表示日历日期而不是 UTC instant。 */
 export type DateOnly = string & { readonly __brand: "DateOnly" };
@@ -91,7 +91,7 @@ export function isSameMonthDateOnly(date: DateOnly | string, month: DateOnly | s
 }
 
 /** 格式化为简洁展示日期。 */
-export function formatDateOnlyForDisplay(date: DateOnly | string, locale: Locale = "zh-CN"): string {
+export function formatDateOnlyForDisplay(date: DateOnly | string, locale: Locale = DEFAULT_LOCALE): string {
   const value = toPlainDate(date);
   return translate(locale, "date.short", {
     year: value.year,
@@ -100,8 +100,8 @@ export function formatDateOnlyForDisplay(date: DateOnly | string, locale: Locale
   });
 }
 
-/** 格式化为中文月日，用于即将续费等紧凑 UI。 */
-export function formatDateOnlyMonthDay(date: DateOnly | string, locale: Locale = "zh-CN"): string {
+/** 格式化为月日短格式，用于即将续费等紧凑 UI。 */
+export function formatDateOnlyMonthDay(date: DateOnly | string, locale: Locale = DEFAULT_LOCALE): string {
   const value = toPlainDate(date);
   return translate(locale, "date.monthDay", {
     month: value.month,
@@ -109,8 +109,8 @@ export function formatDateOnlyMonthDay(date: DateOnly | string, locale: Locale =
   });
 }
 
-/** 格式化为完整中文日期。 */
-export function formatDateOnlyChinese(date: DateOnly | string, locale: Locale = "zh-CN"): string {
+/** 格式化为当前语言的完整日期。 */
+export function formatDateOnlyChinese(date: DateOnly | string, locale: Locale = DEFAULT_LOCALE): string {
   const value = toPlainDate(date);
   return translate(locale, "date.full", {
     year: value.year,

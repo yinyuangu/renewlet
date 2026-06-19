@@ -49,6 +49,7 @@ func TestBuildDueNotificationSkipsOneTimePurchases(t *testing.T) {
 
 func TestBuildDueNotificationCreatesOneTimeFixedTermExpiry(t *testing.T) {
 	settings := defaultAppSettings()
+	settings.Locale = string(localeZhCN)
 	settings.ShowExpired = false
 	settings.Timezone = "Asia/Shanghai"
 
@@ -146,7 +147,8 @@ func TestRepeatReminderScheduleBuildsRepeatItem(t *testing.T) {
 	if item.RepeatReminder == nil || item.RepeatReminder.Interval != "1h" || item.RepeatReminder.Window != "72h" {
 		t.Fatalf("expected repeat reminder snapshot, got %#v", item.RepeatReminder)
 	}
-	if !strings.Contains(message.Content, "重复提醒，每 1 小时") {
+	expectedRepeatCopy := formatRepeatReminderText("1h", defaultAppLocale)
+	if !strings.Contains(message.Content, expectedRepeatCopy) {
 		t.Fatalf("expected repeat reminder copy in content, got %q", message.Content)
 	}
 }

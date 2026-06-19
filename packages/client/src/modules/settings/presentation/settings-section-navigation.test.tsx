@@ -1,4 +1,4 @@
-// 设置目录测试聚焦滚动状态机，避免页面主体测试文件再次超过 CI 行数门禁。
+// 设置目录测试聚焦滚动状态机、移动 sticky 和桌面锚点契约，避免页面主体测试文件再次超过 CI 行数门禁。
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -66,7 +66,15 @@ describe("SettingsScreen section navigation", () => {
     ] as const;
 
     const desktopNav = screen.getByTestId("settings-section-nav-desktop");
-    expect(desktopNav).toHaveClass("sticky", "top-28", "bg-card/70", "backdrop-blur", "overflow-y-auto");
+    expect(desktopNav).toHaveClass(
+      "sticky",
+      "top-[var(--settings-desktop-sticky-top)]",
+      "max-h-[calc(var(--app-viewport-height)-var(--settings-desktop-sticky-top)-1rem)]",
+      "bg-card/70",
+      "backdrop-blur",
+      "overflow-y-auto",
+    );
+    expect(desktopNav).not.toHaveClass("top-28", "max-h-[calc(100vh-8rem)]");
     expect(within(desktopNav).getByRole("link", { name: "账户" })).toHaveAttribute("aria-current", "location");
     expect(IntersectionObserver).not.toHaveBeenCalled();
     expect(screen.queryByTestId("settings-section-content-scroll")).not.toBeInTheDocument();
@@ -85,8 +93,7 @@ describe("SettingsScreen section navigation", () => {
     expect(mobileSubtitle).toBeDefined();
     expect(desktopSubtitle).toBeDefined();
     expect(mobileSubtitle).toHaveAttribute("data-testid", "settings-mobile-page-subtitle");
-    expect(mobileSubtitle?.closest("[data-testid='settings-mobile-page-header']")).toBeNull();
-    expect(mobileSubtitle?.compareDocumentPosition(mobileHeading as Element)).toBe(Node.DOCUMENT_POSITION_PRECEDING);
+    expect(mobileSubtitle?.closest("[data-testid='settings-mobile-page-header']")).not.toBeNull();
     expect(desktopSubtitle?.closest(".hidden.lg\\:block")).not.toBeNull();
     expect(within(content).getByRole("heading", { name: "管理员账户" })).toBeInTheDocument();
     expect(screen.queryByTestId("settings-section-nav-floating-trigger")).not.toBeInTheDocument();
@@ -94,26 +101,36 @@ describe("SettingsScreen section navigation", () => {
     const mobileHeader = within(content).getByTestId("settings-mobile-page-header");
     expect(mobileHeader).toHaveClass(
       "sticky",
-      "top-[calc(8.25rem+env(safe-area-inset-top))]",
-      "bg-background/90",
-      "border-b",
+      "top-[calc(var(--settings-mobile-header-offset)+var(--settings-mobile-sticky-gap))]",
+      "rounded-xl",
+      "border",
+      "bg-background/95",
+      "p-4",
       "lg:hidden",
     );
+    expect(mobileHeader).not.toHaveClass("-mx-4", "border-b", "top-[calc(8.25rem+env(safe-area-inset-top))]");
     const accountSection = container.querySelector("#settings-account");
     expect(accountSection).not.toBeNull();
     expect(mobileHeader.compareDocumentPosition(accountSection as Element)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     const mobileTrigger = within(mobileHeader).getByRole("button", { name: /打开设置目录/ });
-    expect(mobileTrigger).toHaveClass("h-9", "w-9", "rounded-lg", "bg-card/80");
+    expect(mobileTrigger).toHaveClass("h-9", "w-9", "shrink-0", "rounded-lg", "bg-card/80");
     expect(mobileTrigger).not.toHaveTextContent("目录");
     expect(mobileTrigger).not.toHaveTextContent("时区");
-    expect(within(mobileHeader).queryByText("管理您的账户、显示和通知设置")).not.toBeInTheDocument();
+    expect(within(mobileHeader).getByTestId("settings-mobile-page-subtitle")).toHaveTextContent("管理您的账户、显示和通知设置");
     const sectionNav = within(desktopNav);
 
     sections.forEach(([id, label]) => {
       expect(container.querySelector(`section#${id}`)).toHaveClass(
-        "scroll-mt-[calc(13rem+env(safe-area-inset-top))]",
-        "lg:scroll-mt-24",
+        "min-w-0",
+        "w-full",
+        "rounded-xl",
+        "border",
+        "bg-card",
+        "p-4",
+        "sm:p-6",
+        "scroll-mt-[var(--settings-section-scroll-offset)]",
       );
+      expect(container.querySelector(`section#${id}`)).not.toHaveClass("lg:scroll-mt-24");
       const links = sectionNav.getAllByRole("link", { name: label });
       expect(links).toHaveLength(1);
       links.forEach((link) => expect(link).toHaveAttribute("href", `#${id}`));

@@ -4,6 +4,7 @@ import { render as renderComponent, screen, waitFor } from "@testing-library/rea
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { EXPLICIT_LOCALE_PREFERENCE_KEY } from "@/i18n/locales";
 import { IMAGE_UPLOAD_ACCEPT } from "@/lib/upload-constraints";
 import { LogoPicker } from "./logo-picker";
 
@@ -302,6 +303,46 @@ describe("LogoPicker", () => {
     expect(input).toHaveAttribute("accept", IMAGE_UPLOAD_ACCEPT);
     expect(emptyPreview).toHaveClass("border-dashed");
     expect(emptyPreview).not.toHaveClass("media-thumbnail-canvas");
+  });
+
+  it("keeps English Logo action labels at content width", () => {
+    localStorage.setItem(EXPLICIT_LOCALE_PREFERENCE_KEY, "en-US");
+
+    render(<LogoPicker value={undefined} onChange={vi.fn()} />);
+
+    const uploadButton = screen.getByRole("button", { name: "Upload Logo" });
+    const controlRow = screen.getByTestId("logo-picker-control-row");
+    const secondaryActions = screen.getByTestId("logo-picker-secondary-actions");
+    expect(uploadButton).toHaveClass("w-full");
+    expect(controlRow).toHaveClass("flex", "flex-wrap", "items-center", "gap-3");
+    expect(secondaryActions).toHaveClass(
+      "flex",
+      "w-max",
+      "max-w-full",
+      "flex-wrap",
+      "items-center",
+      "justify-start",
+      "gap-2"
+    );
+    expect(secondaryActions).not.toHaveClass("grid");
+    expect(secondaryActions).not.toHaveClass("grid-cols-3");
+    expect(secondaryActions.parentElement).toHaveClass(
+      "min-w-0",
+      "w-fit",
+      "max-w-full",
+      "gap-2"
+    );
+    expect(secondaryActions.parentElement).not.toHaveClass("flex-1");
+    expect(secondaryActions.parentElement).not.toHaveClass("max-w-52");
+
+    for (const label of ["Uploaded", "Search", "Link"]) {
+      const button = screen.getByRole("button", { name: label });
+      const labelText = button.querySelector("span");
+      if (!labelText) throw new Error(`Expected ${label} action to render a text wrapper.`);
+      expect(button).toHaveClass("h-8", "w-fit", "max-w-full", "shrink-0", "px-3");
+      expect(button).not.toHaveClass("w-full");
+      expect(labelText).toHaveClass("min-w-0", "truncate");
+    }
   });
 
   it("selects an uploaded custom Logo from the uploaded Logo picker", async () => {

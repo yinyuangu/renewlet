@@ -1,4 +1,4 @@
-// SettingsScreen 测试保护设置页分区装配和 Cloudflare/Docker 差异入口，不验证普通控件样式。
+// SettingsScreen 测试保护设置页分区装配、H5 布局契约和 Cloudflare/Docker 差异入口，不验证普通控件细节样式。
 import { useState } from "react";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -15,6 +15,7 @@ import {
   createUploadedAssetsManagerState,
   mocks,
   renderSettingsScreen,
+  SETTINGS_SECTION_IDS,
 } from "./settings-screen.test-utils";
 
 function StatefulEmailNotificationPanel({ initialPort = "" }: { initialPort?: string }) {
@@ -729,6 +730,40 @@ describe("SettingsScreen SMTP email settings", () => {
     expect(screen.queryByText("有未保存更改")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "保存更改" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "放弃更改" })).not.toBeInTheDocument();
+  });
+
+  it("uses the unified settings layout contract without horizontal gutter workarounds", () => {
+    const { container } = renderSettingsScreen();
+
+    const pageLayout = screen.getByTestId("settings-page-layout");
+    const content = screen.getByTestId("settings-section-content");
+    expect(screen.getByTestId("settings-main")).toHaveClass("flex-1");
+    expect(pageLayout).toHaveClass("grid", "min-w-0", "gap-6", "lg:gap-8", "lg:grid-cols-[14rem_minmax(0,1fr)]");
+    expect(pageLayout.className).toContain("[--settings-mobile-header-offset:calc(8.25rem+env(safe-area-inset-top))]");
+    expect(pageLayout.className).toContain("[--settings-desktop-sticky-top:7rem]");
+    expect(pageLayout.className).toContain("[--settings-desktop-section-scroll-offset:var(--settings-desktop-sticky-top)]");
+    expect(pageLayout.className).toContain("[--settings-section-scroll-offset:calc(var(--settings-mobile-header-offset)+var(--settings-mobile-sticky-gap)+var(--settings-mobile-header-height)+0.75rem)]");
+    expect(pageLayout.className).toContain("lg:[--settings-section-scroll-offset:var(--settings-desktop-section-scroll-offset)]");
+    expect(content).toHaveClass("grid", "min-w-0", "gap-6", "lg:gap-8");
+    expect(content).not.toHaveClass("lg:overflow-y-auto");
+    expect(content.querySelector(".-mx-4")).toBeNull();
+    expect(content.querySelector(".overflow-x-auto")).toBeNull();
+
+    SETTINGS_SECTION_IDS.forEach((id) => {
+      const section = container.querySelector(`section#${id}`);
+      expect(section).toHaveClass(
+        "min-w-0",
+        "w-full",
+        "rounded-xl",
+        "border",
+        "bg-card",
+        "p-4",
+        "sm:p-6",
+        "scroll-mt-[var(--settings-section-scroll-offset)]",
+      );
+      expect(section).not.toHaveClass("lg:scroll-mt-24");
+      expect(section).not.toHaveClass("p-6");
+    });
   });
 
   it("shows discard and save actions only when there are unsaved changes", async () => {

@@ -4,6 +4,7 @@
  * 支持集合固定为 fawazahmed0/exchange-api 与 FloatRates JSON Feeds 的交集，
  * 已在 2026-05-17 核验。标签和符号运行时由 Intl 派生，让列表保持紧凑且支持 locale。
  */
+import { DEFAULT_LOCALE, type Locale } from "@/i18n/locales";
 
 export const SUPPORTED_EXCHANGE_RATE_CURRENCIES = [
   "AED", "AFN", "ALL", "AMD", "AOA", "ARS", "AUD", "AWG", "AZN", "BAM", "BBD", "BDT",
@@ -49,7 +50,7 @@ export function orderCurrencyItemsByCommonPriority<T extends { value: string }>(
   });
 }
 
-export function getIntlCurrencyName(currency: string, locale: string): string {
+export function getIntlCurrencyName(currency: string, locale: Locale = DEFAULT_LOCALE): string {
   try {
     const displayNames = new Intl.DisplayNames([locale], { type: "currency" });
     return displayNames.of(currency) ?? currency;
@@ -58,7 +59,7 @@ export function getIntlCurrencyName(currency: string, locale: string): string {
   }
 }
 
-export function getIntlCurrencySymbol(currency: string, locale = "zh-CN"): string {
+export function getIntlCurrencySymbol(currency: string, locale: Locale = DEFAULT_LOCALE): string {
   try {
     const narrowParts = new Intl.NumberFormat(locale, {
       style: "currency",
@@ -99,7 +100,7 @@ function formatCurrencyIdentityLabel(code: string, name: string, symbol: string)
   return `${symbol} ${name} (${code})`;
 }
 
-export function getIntlCurrencyIdentityLabel(currency: string, locale: string): IntlCurrencyIdentityLabel {
+export function getIntlCurrencyIdentityLabel(currency: string, locale: Locale = DEFAULT_LOCALE): IntlCurrencyIdentityLabel {
   const code = currency.toUpperCase();
   const name = getIntlCurrencyName(code, locale);
   const symbol = getIntlCurrencySymbol(code, locale);
@@ -108,6 +109,6 @@ export function getIntlCurrencyIdentityLabel(currency: string, locale: string): 
   return { code, name, symbol, label };
 }
 
-export function getIntlCurrencyOptionLabel(currency: string, locale: string): string {
+export function getIntlCurrencyOptionLabel(currency: string, locale: Locale = DEFAULT_LOCALE): string {
   return getIntlCurrencyIdentityLabel(currency, locale).label;
 }

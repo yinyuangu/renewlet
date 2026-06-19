@@ -6,9 +6,8 @@ import { Menu, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/i18n/I18nProvider';
+import { settingsLayout } from './settings-layout';
 
-// H5 锚点定位需要同时避开全局顶部区和设置页局部 sticky 标题；scrollIntoView 会读取目标元素的 scroll-margin。
-export const SETTINGS_SECTION_SCROLL_CLASS = "scroll-mt-[calc(13rem+env(safe-area-inset-top))] lg:scroll-mt-24";
 const PROGRAMMATIC_SCROLL_IDLE_MS = 160;
 const BOTTOM_EDGE_TOLERANCE_PX = 4;
 
@@ -331,7 +330,7 @@ export function DesktopSettingsSectionNav({
   return (
     <nav
       aria-label={t("settings.sectionNavLabel")}
-      className="sticky top-28 max-h-[calc(100vh-8rem)] overflow-y-auto rounded-xl border border-border bg-card/70 p-3 shadow-card backdrop-blur"
+      className={settingsLayout.desktopNav}
       data-testid="settings-section-nav-desktop"
     >
       <div className="grid gap-3">
@@ -420,29 +419,29 @@ export function MobileSettingsPageHeader({ onOpen }: { onOpen: () => void }) {
   const { t } = useI18n();
 
   return (
-    <>
-      <div
-        className="sticky top-[calc(8.25rem+env(safe-area-inset-top))] z-30 -mx-4 border-b border-border/70 bg-background/90 px-4 py-3 backdrop-blur-xl lg:hidden"
-        data-testid="settings-mobile-page-header"
-      >
-        <div className="flex items-center justify-between gap-3">
-          <h1 className="min-w-0 truncate text-2xl font-bold text-foreground">{t("settings.title")}</h1>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="h-9 w-9 shrink-0 rounded-lg border border-border bg-card/80 text-muted-foreground hover:border-primary/40 hover:bg-secondary/80 hover:text-foreground"
-            aria-label={t("settings.sectionNavOpen")}
-            onClick={onOpen}
-          >
-            <Menu className="h-4 w-4" />
-          </Button>
+    <div
+      className={settingsLayout.mobileHeader}
+      data-testid="settings-mobile-page-header"
+    >
+      <div className={settingsLayout.mobileHeaderRow}>
+        <div className={settingsLayout.mobileHeaderText}>
+          <h1 className={settingsLayout.mobileHeaderTitle}>{t("settings.title")}</h1>
+          <p className={settingsLayout.mobileHeaderSubtitle} data-testid="settings-mobile-page-subtitle">
+            {t("settings.subtitle")}
+          </p>
         </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className={settingsLayout.mobileHeaderTrigger}
+          aria-label={t("settings.sectionNavOpen")}
+          onClick={onOpen}
+        >
+          <Menu className="h-4 w-4" />
+        </Button>
       </div>
-      <p className="text-sm text-muted-foreground lg:hidden" data-testid="settings-mobile-page-subtitle">
-        {t("settings.subtitle")}
-      </p>
-    </>
+    </div>
   );
 }
 

@@ -12,12 +12,12 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useI18n } from "@/i18n/I18nProvider";
-import { cn } from "@/lib/utils";
 import { CloudBackupActionsPanel } from "./cloud-backup-actions-panel";
 import { CloudBackupConnectionForm, type CloudBackupConnectionField } from "./cloud-backup-connection-form";
 import { CloudBackupPolicyForm } from "./cloud-backup-policy-form";
 import { CloudBackupSnapshotList } from "./cloud-backup-snapshot-list";
 import { LoadingButtonContent } from "./settings-shared-controls";
+import { getSettingsSectionClassName } from "./settings-layout";
 import type { CloudBackupController } from "../application/use-cloud-backup-controller";
 import type { CloudBackupProvider, CloudBackupSnapshot } from "@/lib/api/schemas/cloud-backup";
 
@@ -89,7 +89,7 @@ export function CloudBackupSection({
   const deleteDialogBusy = deleteTarget ? deletingSnapshotKey === cloudBackupSnapshotKey(deleteTarget) : false;
 
   return (
-    <section id={id} className={cn("rounded-xl border border-border bg-card p-6", className)}>
+    <section id={id} className={getSettingsSectionClassName(className)}>
       <div className="mb-5 flex min-w-0 items-start gap-3">
         <Cloud className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
         <div className="min-w-0">
