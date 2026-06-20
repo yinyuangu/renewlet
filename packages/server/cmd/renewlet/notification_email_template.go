@@ -45,9 +45,32 @@ type emailTheme struct {
 	Border       string
 	Text         string
 	Muted        string
-	Warning      string
-	Danger       string
-	Success      string
+}
+
+type emailBrand struct {
+	Name       string
+	HeaderMark emailBrandMark
+}
+
+type emailBrandMark struct {
+	ClassName    string
+	Size         int
+	Radius       int
+	Background   string
+	Border       string
+	Foreground   string
+	Accent       string
+	TopWidth     int
+	TopHeight    int
+	TopRadius    int
+	DotSize      int
+	DotRadius    int
+	Gap          int
+	RowGap       int
+	BottomWidth  int
+	BottomHeight int
+	BottomRadius int
+	BottomInset  int
 }
 
 type emailCatalog struct {
@@ -79,25 +102,49 @@ type emailCatalog struct {
 }
 
 type emailTemplateData struct {
-	Lang         string
-	Title        string
-	Preheader    string
-	StatusLabel  string
-	HasGroups    bool
-	ContentLines []string
-	Groups       []emailTemplateGroup
-	SummaryRows  []emailTemplateSummaryRow
-	ShowCTA      bool
-	CTAURL       string
-	CTALabel     string
-	Timestamp    string
-	Copy         emailCatalog
-	Theme        emailTheme
+	LayoutMode            string
+	Lang                  string
+	Title                 string
+	Preheader             string
+	StatusLabel           string
+	Summary               emailTemplateSummaryPanel
+	MessagePanel          *emailTemplateMessagePanel
+	Groups                []emailTemplateGroup
+	ShowCTA               bool
+	ShowCardBottomPadding bool
+	CTAURL                string
+	CTALabel              string
+	Timestamp             string
+	Copy                  emailCatalog
+	Theme                 emailTheme
+	Brand                 emailBrand
+}
+
+type emailLayoutMode string
+
+const (
+	emailLayoutReminderList   emailLayoutMode = "reminder-list"
+	emailLayoutTestStatus     emailLayoutMode = "test-status"
+	emailLayoutEmptyMessage   emailLayoutMode = "empty-message"
+	emailLayoutCompactMessage emailLayoutMode = "compact-message"
+)
+
+type emailTemplateSummaryPanel struct {
+	Eyebrow string
+	Value   string
+	Label   string
+	Detail  string
+	Rows    []emailTemplateSummaryRow
 }
 
 type emailTemplateSummaryRow struct {
 	Label string
 	Value string
+}
+
+type emailTemplateMessagePanel struct {
+	Label string
+	Lines []string
 }
 
 type emailTemplateGroup struct {
@@ -113,11 +160,6 @@ type emailTemplateItem struct {
 	Amount     string
 	Currency   string
 	Detail     string
-	Accent     emailAccent
-}
-
-type emailAccent struct {
-	Text string
 }
 
 func buildEmailHTMLMessage(settings appSettings, message notificationMessage) (string, error) {
@@ -146,6 +188,7 @@ func buildEmailTemplateData(settings appSettings, message notificationMessage, c
 	copy := loadEmailCatalog(locale)
 	itemCount := len(message.Items)
 	hasReminderItems := itemCount > 0
+	layoutMode := emailLayoutModeForMessage(message, compact)
 	if compact {
 		message.Items = nil
 		message.Content = emailCompactContent(message.Content, copy)
@@ -153,37 +196,50 @@ func buildEmailTemplateData(settings appSettings, message notificationMessage, c
 
 	groups := []emailTemplateGroup{}
 	if len(message.Items) > 0 {
-		groups = buildEmailTemplateGroups(message.Items, locale, copy, emailThemeFromSettings(settings))
+		groups = buildEmailTemplateGroups(message.Items, locale, copy)
 	}
-	statusLabel := copy.Generated
-	if itemCount == 0 && !message.HasPayload {
-		statusLabel = copy.NoReminders
-	} else if itemCount == 0 {
-		statusLabel = copy.TestNotification
-	}
+	statusLabel := emailStatusLabel(itemCount, message.HasPayload, copy)
 
-	contentLines := []string{}
-	if len(groups) == 0 {
-		contentLines = splitEmailContentLines(message.Content, copy)
+	var messagePanel *emailTemplateMessagePanel
+	if layoutMode == emailLayoutEmptyMessage || layoutMode == emailLayoutCompactMessage {
+		messagePanel = &emailTemplateMessagePanel{
+			Label: copy.Message,
+			Lines: splitEmailContentLines(message.Content, copy),
+		}
 	}
 	showCTA, ctaURL, ctaLabel := emailCTAFromAppURL(os.Getenv("APP_URL"), hasReminderItems, copy)
 
 	return emailTemplateData{
-		Lang:         emailHTMLLang(locale),
-		Title:        message.Title,
-		Preheader:    emailPreheader(message, copy),
-		StatusLabel:  statusLabel,
-		HasGroups:    len(groups) > 0,
-		ContentLines: contentLines,
-		Groups:       groups,
-		SummaryRows:  emailSummaryRows(itemCount, groups, copy),
-		ShowCTA:      showCTA,
-		CTAURL:       ctaURL,
-		CTALabel:     ctaLabel,
-		Timestamp:    message.Timestamp,
-		Copy:         copy,
-		Theme:        emailThemeFromSettings(settings),
+		LayoutMode:            string(layoutMode),
+		Lang:                  emailHTMLLang(locale),
+		Title:                 message.Title,
+		Preheader:             emailPreheader(message, copy),
+		StatusLabel:           statusLabel,
+		Summary:               emailSummaryPanel(itemCount, groups, statusLabel, message, copy),
+		MessagePanel:          messagePanel,
+		Groups:                groups,
+		ShowCTA:               showCTA,
+		ShowCardBottomPadding: !showCTA,
+		CTAURL:                ctaURL,
+		CTALabel:              ctaLabel,
+		Timestamp:             message.Timestamp,
+		Copy:                  copy,
+		Theme:                 emailThemeFromSettings(settings),
+		Brand:                 emailBrandView(),
 	}, nil
+}
+
+func emailLayoutModeForMessage(message notificationMessage, compact bool) emailLayoutMode {
+	if compact {
+		return emailLayoutCompactMessage
+	}
+	if len(message.Items) > 0 {
+		return emailLayoutReminderList
+	}
+	if message.HasPayload {
+		return emailLayoutTestStatus
+	}
+	return emailLayoutEmptyMessage
 }
 
 func renderEmailTemplate(data emailTemplateData) (string, error) {
@@ -235,7 +291,7 @@ func loadEmailCatalog(locale appLocale) emailCatalog {
 	}
 }
 
-func buildEmailTemplateGroups(items []notificationContentItem, locale appLocale, copy emailCatalog, theme emailTheme) []emailTemplateGroup {
+func buildEmailTemplateGroups(items []notificationContentItem, locale appLocale, copy emailCatalog) []emailTemplateGroup {
 	grouped := map[string][]notificationContentItem{
 		"renewal": {},
 		"expiry":  {},
@@ -251,6 +307,7 @@ func buildEmailTemplateGroups(items []notificationContentItem, locale appLocale,
 		grouped[itemType] = append(grouped[itemType], item)
 	}
 
+	// subscription logoUrl 不进入邮件模板；外链图片会让邮件客户端暴露私有资产或第三方请求痕迹。
 	// 邮件分组顺序固定，避免 map iteration 导致同一批提醒在不同运行中顺序抖动。
 	order := []string{"renewal", "expiry", "trial", "expired"}
 	groups := make([]emailTemplateGroup, 0, len(order))
@@ -272,12 +329,42 @@ func buildEmailTemplateGroups(items []notificationContentItem, locale appLocale,
 				Amount:     formatAmount(item.Price),
 				Currency:   item.Currency,
 				Detail:     emailItemDetail(item, locale, copy),
-				Accent:     emailItemAccent(item.Type, theme),
 			})
 		}
 		groups = append(groups, group)
 	}
 	return groups
+}
+
+func emailStatusLabel(itemCount int, hasPayload bool, copy emailCatalog) string {
+	if itemCount == 0 && !hasPayload {
+		return copy.NoReminders
+	}
+	if itemCount == 0 {
+		return copy.TestNotification
+	}
+	return copy.Generated
+}
+
+func emailSummaryPanel(itemCount int, groups []emailTemplateGroup, statusLabel string, message notificationMessage, copy emailCatalog) emailTemplateSummaryPanel {
+	hasReminderItems := itemCount > 0
+	detail := firstNonEmptyLine(message.Content)
+	if hasReminderItems {
+		detail = formatCatalogCopy(copy.PreheaderItems, map[string]interface{}{"count": itemCount})
+	} else if detail == "" {
+		detail = message.Title
+	}
+	label := statusLabel
+	if hasReminderItems {
+		label = copy.ReminderItems
+	}
+	return emailTemplateSummaryPanel{
+		Eyebrow: statusLabel,
+		Value:   fmt.Sprint(itemCount),
+		Label:   label,
+		Detail:  detail,
+		Rows:    emailSummaryRows(itemCount, groups, copy),
+	}
 }
 
 func emailSummaryRows(itemCount int, groups []emailTemplateGroup, copy emailCatalog) []emailTemplateSummaryRow {
@@ -340,15 +427,42 @@ func emailThemeFromSettings(settings appSettings) emailTheme {
 		Primary:      primary,
 		PrimaryText:  contrastTextForHSL(h, s, l),
 		PrimarySoft:  hslToHex(h, math.Min(s, 50), 95),
-		Background:   "#F9FAFB",
+		Background:   "#F5F7F6",
 		Surface:      "#FFFFFF",
-		SurfaceMuted: "#F3F5F7",
-		Border:       "#E3E7ED",
-		Text:         "#171C26",
-		Muted:        "#6C7993",
-		Warning:      "#F59F0A",
-		Danger:       "#DC2828",
-		Success:      primary,
+		SurfaceMuted: "#F8FAF9",
+		Border:       "#E6EAE8",
+		Text:         "#0F172A",
+		Muted:        "#64748B",
+	}
+}
+
+// 邮件品牌标识只提供内联 primitives 的尺寸和颜色；不要改成 SVG/IMG/CID，避免邮件客户端拦截或远程请求泄露。
+func emailBrandView() emailBrand {
+	base := emailBrandMark{
+		Background: "#111720",
+		Border:     "#26313D",
+		Foreground: "#F8FAFC",
+		Accent:     "#10B981",
+	}
+	header := base
+	header.ClassName = "email-brand-lockup-mark"
+	header.Size = 28
+	header.Radius = 7
+	header.TopWidth = 13
+	header.TopHeight = 4
+	header.TopRadius = 2
+	header.DotSize = 4
+	header.DotRadius = 2
+	header.Gap = 3
+	header.RowGap = 6
+	header.BottomWidth = 15
+	header.BottomHeight = 3
+	header.BottomRadius = 2
+	header.BottomInset = 2
+
+	return emailBrand{
+		Name:       "Renewlet",
+		HeaderMark: header,
 	}
 }
 
@@ -378,17 +492,6 @@ func validEmailCustomColor(color themeCustomColor) bool {
 		}
 	}
 	return color.H >= 0 && color.H <= 360 && color.S >= 0 && color.S <= 100 && color.L >= 0 && color.L <= 100
-}
-
-func emailItemAccent(itemType string, theme emailTheme) emailAccent {
-	switch itemType {
-	case "trial", "expiry":
-		return emailAccent{Text: theme.Warning}
-	case "expired":
-		return emailAccent{Text: theme.Danger}
-	default:
-		return emailAccent{Text: theme.Success}
-	}
 }
 
 func emailHTMLLang(locale appLocale) string {
