@@ -79,9 +79,9 @@ func sendTelegram(settings appSettings, message notificationMessage) error {
 	}
 	endpoint := "https://api.telegram.org/bot" + token + "/sendMessage"
 	body := telegramSendMessageRequest{
-		ChatID:                chatID,
-		Text:                  buildTextMessage(message),
-		DisableWebPagePreview: true,
+		ChatID:             chatID,
+		Text:               buildTextMessage(message),
+		LinkPreviewOptions: &telegramLinkPreviewOptions{IsDisabled: true},
 	}
 	var lastErr error
 	for attempt := 0; attempt < 3; attempt++ {

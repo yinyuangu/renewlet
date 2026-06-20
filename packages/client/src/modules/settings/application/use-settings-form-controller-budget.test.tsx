@@ -35,6 +35,14 @@ const mocks = vi.hoisted(() => ({
   createPublicStatusPageMutateAsync: vi.fn(),
   updatePublicStatusPageMutateAsync: vi.fn(),
   deletePublicStatusPageMutateAsync: vi.fn(),
+  publicApiTokens: { data: [], isLoading: false },
+  createPublicApiTokenMutateAsync: vi.fn(),
+  deletePublicApiTokenMutateAsync: vi.fn(),
+  telegramBotCommands: { data: undefined as unknown, isLoading: false, refetch: vi.fn() },
+  installTelegramBotCommandsMutateAsync: vi.fn(),
+  installTelegramBotCommandsIsPending: false,
+  deleteTelegramBotCommandsMutateAsync: vi.fn(),
+  deleteTelegramBotCommandsIsPending: false,
   isCloudflareRuntime: false,
   accountIdentity: { email: "alice@example.com" as string | null, role: "admin", banned: false },
   appStatus: { setupRequired: false, setupEnabled: true, demoMode: false, isLoading: false },
@@ -92,6 +100,24 @@ vi.mock("@/hooks/use-public-status-page", () => ({
   useDeletePublicStatusPage: () => ({ mutateAsync: mocks.deletePublicStatusPageMutateAsync, isPending: false }),
 }));
 
+vi.mock("@/hooks/use-public-api-tokens", () => ({
+  usePublicApiTokens: () => mocks.publicApiTokens,
+  useCreatePublicApiToken: () => ({ mutateAsync: mocks.createPublicApiTokenMutateAsync, isPending: false }),
+  useDeletePublicApiToken: () => ({ mutateAsync: mocks.deletePublicApiTokenMutateAsync, isPending: false, variables: null }),
+}));
+
+vi.mock("@/hooks/use-telegram-bot-commands", () => ({
+  useTelegramBotCommands: () => mocks.telegramBotCommands,
+  useInstallTelegramBotCommands: () => ({
+    mutateAsync: mocks.installTelegramBotCommandsMutateAsync,
+    isPending: mocks.installTelegramBotCommandsIsPending,
+  }),
+  useDeleteTelegramBotCommands: () => ({
+    mutateAsync: mocks.deleteTelegramBotCommandsMutateAsync,
+    isPending: mocks.deleteTelegramBotCommandsIsPending,
+  }),
+}));
+
 vi.mock("@/lib/theme-provider", () => ({
   clearThemeModeOverride: mocks.clearThemeModeOverride,
   useTheme: () => ({ theme: mocks.theme, setTheme: mocks.setTheme }),
@@ -113,6 +139,8 @@ vi.mock("@/i18n/I18nProvider", () => {
     "settings.savedDescription": "所有更改已同步。",
     "settings.saveFailed": "保存失败",
     "settings.budgetInvalid": "预算金额无效",
+    "settings.telegramBotCommandsConfigMissing": "请先填写并保存 Bot Token 和 Chat ID。",
+    "settings.telegramBotCommandsHttpsRequired": "Telegram Webhook 需要 HTTPS 外部访问地址。",
   };
 
   return {
@@ -166,6 +194,13 @@ describe("useSettingsFormController monthly budget input", () => {
     mocks.updateSettingsMutateAsync.mockReset();
     mocks.refreshRates.mockReset();
     mocks.saveConfig.mockReset();
+    mocks.createPublicApiTokenMutateAsync.mockReset();
+    mocks.deletePublicApiTokenMutateAsync.mockReset();
+    mocks.telegramBotCommands.refetch.mockReset();
+    mocks.installTelegramBotCommandsMutateAsync.mockReset();
+    mocks.installTelegramBotCommandsIsPending = false;
+    mocks.deleteTelegramBotCommandsMutateAsync.mockReset();
+    mocks.deleteTelegramBotCommandsIsPending = false;
     mocks.setTheme.mockReset();
     mocks.clearThemeModeOverride.mockReset();
     mocks.theme = "dark";
@@ -175,6 +210,8 @@ describe("useSettingsFormController monthly budget input", () => {
     localStorage.removeItem(SETTINGS_THEME_MODE_STORAGE_KEY);
     mocks.remoteSettings = BASE_SETTINGS;
     mocks.customConfig = DEFAULT_CUSTOM_CONFIG;
+    mocks.publicApiTokens = { data: [], isLoading: false };
+    mocks.telegramBotCommands = { data: undefined, isLoading: false, refetch: vi.fn().mockResolvedValue(undefined) };
     mocks.isCloudflareRuntime = false;
     mocks.accountIdentity = { email: "alice@example.com", role: "admin", banned: false };
     mocks.appStatus = { setupRequired: false, setupEnabled: true, demoMode: false, isLoading: false };

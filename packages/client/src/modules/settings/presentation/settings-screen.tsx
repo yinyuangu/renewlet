@@ -60,6 +60,7 @@ import { UploadedIconsSection } from './uploaded-icons-section';
 import { AIRecognitionSettingsSection } from './ai-recognition-settings-section';
 import { CalendarFeedSection } from './calendar-feed-section';
 import { PublicStatusPageSection } from './public-status-page-section';
+import { PublicApiSection } from './public-api-section';
 import { CloudBackupSection } from './cloud-backup-section';
 import { CheckboxSettingRow, LoadingButtonContent } from './settings-shared-controls';
 import { useCloudBackupController } from '../application/use-cloud-backup-controller';
@@ -124,6 +125,8 @@ export function SettingsScreen() {
     calendarFeed,
     builtInIconIndex,
     publicStatusPage,
+    publicApi,
+    telegramBotCommands,
     password,
     passwordResetEnabled,
     externalIntegrationsDisabled,
@@ -488,6 +491,12 @@ export function SettingsScreen() {
                 onPublicStatusCurrencyChange={(value) => updateSetting("publicStatusCurrency", value as PublicStatusCurrency)}
               />
 
+              <PublicApiSection
+                id="settings-public-api"
+                className={SETTINGS_SECTION_SCROLL_CLASS}
+                controller={publicApi}
+              />
+
               {/* 时区设置 */}
               <section id="settings-timezone" className={SETTINGS_SECTION_FRAME_CLASS}>
                 <h2 className="mb-6 text-lg font-semibold text-foreground">{t("settings.timezone")}</h2>
@@ -568,6 +577,7 @@ export function SettingsScreen() {
                       testingChannel={testingChannel}
                       onTest={handleTestConnection}
                       disabled={externalIntegrationsDisabled}
+                      telegramBotCommands={telegramBotCommands}
                     />
                   </div>
 

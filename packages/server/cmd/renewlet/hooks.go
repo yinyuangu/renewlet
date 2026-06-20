@@ -36,9 +36,12 @@ var (
 	dateOnlyRe     = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
 	localTimeRe    = regexp.MustCompile(`^\d{2}:\d{2}$`)
 	// 私有资产路径只允许 record id 字符集，避免把任意 /api 路径伪装成 logo 引用。
-	privateAssetPathRe  = regexp.MustCompile(`^/api/app/assets/[A-Za-z0-9_-]+$`)
-	calendarFeedTokenRe = regexp.MustCompile(`^[A-Za-z0-9_-]{43}$`)
-	publicStatusTokenRe = regexp.MustCompile(`^[A-Za-z0-9_-]{43}$`)
+	privateAssetPathRe     = regexp.MustCompile(`^/api/app/assets/[A-Za-z0-9_-]+$`)
+	calendarFeedTokenRe    = regexp.MustCompile(`^[A-Za-z0-9_-]{43}$`)
+	publicStatusTokenRe    = regexp.MustCompile(`^[A-Za-z0-9_-]{43}$`)
+	publicAPITokenHashRe   = regexp.MustCompile(`^[A-Za-z0-9_-]{43}$`)
+	publicAPITokenPrefixRe = regexp.MustCompile(`^rlt_[A-Za-z0-9_-]{2,12}$`)
+	telegramSecretHashRe   = regexp.MustCompile(`^[A-Za-z0-9_-]{43}$`)
 )
 
 type customConfigLabels struct {
@@ -96,6 +99,14 @@ func registerRecordHooks(app core.App) {
 			}
 		case "public_status_pages":
 			if err := normalizePublicStatusPageRecord(e.Record); err != nil {
+				return err
+			}
+		case "api_tokens":
+			if err := normalizeAPITokenRecord(e.Record); err != nil {
+				return err
+			}
+		case "telegram_bot_bindings":
+			if err := normalizeTelegramBotBindingRecord(e.Record); err != nil {
 				return err
 			}
 		case "cloud_backup_targets":
@@ -224,15 +235,6 @@ func normalizeCloudBackupTargetRecord(record *core.Record) error {
 		record.Set(field, value)
 	}
 	record.Set("lastError", strings.TrimSpace(record.GetString("lastError")))
-	return nil
-}
-
-func normalizePublicStatusPageRecord(record *core.Record) error {
-	token := strings.TrimSpace(record.GetString("token"))
-	if !publicStatusTokenRe.MatchString(token) {
-		return errors.New("PUBLIC_STATUS_PAGE_TOKEN_INVALID")
-	}
-	record.Set("token", token)
 	return nil
 }
 

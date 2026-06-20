@@ -58,6 +58,14 @@ const mocks = vi.hoisted(() => ({
   createPublicStatusPageMutateAsync: vi.fn(),
   updatePublicStatusPageMutateAsync: vi.fn(),
   deletePublicStatusPageMutateAsync: vi.fn(),
+  publicApiTokens: { data: [], isLoading: false },
+  createPublicApiTokenMutateAsync: vi.fn(),
+  deletePublicApiTokenMutateAsync: vi.fn(),
+  telegramBotCommands: { data: undefined as unknown, isLoading: false, refetch: vi.fn() },
+  installTelegramBotCommandsMutateAsync: vi.fn(),
+  installTelegramBotCommandsIsPending: false,
+  deleteTelegramBotCommandsMutateAsync: vi.fn(),
+  deleteTelegramBotCommandsIsPending: false,
   builtInIconIndexStatus: {
     data: undefined as BuiltInIconIndexStatus | undefined,
     isLoading: false,
@@ -146,6 +154,31 @@ vi.mock("@/hooks/use-public-status-page", () => ({
   }),
 }));
 
+vi.mock("@/hooks/use-public-api-tokens", () => ({
+  usePublicApiTokens: () => mocks.publicApiTokens,
+  useCreatePublicApiToken: () => ({
+    mutateAsync: mocks.createPublicApiTokenMutateAsync,
+    isPending: false,
+  }),
+  useDeletePublicApiToken: () => ({
+    mutateAsync: mocks.deletePublicApiTokenMutateAsync,
+    isPending: false,
+    variables: null,
+  }),
+}));
+
+vi.mock("@/hooks/use-telegram-bot-commands", () => ({
+  useTelegramBotCommands: () => mocks.telegramBotCommands,
+  useInstallTelegramBotCommands: () => ({
+    mutateAsync: mocks.installTelegramBotCommandsMutateAsync,
+    isPending: mocks.installTelegramBotCommandsIsPending,
+  }),
+  useDeleteTelegramBotCommands: () => ({
+    mutateAsync: mocks.deleteTelegramBotCommandsMutateAsync,
+    isPending: mocks.deleteTelegramBotCommandsIsPending,
+  }),
+}));
+
 vi.mock("@/lib/theme-provider", () => ({
   clearThemeModeOverride: mocks.clearThemeModeOverride,
   useTheme: () => ({
@@ -211,6 +244,32 @@ vi.mock("@/i18n/I18nProvider", () => {
     "settings.publicStatusFailedDescription": "无法生成公开展示链接，请稍后重试。",
     "settings.publicStatusRevokeFailedDescription": "无法撤销公开展示，请稍后重试。",
     "settings.publicStatusUpdateFailedDescription": "无法更新公开展示设置，请稍后重试。",
+    "settings.publicApiCreated": "API Token 已创建",
+    "settings.publicApiCreatedDescription": "明文 token 只显示一次，请复制到需要调用 Public API 的客户端。",
+    "settings.publicApiCreateFailed": "API Token 创建失败",
+    "settings.publicApiCreateFailedDescription": "无法创建 API Token，请稍后重试。",
+    "settings.publicApiTokenCopied": "Token 已复制",
+    "settings.publicApiTokenCopiedDescription": "可以把它放到 Telegram Bot adapter 或其它只读客户端的 Bearer 配置里。",
+    "settings.publicApiCopyFailed": "复制失败",
+    "settings.publicApiCopyFailedDescription": "当前一键复制不可用，请手动选择并复制 token。",
+    "settings.publicApiDeleted": "API Token 已删除",
+    "settings.publicApiDeletedDescription": "旧 token 已失效，后续 Public API 请求会被拒绝。",
+    "settings.publicApiDeleteFailed": "API Token 删除失败",
+    "settings.publicApiDeleteFailedDescription": "无法删除 API Token，请稍后重试。",
+    "settings.telegramBotCommandsConfigMissing": "请先填写并保存 Bot Token 和 Chat ID。",
+    "settings.telegramBotCommandsSaveFirst": "Telegram 凭据有未保存更改，请先保存设置。",
+    "settings.telegramBotCommandsHttpsRequired": "Telegram Webhook 需要 HTTPS 外部访问地址。",
+    "settings.telegramBotCommandsDemoDisabled": "演示模式下不能安装外部 Telegram 命令。",
+    "settings.telegramBotCommandsInstalling": "安装中...",
+    "settings.telegramBotCommandsDeleting": "删除中...",
+    "settings.telegramBotCommandsInstalled": "Telegram 查询命令已安装",
+    "settings.telegramBotCommandsInstalledDescription": "你可以在目标 Telegram 聊天的命令菜单中查询 Renewlet 订阅摘要。",
+    "settings.telegramBotCommandsInstallFailed": "Telegram 查询命令安装失败",
+    "settings.telegramBotCommandsInstallFailedDescription": "无法安装 Telegram Bot 查询命令，请检查 Bot Token、Chat ID 和 HTTPS 外部访问地址。",
+    "settings.telegramBotCommandsDeleted": "Telegram 查询命令已删除",
+    "settings.telegramBotCommandsDeletedDescription": "远端 webhook 和命令菜单已清理，本地 binding 已移除。",
+    "settings.telegramBotCommandsDeleteFailed": "Telegram 查询命令删除失败",
+    "settings.telegramBotCommandsDeleteFailedDescription": "无法删除 Telegram Bot 查询命令，请稍后重试。",
     "settings.builtInIconIndexRefreshSuccess": "图标索引已更新",
     "settings.builtInIconIndexRefreshSuccessDescription": ({ source, count }) => `${source} 已更新，${count} 个图标可用于 Logo 和图标搜索。`,
     "settings.builtInIconIndexRefreshFailed": "图标索引更新失败",
@@ -306,6 +365,13 @@ export function setupSettingsFormControllerTestEnvironment() {
     mocks.createPublicStatusPageMutateAsync.mockReset();
     mocks.updatePublicStatusPageMutateAsync.mockReset();
     mocks.deletePublicStatusPageMutateAsync.mockReset();
+    mocks.createPublicApiTokenMutateAsync.mockReset();
+    mocks.deletePublicApiTokenMutateAsync.mockReset();
+    mocks.telegramBotCommands.refetch.mockReset();
+    mocks.installTelegramBotCommandsMutateAsync.mockReset();
+    mocks.installTelegramBotCommandsIsPending = false;
+    mocks.deleteTelegramBotCommandsMutateAsync.mockReset();
+    mocks.deleteTelegramBotCommandsIsPending = false;
     mocks.checkBuiltInIconIndexProviderMutateAsync.mockReset();
     mocks.checkBuiltInIconIndexProviderIsPending = false;
     mocks.refreshBuiltInIconIndexProviderMutateAsync.mockReset();
@@ -318,6 +384,8 @@ export function setupSettingsFormControllerTestEnvironment() {
     localStorage.removeItem(SETTINGS_THEME_MODE_STORAGE_KEY);
     mocks.calendarFeedStatus = { data: { enabled: false, feedUrl: undefined }, isLoading: false };
     mocks.publicStatusPageStatus = { data: { enabled: false, pageUrl: undefined, showPrices: false }, isLoading: false };
+    mocks.publicApiTokens = { data: [], isLoading: false };
+    mocks.telegramBotCommands = { data: undefined, isLoading: false, refetch: vi.fn().mockResolvedValue(undefined) };
     mocks.builtInIconIndexStatus = {
       data: {
         source: "embedded",
@@ -362,6 +430,27 @@ export function setupSettingsFormControllerTestEnvironment() {
       showPrices: true,
     });
     mocks.deletePublicStatusPageMutateAsync.mockResolvedValue({ ok: true });
+    mocks.createPublicApiTokenMutateAsync.mockResolvedValue({
+      token: {
+        id: "tok_test",
+        name: "Test",
+        tokenPrefix: "rlt_test123",
+        scopes: ["read"],
+        createdAt: "2026-06-20T00:00:00Z",
+      },
+      plainToken: "rlt_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNO12",
+    });
+    mocks.deletePublicApiTokenMutateAsync.mockResolvedValue({ ok: true });
+    mocks.installTelegramBotCommandsMutateAsync.mockResolvedValue({
+      configComplete: true,
+      installed: true,
+      status: "installed",
+      chatId: "123456",
+      commandsVersion: 1,
+      installedAt: "2026-06-20T00:00:00Z",
+      lastUsedAt: null,
+    });
+    mocks.deleteTelegramBotCommandsMutateAsync.mockResolvedValue(undefined);
     mocks.checkBuiltInIconIndexProviderMutateAsync.mockImplementation(async (provider: BuiltInIconProvider) => ({
       status: {
         ...(mocks.builtInIconIndexStatus.data ?? {}),

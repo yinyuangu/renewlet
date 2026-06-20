@@ -12,6 +12,7 @@ import type { ThemeMode } from "@/types/theme";
 import { BUILT_IN_ICON_PROVIDERS, type BuiltInIconProvider } from "@renewlet/shared/built-in-icons";
 import { SettingsScreen } from "./settings-screen";
 import type { UploadedAssetsManagerController } from "../application/use-uploaded-assets-manager";
+import type { SettingsTelegramBotCommandsController } from "../application/use-telegram-bot-commands-controller";
 
 const mocks = vi.hoisted(() => ({
   useSettingsFormController: vi.fn(),
@@ -34,6 +35,7 @@ export const SETTINGS_SECTION_IDS = [
   "settings-exchange",
   "settings-calendar-feed",
   "settings-public-status",
+  "settings-public-api",
   "settings-timezone",
   "settings-notifications",
 ] as const;
@@ -344,6 +346,18 @@ export function createControllerState(overrides: {
     visibleCount?: number;
     hiddenCount?: number;
   };
+  publicApi?: {
+    tokens?: Array<{
+      id: string;
+      name: string;
+      tokenPrefix: string;
+      scopes: ["read"];
+      createdAt: string;
+      lastUsedAt?: string | null;
+    }>;
+    createdPlainToken?: string | null;
+  };
+  telegramBotCommands?: Partial<SettingsTelegramBotCommandsController>;
   rates?: ExchangeRates;
   externalIntegrationsDisabled?: boolean;
   customConfig?: CustomConfig;
@@ -477,6 +491,29 @@ export function createControllerState(overrides: {
       regenerate: fn,
       revoke: fn,
       updateShowPrices: fn,
+    },
+    publicApi: {
+      tokens: overrides.publicApi?.tokens ?? [],
+      createdPlainToken: overrides.publicApi?.createdPlainToken ?? null,
+      isLoading: false,
+      isCreating: false,
+      deletingTokenId: null,
+      createToken: fn,
+      copyPlainToken: fn,
+      dismissPlainToken: fn,
+      deleteToken: fn,
+    },
+    telegramBotCommands: {
+      data: undefined,
+      isLoading: false,
+      isInstalling: false,
+      isDeleting: false,
+      installDisabledReason: "请先填写并保存 Bot Token 和 Chat ID。",
+      deleteDisabledReason: "请先填写并保存 Bot Token 和 Chat ID。",
+      install: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+      deleteCommands: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+      refetch: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+      ...overrides.telegramBotCommands,
     },
     password: {
       passwordDialogOpen: false,

@@ -143,6 +143,12 @@ func handleSettingsUpdate(app core.App, e *core.RequestEvent) error {
 	if err := demoModePolicy.RejectSettingsSecretMutation(e, current, next); err != nil {
 		return err
 	}
+	if err := rejectInstalledTelegramBotSettingsChange(app, e.Auth.Id, current, next); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return e.InternalServerError(serverText(locale, "common.internalError"), err)
+		}
+		return e.BadRequestError(serverText(locale, "common.invalidRequestParameters"), err)
+	}
 	if record == nil {
 		record, err = createSettingsRecord(app, e.Auth.Id, next)
 		if err != nil {

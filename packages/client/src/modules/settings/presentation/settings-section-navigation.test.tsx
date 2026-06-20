@@ -61,6 +61,7 @@ describe("SettingsScreen section navigation", () => {
       ["settings-exchange", "汇率"],
       ["settings-calendar-feed", "日历订阅"],
       ["settings-public-status", "公开展示"],
+      ["settings-public-api", "Public API"],
       ["settings-timezone", "时区"],
       ["settings-notifications", "通知"],
     ] as const;

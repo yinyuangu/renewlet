@@ -7,7 +7,7 @@ import { DISABLED_REMINDER_DAYS, MAX_REMINDER_DAYS } from "@renewlet/shared/runt
 import type { AdminUser } from "@renewlet/shared/schemas/admin";
 import type { AssetInUseDetails } from "@renewlet/shared/schemas/media";
 import type { z } from "zod";
-import type { AssetRow, Env, NotificationJobRow, SubscriptionRow, UserRow } from "./types";
+import type { ApiTokenRow, AssetRow, Env, NotificationJobRow, SubscriptionRow, TelegramBotBindingRow, UserRow } from "./types";
 
 /**
  * D1 数据访问层只暴露 Renewlet 产品语义。
@@ -92,11 +92,40 @@ const notificationJobColumnNames = [
   "updated_at",
 ] as const;
 
+const apiTokenColumnNames = [
+  "id",
+  "user_id",
+  "name",
+  "token_hash",
+  "token_prefix",
+  "scopes_json",
+  "last_used_at",
+  "created_at",
+  "updated_at",
+] as const;
+
+const telegramBotBindingColumnNames = [
+  "id",
+  "user_id",
+  "chat_id",
+  "bot_token_hash",
+  "webhook_secret_hash",
+  "status",
+  "commands_version",
+  "last_update_id",
+  "last_used_at",
+  "created_at",
+  "updated_at",
+] as const;
+
 export const USER_COLUMNS = userColumnNames.join(", ");
 export const USER_COLUMNS_FROM_USERS = userColumnNames.map((column) => `users.${column} AS ${column}`).join(", ");
 export const SUBSCRIPTION_COLUMNS = subscriptionColumnNames.join(", ");
 export const ASSET_COLUMNS = assetColumnNames.join(", ");
 export const NOTIFICATION_JOB_COLUMNS = notificationJobColumnNames.join(", ");
+export const API_TOKEN_COLUMNS = apiTokenColumnNames.join(", ");
+export const API_TOKEN_COLUMNS_FROM_API_TOKENS = apiTokenColumnNames.map((column) => `api_tokens.${column} AS ${column}`).join(", ");
+export const TELEGRAM_BOT_BINDING_COLUMNS = telegramBotBindingColumnNames.join(", ");
 
 /** Worker 统一使用 ISO instant；用户本地日期/时间只保存在业务字段中。 */
 export function nowIso(): string {
@@ -129,6 +158,17 @@ export function toAdminUser(row: UserRow): AdminUser {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+export async function listApiTokenRows(env: Env, userId: string): Promise<ApiTokenRow[]> {
+  const result = await env.DB.prepare(`SELECT ${API_TOKEN_COLUMNS} FROM api_tokens WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT 200`)
+    .bind(userId)
+    .all<ApiTokenRow>();
+  return result.results;
+}
+
+export async function getTelegramBotBinding(env: Env, userId: string): Promise<TelegramBotBindingRow | null> {
+  return await env.DB.prepare(`SELECT ${TELEGRAM_BOT_BINDING_COLUMNS} FROM telegram_bot_bindings WHERE user_id = ? LIMIT 1`).bind(userId).first<TelegramBotBindingRow>();
 }
 
 /** email 查找在 SQL 层 lower 对齐，避免登录大小写差异制造重复账号语义。 */

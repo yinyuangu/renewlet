@@ -336,9 +336,13 @@ type notificationHistoryJob struct {
 }
 
 type telegramSendMessageRequest struct {
-	ChatID                string `json:"chat_id"`
-	Text                  string `json:"text"`
-	DisableWebPagePreview bool   `json:"disable_web_page_preview"`
+	ChatID             string                      `json:"chat_id"`
+	Text               string                      `json:"text"`
+	LinkPreviewOptions *telegramLinkPreviewOptions `json:"link_preview_options,omitempty"`
+}
+
+type telegramLinkPreviewOptions struct {
+	IsDisabled bool `json:"is_disabled"`
 }
 
 type notifyxSendRequest struct {

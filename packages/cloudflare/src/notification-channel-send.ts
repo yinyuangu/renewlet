@@ -60,7 +60,7 @@ export async function sendChannel(
       await postJson(`https://api.telegram.org/bot${token}/sendMessage`, {
         chat_id: chatId,
         text: textMessage(message),
-        disable_web_page_preview: true,
+        link_preview_options: { is_disabled: true },
       }, "Telegram", locale, undefined, { secrets: [token, chatId] });
       return;
     }
