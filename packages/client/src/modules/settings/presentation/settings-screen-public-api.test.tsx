@@ -170,13 +170,14 @@ describe("SettingsScreen Public API and Telegram commands", () => {
     const telegramPanel = within(notificationsSection as HTMLElement);
     expect(telegramPanel.getByText("Bot 查询命令")).toBeInTheDocument();
     expect(telegramPanel.getByText("Telegram 消息样式")).toBeInTheDocument();
-    expect(telegramPanel.getByRole("button", { name: "纯文本" })).toHaveAttribute("aria-pressed", "true");
-    expect(telegramPanel.getByRole("button", { name: "富文本" })).toHaveAttribute("aria-pressed", "false");
+    expect(telegramPanel.getByRole("radiogroup", { name: "Telegram 消息样式" })).toBeInTheDocument();
+    expect(telegramPanel.getByRole("radio", { name: /纯文本/ })).toBeChecked();
+    expect(telegramPanel.getByRole("radio", { name: /富文本/ })).not.toBeChecked();
     expect(telegramPanel.getByText("已安装")).toBeInTheDocument();
     expect(telegramPanel.getByText("绑定 Chat ID：123456")).toBeInTheDocument();
     expect(telegramPanel.getByText("最后使用：从未")).toBeInTheDocument();
 
-    await user.click(telegramPanel.getByRole("button", { name: "富文本" }));
+    await user.click(telegramPanel.getByRole("radio", { name: /富文本/ }));
     expect(controller.updateSetting).toHaveBeenCalledWith("telegramMessageFormat", "html");
 
     await user.click(telegramPanel.getByRole("button", { name: "重新安装" }));
@@ -208,5 +209,65 @@ describe("SettingsScreen Public API and Telegram commands", () => {
     const telegramPanel = within(notificationsSection as HTMLElement);
     expect(telegramPanel.getByText("请先填写并保存 Bot Token 和 Chat ID。")).toBeInTheDocument();
     expect(telegramPanel.getByRole("button", { name: "安装命令" })).toBeDisabled();
+  });
+
+  it("shows Telegram command install loading label", () => {
+    mocks.useSettingsFormController.mockReturnValue(createControllerState({
+      settings: {
+        enabledChannels: ["telegram"],
+        telegramBotToken: "123456:bot-token",
+        telegramChatId: "123456",
+      },
+      telegramBotCommands: {
+        data: {
+          configComplete: true,
+          installed: false,
+          status: "installing",
+          chatId: "123456",
+          commandsVersion: "v2",
+          installedAt: null,
+          lastUsedAt: null,
+        },
+        installDisabledReason: null,
+        deleteDisabledReason: null,
+        isInstalling: true,
+      },
+    }));
+
+    renderSettingsScreen();
+
+    const notificationsSection = document.getElementById("settings-notifications");
+    expect(notificationsSection).not.toBeNull();
+    expect(within(notificationsSection as HTMLElement).getByRole("button", { name: "安装中..." })).toHaveAttribute("aria-busy", "true");
+  });
+
+  it("shows Telegram command delete loading label", () => {
+    mocks.useSettingsFormController.mockReturnValue(createControllerState({
+      settings: {
+        enabledChannels: ["telegram"],
+        telegramBotToken: "123456:bot-token",
+        telegramChatId: "123456",
+      },
+      telegramBotCommands: {
+        data: {
+          configComplete: true,
+          installed: true,
+          status: "installed",
+          chatId: "123456",
+          commandsVersion: "v2",
+          installedAt: "2026-06-20T00:00:00Z",
+          lastUsedAt: null,
+        },
+        installDisabledReason: null,
+        deleteDisabledReason: null,
+        isDeleting: true,
+      },
+    }));
+
+    renderSettingsScreen();
+
+    const notificationsSection = document.getElementById("settings-notifications");
+    expect(notificationsSection).not.toBeNull();
+    expect(within(notificationsSection as HTMLElement).getByRole("button", { name: "删除中..." })).toHaveAttribute("aria-busy", "true");
   });
 });
