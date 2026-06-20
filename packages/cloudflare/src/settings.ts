@@ -1,8 +1,9 @@
 import { customConfigResponseSchema } from "@renewlet/shared/schemas/custom-config";
 import { settingsUpdateBodySchema } from "@renewlet/shared/schemas/settings";
-import { ensureSettings, getCustomConfig, mergeSettingsPatch, putCustomConfig, putSettings } from "./db";
-import { json, readJson, requestLocale } from "./http";
+import { ensureSettings, getCustomConfig, getTelegramBotBinding, mergeSettingsPatch, putCustomConfig, putSettings } from "./db";
+import { HttpError, json, readJson, requestLocale } from "./http";
 import { requireAuth } from "./auth";
+import { serverText } from "./server-i18n";
 import type { Env } from "./types";
 
 /**
@@ -27,6 +28,7 @@ export async function updateSettings(request: Request, env: Env): Promise<Respon
   const current = await ensureSettings(env, auth.user.id, locale);
   // PATCH 语义由“当前设置 + 局部字段”合成，最终仍过完整 schema，防止删除隐式默认项。
   const next = mergeSettingsPatch(current, patch);
+  await rejectInstalledTelegramBotSettingsChange(env, auth.user.id, current, next, locale);
   return json({ settings: await putSettings(env, auth.user.id, next) });
 }
 
@@ -52,4 +54,18 @@ export async function updateCustomConfig(request: Request, env: Env): Promise<Re
   const body = await readJson(request, customConfigResponseSchema, locale);
   const config = await putCustomConfig(env, auth.user.id, body.config);
   return json(customConfigResponseSchema.parse({ config }));
+}
+
+async function rejectInstalledTelegramBotSettingsChange(
+  env: Env,
+  userId: string,
+  current: Awaited<ReturnType<typeof ensureSettings>>,
+  next: Awaited<ReturnType<typeof ensureSettings>>,
+  locale: ReturnType<typeof requestLocale>,
+): Promise<void> {
+  if (current.telegramBotToken.trim() === next.telegramBotToken.trim() && current.telegramChatId.trim() === next.telegramChatId.trim()) return;
+  const binding = await getTelegramBotBinding(env, userId);
+  if (!binding || binding.status !== "installed") return;
+  // 已安装命令时 Telegram 远端仍持有 webhook；必须先删除命令，才能改 Bot Token 或 Chat ID。
+  throw new HttpError(400, serverText(locale, "common.invalidRequestParameters"), "TELEGRAM_BOT_COMMANDS_INSTALLED");
 }

@@ -51,6 +51,22 @@ import {
   readPublicStatusPage,
   updatePublicStatusPage,
 } from "./public-status";
+import {
+  createApiToken,
+  deleteApiToken,
+  listApiTokens,
+  publicApiDue,
+  publicApiMe,
+  publicApiStatus,
+  publicApiSubscription,
+  publicApiSubscriptions,
+} from "./public-api";
+import {
+  deleteTelegramBotCommands,
+  installTelegramBotCommands,
+  readTelegramBotCommands,
+  telegramWebhook,
+} from "./telegram-bot";
 import { systemRestart, systemUpdate, systemVersion } from "./system";
 import { errorResponse, methodNotAllowed, pathSegments, requestLocale, toResponse } from "./http";
 import { serverText } from "./server-i18n";
@@ -135,14 +151,40 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
     GET: () => setupStatus(request, env),
     POST: () => createInitialAdmin(request, env),
   });
+  if (url.pathname.startsWith("/api/telegram/")) return routeTelegram(request, env, url);
   if (url.pathname.startsWith("/api/public/")) return routePublic(request, env, url);
   if (url.pathname.startsWith("/api/app/")) return routeApp(request, env, url);
   return errorResponse(404, serverText(locale, "common.notFound"), "NOT_FOUND");
 }
 
+async function routeTelegram(request: Request, env: Env, url: URL): Promise<Response> {
+  const [head, second, third] = pathSegments(url, "/api/telegram");
+  if (head === "webhook" && second && !third) {
+    return routeMethods(request, { POST: () => telegramWebhook(request, env, second) });
+  }
+  return errorResponse(404, serverText(requestLocale(request), "common.notFound"), "NOT_FOUND");
+}
+
 async function routePublic(request: Request, env: Env, url: URL): Promise<Response> {
   const segments = pathSegments(url, "/api/public");
-  const [head, pageToken, third, assetId] = segments;
+  const [head, second, third, fourth] = segments;
+  if (head === "v1" && second === "me" && !third) {
+    return routeMethods(request, { GET: () => publicApiMe(request, env) });
+  }
+  if (head === "v1" && second === "subscriptions" && !third) {
+    return routeMethods(request, { GET: () => publicApiSubscriptions(request, env) });
+  }
+  if (head === "v1" && second === "subscriptions" && third && !fourth) {
+    return routeMethods(request, { GET: () => publicApiSubscription(request, env, third) });
+  }
+  if (head === "v1" && second === "status" && !third) {
+    return routeMethods(request, { GET: () => publicApiStatus(request, env) });
+  }
+  if (head === "v1" && second === "due" && !third) {
+    return routeMethods(request, { GET: () => publicApiDue(request, env) });
+  }
+  const pageToken = second;
+  const assetId = fourth;
   if (head === "status" && pageToken && !third) {
     return routeMethods(request, { GET: () => readPublicStatus(request, env, pageToken) });
   }
@@ -210,6 +252,20 @@ async function routeApp(request: Request, env: Env, url: URL): Promise<Response>
   if (head === "custom-config") return routeMethods(request, {
     GET: () => readCustomConfig(request, env),
     PUT: () => updateCustomConfig(request, env),
+  });
+
+  if (head === "api-tokens" && !second) return routeMethods(request, {
+    GET: () => listApiTokens(request, env),
+    POST: () => createApiToken(request, env),
+  });
+  if (head === "api-tokens" && second && !third) return routeMethods(request, {
+    DELETE: () => deleteApiToken(request, env, second),
+  });
+
+  if (head === "telegram-bot" && second === "commands" && !third) return routeMethods(request, {
+    GET: () => readTelegramBotCommands(request, env),
+    POST: () => installTelegramBotCommands(request, env),
+    DELETE: () => deleteTelegramBotCommands(request, env),
   });
 
   if (head === "subscriptions" && !second) return routeMethods(request, {

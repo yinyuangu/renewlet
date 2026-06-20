@@ -599,7 +599,7 @@ describe("CloudBackupSection", () => {
     await user.click(screen.getByRole("tab", { name: "S3 兼容存储" }));
 
     expect(screen.getByText("renewlet-s3.zip")).toBeInTheDocument();
-    expect(screen.queryByText("恢复中...")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "恢复中..." })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "恢复" })).toBeDisabled();
 
     expect(restoreSnapshot).not.toHaveBeenCalled();
@@ -634,7 +634,7 @@ describe("CloudBackupSection", () => {
     await user.click(screen.getByRole("tab", { name: "S3 兼容存储" }));
 
     expect(screen.getByText("renewlet-s3.zip")).toBeInTheDocument();
-    expect(screen.queryByText("删除中...")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "删除中..." })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "删除" })).toBeDisabled();
 
     expect(deleteSnapshot).not.toHaveBeenCalled();

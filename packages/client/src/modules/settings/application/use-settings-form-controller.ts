@@ -65,6 +65,14 @@ import {
   type SettingsPublicStatusPageController,
 } from "./use-public-status-page-settings-controller";
 import {
+  usePublicApiSettingsController,
+  type SettingsPublicApiController,
+} from "./use-public-api-settings-controller";
+import {
+  useTelegramBotCommandsController,
+  type SettingsTelegramBotCommandsController,
+} from "./use-telegram-bot-commands-controller";
+import {
   useSettingsBuiltInIconIndexController,
   type SettingsBuiltInIconIndexController,
 } from "./use-built-in-icon-index-controller";
@@ -152,6 +160,8 @@ export interface SettingsFormController {
   calendarFeed: SettingsCalendarFeedController;
   builtInIconIndex: SettingsBuiltInIconIndexController;
   publicStatusPage: SettingsPublicStatusPageController;
+  publicApi: SettingsPublicApiController;
+  telegramBotCommands: SettingsTelegramBotCommandsController;
   password: PasswordChangeController;
   passwordResetEnabled: boolean;
   externalIntegrationsDisabled: boolean;
@@ -214,6 +224,13 @@ export function useSettingsFormController(): SettingsFormController {
     [subscriptionsQuery.data],
   );
   const publicStatusPage = usePublicStatusPageSettingsController(subscriptionsQuery.data);
+  const publicApi = usePublicApiSettingsController();
+  const telegramBotCommands = useTelegramBotCommandsController({
+    settings,
+    savedSettings,
+    externalIntegrationsDisabled,
+  });
+  const { refetch: refetchTelegramBotCommands } = telegramBotCommands;
 
   const monthlyBudgetInputDirty = monthlyBudgetInput !== String(settings.monthlyBudget);
   const settingsDirty = useMemo(
@@ -433,6 +450,8 @@ export function useSettingsFormController(): SettingsFormController {
         setMonthlyBudgetError(null);
         syncSavedPreviewState(saved, { syncAppearance: appearanceChanged, rememberLocalePreference: localeChanged });
         void refetchNotificationHistory();
+        // Bot 命令安装状态读取的是已保存凭据；保存 token/chat 后要主动刷新，不能等低频 query 自然过期。
+        void refetchTelegramBotCommands();
         if (providerChanged) {
           try {
             await refreshRates(saved.exchangeRateProvider);
@@ -498,6 +517,7 @@ export function useSettingsFormController(): SettingsFormController {
     settingsDirty,
     syncSavedPreviewState,
     t,
+    refetchTelegramBotCommands,
     toast,
     updateSettings,
   ]);
@@ -722,6 +742,8 @@ export function useSettingsFormController(): SettingsFormController {
     },
     builtInIconIndex,
     publicStatusPage,
+    publicApi,
+    telegramBotCommands,
     password,
     passwordResetEnabled,
     externalIntegrationsDisabled,

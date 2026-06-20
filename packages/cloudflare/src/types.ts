@@ -54,6 +54,33 @@ export interface SessionAuthRow extends UserRow {
   session_last_seen_at: string;
 }
 
+/** Public API token 行只保存 hash/prefix；明文 token 不进入 D1、备份或导出。 */
+export interface ApiTokenRow {
+  id: string;
+  user_id: string;
+  name: string;
+  token_hash: string;
+  token_prefix: string;
+  scopes_json: string;
+  last_used_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Telegram Bot command binding 只保存 hash 和状态；Webhook 入站不能读取浏览器 session。 */
+export interface TelegramBotBindingRow {
+  id: string;
+  user_id: string;
+  chat_id: string;
+  bot_token_hash: string;
+  webhook_secret_hash: string;
+  status: "installing" | "installed";
+  last_update_id: number;
+  last_used_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 /** D1 订阅行模型；snake_case 与整数布尔必须在 `toApiSubscription` 里收敛到 shared schema。 */
 export interface SubscriptionRow {
   id: string;
