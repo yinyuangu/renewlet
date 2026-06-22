@@ -42,7 +42,7 @@ Sign in with `demo@renewlet.local` / `renewlet-demo`. The demo resets regularly,
 - AI recognition for bill screenshots, notes, CSV/TSV, and pasted table text; drafts are reviewed before import.
 - Global private ICS feed and per-subscription calendar feeds.
 - Public subscription status pages with per-subscription visibility and optional price display.
-- Import and export for Renewlet data, old Renewlet `subscriptions.json`, and Wallos files.
+- Import and export Renewlet data, plus Wallos file imports.
 - Uploaded logos, image URLs, built-in icon sources, and favicon fallback suggestions.
 - Docker deployment with React, Go/PocketBase, SQLite, and static assets in one container.
 - Cloudflare Workers deployment with React static assets, Worker API, D1, R2, and Cron Triggers.
@@ -95,8 +95,6 @@ Back up data and config before upgrading:
 ```bash
 tar -czf renewlet-backup-$(date +%F).tgz .env docker-compose.yml data
 ```
-
-If you deployed Renewlet before 2026-06-04, open the old version before upgrading and export `subscriptions.json` from Export subscriptions. After upgrading, import it from Import data. This file is only for subscription migration; keep the backup above as well.
 
 Upgrade with Docker Compose:
 
