@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { KeyRound, Plus, Trash2 } from "lucide-react";
 import {
@@ -31,6 +31,7 @@ import { LoadingButtonContent } from "./settings-shared-controls";
 import { MFA_STATUS_QUERY_KEY, PASSKEYS_QUERY_KEY } from "./account-security-query-keys";
 
 interface AccountPasskeysManagerDialogProps {
+  accountEmail: string | null;
   disabled?: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -43,6 +44,7 @@ interface AccountPasskeysManagerDialogProps {
  * 这里独立处理添加/删除，不能借用身份验证器 Dialog 的密码确认或恢复码状态。
  */
 export function AccountPasskeysManagerDialog({
+  accountEmail,
   disabled = false,
   open,
   onOpenChange,
@@ -116,6 +118,11 @@ export function AccountPasskeysManagerDialog({
   }, [disabled, isBusy]);
 
   const canRegister = !disabled && !isBusy && passkeyName.trim().length > 0 && passkeyPassword.length > 0;
+  const submitPasskeyRegistration = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!canRegister) return;
+    registerMutation.mutate();
+  };
   const formattedCreatedAt = (passkey: Passkey) =>
     formatDateTime(passkey.createdAt, { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
 
@@ -139,16 +146,33 @@ export function AccountPasskeysManagerDialog({
 
           <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6" data-testid="passkeys-manager-scroll">
             <div className="grid gap-5">
-              <div className="grid gap-3 rounded-md border border-border bg-secondary/20 p-3">
+              <form
+                aria-label={t("settings.addPasskey")}
+                className="grid gap-3 rounded-md border border-border bg-secondary/20 p-3"
+                onSubmit={submitPasskeyRegistration}
+                noValidate
+              >
                 <div className="min-w-0">
                   <h3 className="text-sm font-medium text-foreground">{t("settings.addPasskey")}</h3>
                   <p className="mt-1 text-xs leading-5 text-muted-foreground">{t("settings.addPasskeyDescription")}</p>
                 </div>
+                <input
+                  type="text"
+                  name="username"
+                  autoComplete="username"
+                  value={accountEmail ?? ""}
+                  readOnly
+                  tabIndex={-1}
+                  aria-hidden="true"
+                  className="sr-only"
+                />
                 <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] md:items-end">
                   <FormField id="passkey-name" label={t("settings.passkeyName")}>
                     {({ id }) => (
                       <Input
                         id={id}
+                        name="passkey-name"
+                        autoComplete="off"
                         value={passkeyName}
                         onChange={(event) => setPasskeyName(event.target.value)}
                         placeholder={t("settings.passkeyNamePlaceholder")}
@@ -161,6 +185,7 @@ export function AccountPasskeysManagerDialog({
                     {({ id }) => (
                       <Input
                         id={id}
+                        name="current-password"
                         type="password"
                         autoComplete="current-password"
                         value={passkeyPassword}
@@ -171,10 +196,9 @@ export function AccountPasskeysManagerDialog({
                     )}
                   </FormField>
                   <Button
-                    type="button"
+                    type="submit"
                     className="justify-center gap-2"
                     disabled={!canRegister}
-                    onClick={() => registerMutation.mutate()}
                   >
                     <LoadingButtonContent loading={registerMutation.isPending} loadingLabel={t("common.saving")}>
                       <Plus className="h-4 w-4" />
@@ -182,7 +206,7 @@ export function AccountPasskeysManagerDialog({
                     </LoadingButtonContent>
                   </Button>
                 </div>
-              </div>
+              </form>
 
               <div className="grid gap-3 border-t border-border pt-4">
                 <div className="flex items-center justify-between gap-3">
@@ -255,6 +279,7 @@ export function AccountPasskeysManagerDialog({
             {({ id }) => (
               <Input
                 id={id}
+                name="current-password"
                 type="password"
                 autoComplete="current-password"
                 value={deletePasskeyPassword}

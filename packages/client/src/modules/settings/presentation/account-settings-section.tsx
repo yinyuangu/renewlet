@@ -5,18 +5,22 @@
  *
  * 注意： 不要在展示层缓存密码字段，关闭弹窗时必须交给 controller 清理。
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Link from '@/components/router-link';
 import { useI18n } from '@/i18n/I18nProvider';
 import { ExternalLink } from 'lucide-react';
+import { passkeyService } from "@/services/passkey-service";
 import { PasswordChangeDialog } from './password-change-dialog';
 import { AccountMfaSection } from './account-mfa-section';
 import { AccountPasskeysSection } from './account-passkeys-section';
+import { AccountPasskeysManagerDialog } from "./account-passkeys-manager-dialog";
 import { AccountSecurityDialogs } from "./account-security-dialogs";
-import type { AccountSecurityDialogState } from "./account-security-dialog-state";
+import { PASSKEYS_QUERY_KEY } from "./account-security-query-keys";
+import type { AccountSecurityDialogState, MfaPasswordAction } from "./account-security-dialog-state";
 import { getSettingsSectionClassName } from './settings-layout';
 
 export interface AccountSettingsSectionProps {
@@ -63,8 +67,29 @@ export function AccountSettingsSection({
   accountSecurityDemoDisabled = false,
 }: AccountSettingsSectionProps) {
   const { t } = useI18n();
-  // 身份验证器仍走短生命周期状态机；通行密钥完整管理内聚在自身弹窗，避免两个安全能力串线。
   const [accountSecurityDialog, setAccountSecurityDialog] = useState<AccountSecurityDialogState>({ type: "none" });
+  const passkeysQuery = useQuery({
+    queryKey: PASSKEYS_QUERY_KEY,
+    queryFn: () => passkeyService.list(),
+    staleTime: 30_000,
+  });
+  const passkeys = passkeysQuery.data ?? [];
+
+  const openAccountSecurityDialog = (nextState: AccountSecurityDialogState) => {
+    if (passwordDisabled && nextState.type !== "none") return;
+    setAccountSecurityDialog((current) => (current.type === "passkeys_manager" && nextState.type !== "none" ? current : nextState));
+  };
+  const openMfaPasswordAction = (action: MfaPasswordAction) => {
+    openAccountSecurityDialog({ type: "mfa_password", action });
+  };
+  const handlePasskeysManagerOpenChange = (open: boolean) => {
+    openAccountSecurityDialog(open ? { type: "passkeys_manager" } : { type: "none" });
+  };
+  useEffect(() => {
+    if (passwordDisabled && accountSecurityDialog.type !== "none") {
+      setAccountSecurityDialog({ type: "none" });
+    }
+  }, [passwordDisabled, accountSecurityDialog.type]);
 
   return (
     <>
@@ -143,10 +168,15 @@ export function AccountSettingsSection({
                       ) : null}
                       <AccountMfaSection
                         disabled={passwordDisabled}
-                        onSetupReady={(setup) => setAccountSecurityDialog({ type: "mfa_setup", setup })}
-                        onPasswordAction={(action) => setAccountSecurityDialog({ type: "mfa_password", action })}
+                        onSetupReady={(setup) => openAccountSecurityDialog({ type: "mfa_setup", setup })}
+                        onPasswordAction={openMfaPasswordAction}
                       />
-                      <AccountPasskeysSection disabled={passwordDisabled} />
+                      <AccountPasskeysSection
+                        disabled={passwordDisabled}
+                        count={passkeys.length}
+                        isLoading={passkeysQuery.isLoading}
+                        onManagePasskeys={() => openAccountSecurityDialog({ type: "passkeys_manager" })}
+                      />
                     </div>
                   </section>
       
@@ -164,7 +194,15 @@ export function AccountSettingsSection({
                   />
                   <AccountSecurityDialogs
                     state={accountSecurityDialog}
-                    onStateChange={setAccountSecurityDialog}
+                    onStateChange={openAccountSecurityDialog}
+                  />
+                  <AccountPasskeysManagerDialog
+                    accountEmail={accountEmail}
+                    disabled={passwordDisabled}
+                    open={accountSecurityDialog.type === "passkeys_manager"}
+                    onOpenChange={handlePasskeysManagerOpenChange}
+                    passkeys={passkeys}
+                    isLoading={passkeysQuery.isLoading}
                   />
       
     </>

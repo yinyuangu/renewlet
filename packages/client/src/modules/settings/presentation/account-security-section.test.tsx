@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -221,6 +221,77 @@ describe("AccountSettingsSection account security dialogs", () => {
         currentPassword: "Aa111111",
       });
     });
+    expect(mocks.mfaService.disable).not.toHaveBeenCalled();
+    expect(mocks.mfaService.regenerateRecoveryCodes).not.toHaveBeenCalled();
+  });
+
+  it("keeps MFA password actions blocked while the passkey manager is open", async () => {
+    const user = userEvent.setup();
+    renderAccountSettings();
+    await waitForAccountSecurityReady();
+
+    const disableAuthenticatorButton = screen.getByRole("button", { name: "关闭身份验证器" });
+    await user.click(screen.getByRole("button", { name: "管理通行密钥" }));
+
+    expect(screen.getByRole("dialog", { name: "管理通行密钥" })).toBeInTheDocument();
+    fireEvent.click(disableAuthenticatorButton);
+
+    expect(screen.queryByRole("dialog", { name: "关闭身份验证器？" })).not.toBeInTheDocument();
+    expect(mocks.mfaService.disable).not.toHaveBeenCalled();
+  });
+
+  it("uses password-manager friendly form metadata for passkey registration", async () => {
+    const user = userEvent.setup();
+    renderAccountSettings();
+    await waitForAccountSecurityReady();
+
+    await user.click(screen.getByRole("button", { name: "管理通行密钥" }));
+    const dialog = screen.getByRole("dialog", { name: "管理通行密钥" });
+    const addForm = within(dialog).getByRole("form", { name: "添加通行密钥" });
+    const usernameInput = addForm.querySelector<HTMLInputElement>('input[name="username"]');
+    const nameInput = within(addForm).getByLabelText("通行密钥名称");
+    const passwordInput = within(addForm).getByLabelText("当前密码");
+
+    expect(usernameInput).toHaveAttribute("autocomplete", "username");
+    expect(usernameInput).toHaveValue("alice@example.com");
+    expect(nameInput).toHaveAttribute("name", "passkey-name");
+    expect(nameInput).toHaveAttribute("autocomplete", "off");
+    expect(passwordInput).toHaveAttribute("name", "current-password");
+    expect(passwordInput).toHaveAttribute("autocomplete", "current-password");
+  });
+
+  it("does not open MFA dialogs when a password manager fills the passkey form", async () => {
+    const user = userEvent.setup();
+    renderAccountSettings();
+    await waitForAccountSecurityReady();
+
+    await user.click(screen.getByRole("button", { name: "管理通行密钥" }));
+    const dialog = screen.getByRole("dialog", { name: "管理通行密钥" });
+    fireEvent.change(within(dialog).getByLabelText("通行密钥名称"), { target: { value: "1password" } });
+    fireEvent.change(within(dialog).getByLabelText("当前密码"), { target: { value: "Aa111111" } });
+
+    expect(screen.queryByRole("dialog", { name: "关闭身份验证器？" })).not.toBeInTheDocument();
+    expect(mocks.mfaService.disable).not.toHaveBeenCalled();
+    expect(mocks.mfaService.regenerateRecoveryCodes).not.toHaveBeenCalled();
+  });
+
+  it("submits only passkey registration when pressing Enter in the manager password field", async () => {
+    const user = userEvent.setup();
+    renderAccountSettings();
+    await waitForAccountSecurityReady();
+
+    await user.click(screen.getByRole("button", { name: "管理通行密钥" }));
+    const dialog = screen.getByRole("dialog", { name: "管理通行密钥" });
+    await user.type(within(dialog).getByLabelText("通行密钥名称"), "iPhone Face ID");
+    await user.type(within(dialog).getByLabelText("当前密码"), "Aa111111{Enter}");
+
+    await waitFor(() => {
+      expect(mocks.passkeyService.register).toHaveBeenCalledWith({
+        name: "iPhone Face ID",
+        currentPassword: "Aa111111",
+      });
+    });
+    expect(screen.queryByRole("dialog", { name: "关闭身份验证器？" })).not.toBeInTheDocument();
     expect(mocks.mfaService.disable).not.toHaveBeenCalled();
     expect(mocks.mfaService.regenerateRecoveryCodes).not.toHaveBeenCalled();
   });
