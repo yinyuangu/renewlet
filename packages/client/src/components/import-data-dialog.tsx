@@ -167,6 +167,7 @@ export function ImportDataDialog({ open, onOpenChange, settings, config, initial
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
+        dismissMode="explicit"
         layout="frame"
         className="h5-dialog-frame h5-import-dialog-panel overflow-hidden border-border bg-card p-0 sm:max-w-5xl"
         onOpenAutoFocus={(event) => {

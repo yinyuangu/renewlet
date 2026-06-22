@@ -88,7 +88,7 @@ export function PublicApiSection({ id, className, controller }: PublicApiSection
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={handleDialogOpenChange}>
-        <DialogContent className="flex h-[min(calc(var(--app-viewport-height)-2rem),44rem)] min-h-0 max-w-3xl flex-col gap-0 overflow-hidden border-border bg-card p-0">
+        <DialogContent dismissMode="explicit" className="flex h-[min(calc(var(--app-viewport-height)-2rem),44rem)] min-h-0 max-w-3xl flex-col gap-0 overflow-hidden border-border bg-card p-0">
           <DialogHeader className="border-b border-border px-4 py-5 pr-12 text-left sm:px-6 sm:pr-14">
             <DialogTitle className="flex items-center gap-2">
               <KeyRound className="h-5 w-5 text-primary" />

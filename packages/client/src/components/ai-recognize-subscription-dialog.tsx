@@ -702,6 +702,7 @@ export function AIRecognizeSubscriptionDialog({
     <>
       <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent
+          dismissMode="explicit"
           layout="frame"
           closeLabel={t("common.close")}
           className={cn(

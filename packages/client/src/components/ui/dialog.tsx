@@ -44,13 +44,24 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 
 type DialogContentProps = React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
   closeLabel?: string;
+  dismissMode?: "default" | "explicit";
   layout?: "content" | "frame";
 };
 
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   DialogContentProps
->(({ className, children, closeLabel = "Close", layout = "content", ...props }, ref) => {
+>(({
+  className,
+  children,
+  closeLabel = "Close",
+  dismissMode = "default",
+  layout = "content",
+  onEscapeKeyDown,
+  onInteractOutside,
+  onPointerDownOutside,
+  ...props
+}, ref) => {
   const [portalContainer, setPortalContainer] = React.useState<HTMLElement | null>(null);
   const setRefs = React.useCallback(
     (node: React.ElementRef<typeof DialogPrimitive.Content> | null) => {
@@ -74,6 +85,19 @@ const DialogContent = React.forwardRef<
           layout === "content" && "h-fit",
           className,
         )}
+        // 表单/敏感工作流只能走弹窗内的 X、取消、关闭、完成按钮，避免外部点击或 Escape 丢弃本地编辑状态。
+        onEscapeKeyDown={(event) => {
+          onEscapeKeyDown?.(event);
+          if (dismissMode === "explicit") event.preventDefault();
+        }}
+        onInteractOutside={(event) => {
+          onInteractOutside?.(event);
+          if (dismissMode === "explicit") event.preventDefault();
+        }}
+        onPointerDownOutside={(event) => {
+          onPointerDownOutside?.(event);
+          if (dismissMode === "explicit") event.preventDefault();
+        }}
         {...props}
       >
         <DialogPortalContainerContext.Provider value={portalContainer}>

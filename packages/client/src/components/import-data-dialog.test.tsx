@@ -118,11 +118,12 @@ function renderImportDialog(props: {
     },
   });
 
+  const onOpenChange = vi.fn();
   const rendered = render(
     <QueryClientProvider client={queryClient}>
       <ImportDataDialog
         open
-        onOpenChange={vi.fn()}
+        onOpenChange={onOpenChange}
         settings={DEFAULT_SETTINGS}
         config={DEFAULT_CUSTOM_CONFIG}
         {...("initialFile" in props ? { initialFile: props.initialFile } : {})}
@@ -130,7 +131,13 @@ function renderImportDialog(props: {
       />
     </QueryClientProvider>,
   );
-  return { ...rendered, queryClient };
+  return { ...rendered, queryClient, onOpenChange };
+}
+
+function getDialogOverlay() {
+  const overlay = document.querySelector<HTMLElement>("[data-dialog-overlay]");
+  if (!overlay) throw new Error("Dialog overlay was not rendered");
+  return overlay;
 }
 
 describe("ImportDataDialog", () => {
@@ -194,6 +201,20 @@ describe("ImportDataDialog", () => {
       includesSettings: Boolean(payload.settings),
       includesCustomConfig: Boolean(payload.customConfig),
     }));
+  });
+
+  it("requires explicit controls to close the import workflow", async () => {
+    const user = userEvent.setup();
+    const { onOpenChange } = renderImportDialog();
+
+    await user.keyboard("{Escape}");
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
+    await user.click(getDialogOverlay());
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
+    expect(screen.getByRole("dialog", { name: "导入数据" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "取消" }));
+    expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
   it("writes high-confidence built-in Logo matches before import preview", async () => {

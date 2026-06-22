@@ -29,6 +29,12 @@ describe("SettingsScreen Public API and Telegram commands", () => {
     vi.unstubAllGlobals();
   });
 
+  function getDialogOverlay() {
+    const overlay = document.querySelector<HTMLElement>("[data-dialog-overlay]");
+    if (!overlay) throw new Error("Dialog overlay was not rendered");
+    return overlay;
+  }
+
   it("renders Public API token management with one-time token and delete flow", async () => {
     const user = userEvent.setup();
     const controller = createControllerState({
@@ -63,6 +69,11 @@ describe("SettingsScreen Public API and Telegram commands", () => {
     expect(within(managementDialog).getByLabelText("一次性 API Token")).toHaveValue("rlt_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNO12");
     expect(within(managementDialog).getByText("rlt_abc123")).toBeInTheDocument();
     expect(within(managementDialog).getByText("权限：read")).toBeInTheDocument();
+
+    await user.keyboard("{Escape}");
+    expect(screen.getByRole("dialog", { name: "管理 Public API token" })).toBeInTheDocument();
+    await user.click(getDialogOverlay());
+    expect(screen.getByRole("dialog", { name: "管理 Public API token" })).toBeInTheDocument();
 
     await user.type(within(managementDialog).getByLabelText("Token 名称"), "Shortcuts");
     await user.click(within(managementDialog).getByRole("button", { name: "创建 token" }));

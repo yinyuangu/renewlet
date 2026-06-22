@@ -117,18 +117,21 @@ export function makePreview(): ImportPreviewResponse {
   };
 }
 
-export function renderDialog(settings: AppSettings = configuredSettings()) {
-  return render(
-    <TooltipProvider delayDuration={0}>
-      <AIRecognizeSubscriptionDialog
-        open
-        onOpenChange={vi.fn()}
-        settings={settings}
-        config={DEFAULT_CUSTOM_CONFIG}
-        availableTags={["Work", "Streaming"]}
-      />
-    </TooltipProvider>,
-  );
+export function renderDialog(settings: AppSettings = configuredSettings(), onOpenChange = vi.fn()) {
+  return {
+    onOpenChange,
+    ...render(
+      <TooltipProvider delayDuration={0}>
+        <AIRecognizeSubscriptionDialog
+          open
+          onOpenChange={onOpenChange}
+          settings={settings}
+          config={DEFAULT_CUSTOM_CONFIG}
+          availableTags={["Work", "Streaming"]}
+        />
+      </TooltipProvider>,
+    ),
+  };
 }
 
 export function mockMobile(matches = true) {

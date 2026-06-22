@@ -203,6 +203,7 @@ export const ConfigManagerDialog = ({
         </button>
       </DialogTrigger>
       <DialogContent
+        dismissMode="explicit"
         layout={searchable ? "frame" : "content"}
         className={cn(
           "sm:max-w-lg",

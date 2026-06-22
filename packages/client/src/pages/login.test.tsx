@@ -1,5 +1,5 @@
 // Login 页面测试保护 setup/forgot-password 能力入口和 next 跳转清洗，不让认证页绕过公共路由契约。
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
@@ -46,6 +46,13 @@ function renderLogin() {
       <Login />
     </MemoryRouter>,
   );
+}
+
+function getTopDialogOverlay() {
+  const overlays = document.querySelectorAll<HTMLElement>("[data-dialog-overlay]");
+  const overlay = overlays.item(overlays.length - 1);
+  if (!overlay) throw new Error("Dialog overlay was not rendered");
+  return overlay;
 }
 
 function createDeferred<T>() {
@@ -407,6 +414,39 @@ describe("Login page", () => {
       expect(screen.queryByRole("dialog", { name: "Complete sign-in verification" })).not.toBeInTheDocument();
     });
     expect(container.querySelector("#login-password")).toHaveFocus();
+  });
+
+  it("requires the explicit close button for the MFA dialog", async () => {
+    const user = userEvent.setup();
+    mocks.signInEmail.mockResolvedValueOnce({
+      data: {
+        type: "mfa_required",
+        ticketId: "ticket-1",
+        expiresAt: "2026-07-01T00:00:00.000Z",
+        methods: ["totp"],
+      },
+      error: null,
+    });
+    renderLogin();
+
+    await user.type(screen.getByLabelText("Email"), "alice@example.com");
+    await user.type(screen.getByLabelText("Password"), "password123");
+    await user.click(screen.getByRole("button", { name: "Log in" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Complete sign-in verification" });
+    await user.keyboard("{Escape}");
+    expect(screen.getByRole("dialog", { name: "Complete sign-in verification" })).toBeInTheDocument();
+
+    await user.click(getTopDialogOverlay());
+    expect(screen.getByRole("dialog", { name: "Complete sign-in verification" })).toBeInTheDocument();
+
+    fireEvent.focusIn(screen.getByLabelText("Password"));
+    expect(screen.getByRole("dialog", { name: "Complete sign-in verification" })).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole("button", { name: "Close" }));
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Complete sign-in verification" })).not.toBeInTheDocument();
+    });
   });
 
   it("verifies TOTP with the in-memory ticket and remembers the email only after MFA succeeds", async () => {

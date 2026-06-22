@@ -60,6 +60,7 @@ export function LoginMfaDialog({
       {state ? (
         <DialogContent
           closeLabel={t("common.close")}
+          dismissMode="explicit"
           className="max-h-[calc(var(--app-viewport-height)-2rem)] overflow-y-auto border-border bg-card sm:max-w-md"
           onOpenAutoFocus={(event) => {
             event.preventDefault();

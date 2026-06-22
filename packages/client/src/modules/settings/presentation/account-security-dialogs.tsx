@@ -109,7 +109,7 @@ export function AccountSecurityDialogs({ state, onStateChange }: AccountSecurity
       <Dialog open onOpenChange={(open) => {
         if (!open) closeDialog();
       }}>
-        <DialogContent closeLabel={t("common.close")}>
+        <DialogContent closeLabel={t("common.close")} dismissMode="explicit">
           <DialogHeader>
             <DialogTitle>{t("settings.mfaSetupTitle")}</DialogTitle>
             <DialogDescription>{t("settings.mfaSetupDescription")}</DialogDescription>
@@ -171,7 +171,7 @@ export function AccountSecurityDialogs({ state, onStateChange }: AccountSecurity
       <Dialog open onOpenChange={(open) => {
         if (!open) closeDialog();
       }}>
-        <DialogContent closeLabel={t("common.close")}>
+        <DialogContent closeLabel={t("common.close")} dismissMode="explicit">
           <DialogHeader>
             <DialogTitle>
               {state.action === "disable" ? t("settings.mfaDisableTitle") : t("settings.mfaRegenerateTitle")}
@@ -228,7 +228,7 @@ export function AccountSecurityDialogs({ state, onStateChange }: AccountSecurity
       <Dialog open onOpenChange={(open) => {
         if (!open) closeDialog();
       }}>
-        <DialogContent closeLabel={t("common.close")}>
+        <DialogContent closeLabel={t("common.close")} dismissMode="explicit">
           <DialogHeader>
             <DialogTitle>{t("settings.mfaRecoveryCodesTitle")}</DialogTitle>
             <DialogDescription>{t("settings.mfaRecoveryCodesDescription")}</DialogDescription>

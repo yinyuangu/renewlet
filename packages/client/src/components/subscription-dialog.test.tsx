@@ -236,23 +236,6 @@ describe("SubscriptionDialog", () => {
     expect(screen.getByRole("dialog", { name: "编辑订阅" })).toBeInTheDocument();
     expect(onOpenChange).not.toHaveBeenCalledWith(false);
 
-    await user.click(screen.getByRole("button", { name: "管理成员" }));
-    expect(screen.getByRole("dialog", { name: "管理共享成员" })).toBeInTheDocument();
-    const overlays = document.querySelectorAll<HTMLElement>("[data-dialog-overlay]");
-    const topOverlay = overlays.item(overlays.length - 1);
-    if (!topOverlay) throw new Error("Member dialog overlay was not rendered");
-    await user.click(topOverlay);
-    expect(screen.queryByRole("dialog", { name: "管理共享成员" })).not.toBeInTheDocument();
-    expect(screen.getByRole("dialog", { name: "编辑订阅" })).toBeInTheDocument();
-    expect(onOpenChange).not.toHaveBeenCalledWith(false);
-
-    await user.click(screen.getByRole("button", { name: "管理成员" }));
-    expect(screen.getByRole("dialog", { name: "管理共享成员" })).toBeInTheDocument();
-    await user.keyboard("{Escape}");
-    expect(screen.queryByRole("dialog", { name: "管理共享成员" })).not.toBeInTheDocument();
-    expect(screen.getByRole("dialog", { name: "编辑订阅" })).toBeInTheDocument();
-    expect(onOpenChange).not.toHaveBeenCalledWith(false);
-
     await user.click(screen.getByRole("button", { name: "保存修改" }));
     expect(submittedMembers).toEqual([
       expect.objectContaining({ id: "partner", customAmount: 10 }),

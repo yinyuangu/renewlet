@@ -256,7 +256,7 @@ export function ImageCropDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md border-border bg-card">
+      <DialogContent dismissMode="explicit" className="sm:max-w-md border-border bg-card">
         <DialogHeader>
           <DialogTitle>{t("media.cropTitle")}</DialogTitle>
           <DialogDescription className="sr-only">

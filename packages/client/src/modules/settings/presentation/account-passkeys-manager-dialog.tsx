@@ -130,6 +130,7 @@ export function AccountPasskeysManagerDialog({
     <>
       <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent
+          dismissMode="explicit"
           layout="frame"
           className="flex h-[min(calc(var(--app-viewport-height)-2rem),44rem)] min-h-0 max-w-3xl flex-col gap-0 overflow-hidden border-border bg-card p-0"
           closeLabel={t("common.close")}

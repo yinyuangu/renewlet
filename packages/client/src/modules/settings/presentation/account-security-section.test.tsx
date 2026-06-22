@@ -79,6 +79,12 @@ const translations: Record<string, string> = {
   "settings.mfaRegenerateTitle": "重新生成恢复码？",
   "settings.mfaSetupFailed": "无法开始设置身份验证器",
   "settings.mfaSetupFailedDescription": "账号安全初始化失败，请稍后重试。",
+  "settings.mfaSetupTitle": "设置身份验证器",
+  "settings.mfaSetupDescription": "扫描二维码或手动输入密钥，然后填写身份验证器中的 6 位验证码。",
+  "settings.mfaManualSecret": "手动密钥",
+  "settings.mfaSetupCode": "身份验证器验证码",
+  "settings.mfaConfirmEnable": "启用并生成恢复码",
+  "settings.mfaEnabled": "身份验证器已启用",
   "settings.mfaTitle": "身份验证器",
   "settings.newPasswordPlaceholder": "至少 8 位",
   "settings.noPasskeys": "尚未添加通行密钥。",
@@ -158,6 +164,13 @@ async function waitForAccountSecurityReady() {
   expect(await screen.findByText("已添加：1 个")).toBeInTheDocument();
 }
 
+function getTopDialogOverlay() {
+  const overlays = document.querySelectorAll<HTMLElement>("[data-dialog-overlay]");
+  const overlay = overlays.item(overlays.length - 1);
+  if (!overlay) throw new Error("Dialog overlay was not rendered");
+  return overlay;
+}
+
 describe("AccountSettingsSection account security dialogs", () => {
   beforeEach(() => {
     mocks.mfaService.status.mockReset().mockResolvedValue({
@@ -198,6 +211,34 @@ describe("AccountSettingsSection account security dialogs", () => {
     expect(within(dialog).getByText("添加于 formatted:2026-06-22T00:00:00.000Z")).toBeInTheDocument();
     expect(within(dialog).queryByText(/可和身份验证器同时启用/)).not.toBeInTheDocument();
     expect(within(dialog).getByTestId("passkeys-manager-scroll")).toHaveClass("min-h-0", "flex-1", "overflow-y-auto");
+
+    await user.keyboard("{Escape}");
+    expect(screen.getByRole("dialog", { name: "管理通行密钥" })).toBeInTheDocument();
+    await user.click(getTopDialogOverlay());
+    expect(screen.getByRole("dialog", { name: "管理通行密钥" })).toBeInTheDocument();
+    await user.click(within(dialog).getAllByRole("button", { name: "关闭" })[0]!);
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "管理通行密钥" })).not.toBeInTheDocument();
+    });
+  });
+
+  it("requires explicit close controls while setting up an authenticator", async () => {
+    const user = userEvent.setup();
+    renderAccountSettings();
+    await waitForAccountSecurityReady();
+
+    await user.click(screen.getByRole("button", { name: "更换身份验证器" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "设置身份验证器" });
+    await user.keyboard("{Escape}");
+    expect(screen.getByRole("dialog", { name: "设置身份验证器" })).toBeInTheDocument();
+    await user.click(getTopDialogOverlay());
+    expect(screen.getByRole("dialog", { name: "设置身份验证器" })).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole("button", { name: "取消" }));
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "设置身份验证器" })).not.toBeInTheDocument();
+    });
   });
 
   it("submits passkey add from the manager without calling MFA services", async () => {

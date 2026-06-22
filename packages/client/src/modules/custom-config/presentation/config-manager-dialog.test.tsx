@@ -1,5 +1,5 @@
 // 配置管理弹窗测试保护排序、启用、只读和上传中禁保存，避免自定义配置 UI 绕过 domain 策略。
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -56,6 +56,13 @@ const dialogCases: Array<{
   },
 ];
 
+function getTopDialogOverlay() {
+  const overlays = document.querySelectorAll<HTMLElement>("[data-dialog-overlay]");
+  const overlay = overlays.item(overlays.length - 1);
+  if (!overlay) throw new Error("Dialog overlay was not rendered");
+  return overlay;
+}
+
 describe("ConfigManagerDialog", () => {
   it.each(dialogCases)("renders $title items immediately after opening", async ({ title, items, props, expectedValues }) => {
     const user = userEvent.setup();
@@ -101,6 +108,39 @@ describe("ConfigManagerDialog", () => {
     const dialog = screen.getByRole("dialog", { name: "分类管理" });
     expect(dialog).toHaveAccessibleDescription("自定义订阅分类的名称、颜色和排序。");
     expect(within(dialog).getByText("自定义订阅分类的名称、颜色和排序。")).toBeInTheDocument();
+  });
+
+  it("requires explicit close controls for config management dialogs", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <TooltipProvider delayDuration={0}>
+        <ConfigManagerDialog
+          title="分类管理"
+          description="自定义订阅分类的名称、颜色和排序。"
+          items={dialogCases[0]?.items ?? []}
+          onUpdate={vi.fn()}
+          showColor
+        />
+      </TooltipProvider>,
+    );
+
+    await user.click(screen.getByRole("button", { name: /分类管理/ }));
+    expect(screen.getByRole("dialog", { name: "分类管理" })).toBeInTheDocument();
+
+    await user.keyboard("{Escape}");
+    expect(screen.getByRole("dialog", { name: "分类管理" })).toBeInTheDocument();
+
+    await user.click(getTopDialogOverlay());
+    expect(screen.getByRole("dialog", { name: "分类管理" })).toBeInTheDocument();
+
+    fireEvent.focusIn(document.body);
+    expect(screen.getByRole("dialog", { name: "分类管理" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Close" }));
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "分类管理" })).not.toBeInTheDocument();
+    });
   });
 
   it("filters currency options by code, localized label, and symbol", async () => {

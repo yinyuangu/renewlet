@@ -49,7 +49,7 @@ export function CreateUserDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="border-border bg-card sm:max-w-xl">
+      <DialogContent dismissMode="explicit" className="border-border bg-card sm:max-w-xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <UserPlus className="h-5 w-5 text-primary" />
@@ -209,7 +209,7 @@ export function ResetPasswordDialog({
 
   return (
     <Dialog open={Boolean(user)} onOpenChange={onOpenChange}>
-      <DialogContent className="border-border bg-card sm:max-w-lg">
+      <DialogContent dismissMode="explicit" className="border-border bg-card sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <KeyRound className="h-5 w-5 text-primary" />

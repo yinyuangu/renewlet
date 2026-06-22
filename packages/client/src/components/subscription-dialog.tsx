@@ -444,6 +444,7 @@ export function SubscriptionDialog(props: SubscriptionDialogProps) {
         {"trigger" in props && props.trigger ? <DialogTrigger asChild>{props.trigger}</DialogTrigger> : null}
 
         <DialogContent
+          dismissMode="explicit"
           layout="frame"
           className="h5-dialog-frame h5-subscription-dialog-panel border-border bg-card p-0 sm:max-w-2xl"
         >
@@ -568,6 +569,7 @@ function CostSharingMemberDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
+        dismissMode="explicit"
         layout="frame"
         className="h5-dialog-frame h5-subscription-dialog-panel border-border bg-card p-0 sm:max-w-2xl"
         onOpenAutoFocus={(event) => {

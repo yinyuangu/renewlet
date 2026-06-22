@@ -38,7 +38,7 @@ export function PasswordChangeDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="border-border bg-card">
+      <DialogContent dismissMode="explicit" className="border-border bg-card">
         <DialogHeader>
           <DialogTitle>{t("settings.passwordDialogTitle")}</DialogTitle>
           <DialogDescription>{t("settings.passwordDialogDescription")}</DialogDescription>
