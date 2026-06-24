@@ -65,7 +65,7 @@ export function useSetupStatus(): SetupStatus {
         }
         if (!cancelled) {
           setStatus({
-            ...normalizeSetupStatus(parsed.data),
+            ...normalizeSetupStatus(parsed.data.data),
             isLoading: false,
           });
         }

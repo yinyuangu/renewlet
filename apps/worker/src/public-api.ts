@@ -1,17 +1,16 @@
 import { z } from "zod";
 import {
   apiTokenCreateRequestSchema,
-  apiTokenCreateResponseSchema,
-  apiTokenDeleteResponseSchema,
+  apiTokenCreatePayloadSchema,
   apiTokenSchema,
-  apiTokensListResponseSchema,
+  apiTokensListPayloadSchema,
   publicApiDueQuerySchema,
   publicApiDueItemSchema,
-  publicApiDueResponseSchema,
-  publicApiMeResponseSchema,
-  publicApiStatusResponseSchema,
-  publicApiSubscriptionResponseSchema,
-  publicApiSubscriptionsListResponseSchema,
+  publicApiDuePayloadSchema,
+  publicApiMePayloadSchema,
+  publicApiStatusPayloadSchema,
+  publicApiSubscriptionPayloadSchema,
+  publicApiSubscriptionsListPayloadSchema,
   publicApiSubscriptionsQuerySchema,
   publicApiTokenPlainSchema,
   type ApiToken,
@@ -34,7 +33,7 @@ import {
   toApiSubscription,
 } from "./db";
 import { dateOnlyInZone } from "./subscription-renewal";
-import { bearerToken, HttpError, json, readJson, requestLocale } from "./http";
+import { bearerToken, HttpError, readJson, requestLocale, successJson } from "./http";
 import { serverText } from "./server-i18n";
 import type { ApiAppSettings, ApiTokenRow, Env, SubscriptionRow } from "./types";
 
@@ -64,7 +63,7 @@ interface PublicApiDueOptions {
 export async function listApiTokens(request: Request, env: Env): Promise<Response> {
   const auth = await requireAuth(request, env);
   const tokens = (await listApiTokenRows(env, auth.user.id)).map(toApiToken);
-  return noStoreJson(apiTokensListResponseSchema.parse({ tokens }));
+  return noStoreSuccessJson(apiTokensListPayloadSchema.parse({ tokens }));
 }
 
 export async function createApiToken(request: Request, env: Env): Promise<Response> {
@@ -90,7 +89,7 @@ export async function createApiToken(request: Request, env: Env): Promise<Respon
     INSERT INTO api_tokens (id, user_id, name, token_hash, token_prefix, scopes_json, last_used_at, created_at, updated_at)
     VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?)
   `).bind(row.id, row.user_id, row.name, row.token_hash, row.token_prefix, row.scopes_json, row.created_at, row.updated_at).run();
-  return noStoreJson(apiTokenCreateResponseSchema.parse({ token: toApiToken(row), plainToken }), { status: 201 });
+  return noStoreSuccessJson(apiTokenCreatePayloadSchema.parse({ token: toApiToken(row), plainToken }), { status: 201 });
 }
 
 export async function deleteApiToken(request: Request, env: Env, tokenId: string): Promise<Response> {
@@ -102,12 +101,12 @@ export async function deleteApiToken(request: Request, env: Env, tokenId: string
     WHERE user_id = ? AND id = ?
   `).bind(auth.user.id, tokenId).run();
   if ((result.meta.changes ?? 0) === 0) throw new HttpError(404, serverText(locale, "common.notFound"), "NOT_FOUND");
-  return noStoreJson(apiTokenDeleteResponseSchema.parse({ ok: true }));
+  return noStoreSuccessJson({}, { status: 200 });
 }
 
 export async function publicApiMe(request: Request, env: Env): Promise<Response> {
   const auth = await requirePublicApiRead(request, env);
-  return noStoreJson(publicApiMeResponseSchema.parse({ ok: true, scopes: auth.scopes }));
+  return noStoreSuccessJson(publicApiMePayloadSchema.parse({ scopes: auth.scopes }));
 }
 
 export async function publicApiSubscriptions(request: Request, env: Env): Promise<Response> {
@@ -118,7 +117,7 @@ export async function publicApiSubscriptions(request: Request, env: Env): Promis
     limit: url.searchParams.get("limit") ?? undefined,
     cursor: url.searchParams.get("cursor") ?? undefined,
   }, locale);
-  return noStoreJson(await readPublicApiSubscriptionsForUser(env, auth.userId, {
+  return noStoreSuccessJson(await readPublicApiSubscriptionsForUser(env, auth.userId, {
     limit: parsed.limit,
     ...(parsed.cursor ? { cursor: parsed.cursor } : {}),
     locale,
@@ -130,12 +129,12 @@ export async function publicApiSubscription(request: Request, env: Env, subscrip
   const auth = await requirePublicApiRead(request, env);
   const row = await getSubscription(env, auth.userId, subscriptionId);
   if (!row) throw new HttpError(404, serverText(locale, "subscription.notFound"), "NOT_FOUND");
-  return noStoreJson(publicApiSubscriptionResponseSchema.parse({ subscription: toApiSubscription(row) }));
+  return noStoreSuccessJson(publicApiSubscriptionPayloadSchema.parse({ subscription: toApiSubscription(row) }));
 }
 
 export async function publicApiStatus(request: Request, env: Env): Promise<Response> {
   const auth = await requirePublicApiRead(request, env);
-  return noStoreJson(await readPublicApiStatusForUser(env, auth.userId));
+  return noStoreSuccessJson(await readPublicApiStatusForUser(env, auth.userId));
 }
 
 export async function publicApiDue(request: Request, env: Env): Promise<Response> {
@@ -145,28 +144,28 @@ export async function publicApiDue(request: Request, env: Env): Promise<Response
   const parsed = parseQuery(publicApiDueQuerySchema, {
     days: url.searchParams.get("days") ?? undefined,
   }, locale);
-  return noStoreJson(await readPublicApiDueForUser(env, auth.userId, parsed.days ?? PUBLIC_API_DUE_DEFAULT_DAYS));
+  return noStoreSuccessJson(await readPublicApiDueForUser(env, auth.userId, parsed.days ?? PUBLIC_API_DUE_DEFAULT_DAYS));
 }
 
 export async function readPublicApiSubscriptionsForUser(
   env: Env,
   userId: string,
   options: PublicApiSubscriptionsOptions,
-): Promise<z.infer<typeof publicApiSubscriptionsListResponseSchema>> {
+): Promise<z.infer<typeof publicApiSubscriptionsListPayloadSchema>> {
   if (options.cursor && !parseSubscriptionCursor(options.cursor)) {
     throw new HttpError(400, serverText(options.locale, "common.invalidRequestParameters"), "INVALID_CURSOR");
   }
   const rows = await listSubscriptionsPage(env, userId, { limit: options.limit + 1, cursor: options.cursor });
   const pageRows = rows.slice(0, options.limit);
   const nextCursor = rows.length > options.limit ? subscriptionCursor(pageRows[pageRows.length - 1]!) : null;
-  return publicApiSubscriptionsListResponseSchema.parse({
+  return publicApiSubscriptionsListPayloadSchema.parse({
     subscriptions: pageRows.map(toApiSubscription),
     nextCursor,
     total: await countSubscriptions(env, userId),
   });
 }
 
-export async function readPublicApiStatusForUser(env: Env, userId: string): Promise<z.infer<typeof publicApiStatusResponseSchema>> {
+export async function readPublicApiStatusForUser(env: Env, userId: string): Promise<z.infer<typeof publicApiStatusPayloadSchema>> {
   const byStatus = Object.fromEntries(SUBSCRIPTION_STATUSES.map((status) => [status, 0])) as Record<(typeof SUBSCRIPTION_STATUSES)[number], number>;
   const result = await env.DB.prepare(`
     SELECT status, COUNT(*) AS count
@@ -178,14 +177,14 @@ export async function readPublicApiStatusForUser(env: Env, userId: string): Prom
     if (row.status in byStatus) byStatus[row.status as keyof typeof byStatus] = row.count;
   }
   const total = Object.values(byStatus).reduce((sum, count) => sum + count, 0);
-  return publicApiStatusResponseSchema.parse({
+  return publicApiStatusPayloadSchema.parse({
     generatedAt: nowIso(),
     total,
     byStatus,
   });
 }
 
-export async function readPublicApiDueForUser(env: Env, userId: string, days: number, options: PublicApiDueOptions = {}): Promise<z.infer<typeof publicApiDueResponseSchema>> {
+export async function readPublicApiDueForUser(env: Env, userId: string, days: number, options: PublicApiDueOptions = {}): Promise<z.infer<typeof publicApiDuePayloadSchema>> {
   const settings = options.settings ?? await getSettings(env, userId);
   const today = dateOnlyInZone(new Date(), settings.timezone);
   const through = addDateOnlyDays(today, days);
@@ -203,7 +202,7 @@ export async function readPublicApiDueForUser(env: Env, userId: string, days: nu
     .map((row) => toDueItem(row, today, through))
     .filter((item): item is NonNullable<ReturnType<typeof toDueItem>> => item !== null)
     .sort((left, right) => left.dueDate.localeCompare(right.dueDate) || left.subscription.name.localeCompare(right.subscription.name));
-  return publicApiDueResponseSchema.parse({
+  return publicApiDuePayloadSchema.parse({
     days,
     generatedAt: nowIso(),
     items,
@@ -320,8 +319,8 @@ function addDateOnlyDays(value: string, days: number): string {
   return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
 }
 
-function noStoreJson(value: unknown, init: ResponseInit = {}): Response {
-  const response = json(value, init);
+function noStoreSuccessJson(value: unknown, init: ResponseInit = {}): Response {
+  const response = successJson(value, init);
   response.headers.set("cache-control", "no-store");
   response.headers.set("x-content-type-options", "nosniff");
   return response;

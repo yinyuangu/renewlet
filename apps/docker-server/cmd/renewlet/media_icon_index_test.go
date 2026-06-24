@@ -61,10 +61,7 @@ func TestMediaIconIndexStatusUsesSeedProviderVersions(t *testing.T) {
 	if res.Code != http.StatusOK {
 		t.Fatalf("expected status 200, got %d: %s", res.Code, res.Body.String())
 	}
-	var status builtInIconIndexStatusResponse
-	if err := json.NewDecoder(res.Body).Decode(&status); err != nil {
-		t.Fatal(err)
-	}
+	status := decodeAPISuccessDataForTest[builtInIconIndexStatusResponse](t, res.Body.Bytes())
 	assertSeedProviderVersions(t, status, nil)
 }
 
@@ -105,10 +102,7 @@ func TestMediaIconIndexCheckProviderDoesNotSwitchActive(t *testing.T) {
 	if res.Code != http.StatusOK {
 		t.Fatalf("expected check success 200, got %d: %s", res.Code, res.Body.String())
 	}
-	var response builtInIconIndexProviderCheckResponse
-	if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
-		t.Fatal(err)
-	}
+	response := decodeAPISuccessDataForTest[builtInIconIndexProviderCheckResponse](t, res.Body.Bytes())
 	if response.Status.Source != "embedded" || response.Status.Refreshing || response.Provider.Refreshing || response.Provider.Latest == nil || response.Provider.Latest.CommitSHA == nil || response.Provider.Latest.ReleaseTag == nil {
 		t.Fatalf("unexpected check status: %#v", response.Status)
 	}
@@ -141,10 +135,7 @@ func TestMediaIconIndexCheckProviderRecordsAtomFailureWithoutSwitchingActive(t *
 	if res.Code != http.StatusOK {
 		t.Fatalf("expected failed check to keep a usable 200 response, got %d: %s", res.Code, res.Body.String())
 	}
-	var response builtInIconIndexProviderCheckResponse
-	if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
-		t.Fatal(err)
-	}
+	response := decodeAPISuccessDataForTest[builtInIconIndexProviderCheckResponse](t, res.Body.Bytes())
 	if response.Provider.LastError == nil || !strings.Contains(*response.Provider.LastError, "GitHub commit feed HTTP 429") {
 		t.Fatalf("expected Atom feed failure in lastError, got %#v", response.Provider.LastError)
 	}
@@ -212,10 +203,7 @@ func TestMediaIconIndexCheckUsesAtomETagWithoutCallingRestAPI(t *testing.T) {
 	if res.Code != http.StatusOK {
 		t.Fatalf("expected check success 200, got %d: %s", res.Code, res.Body.String())
 	}
-	var response builtInIconIndexProviderCheckResponse
-	if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
-		t.Fatal(err)
-	}
+	response := decodeAPISuccessDataForTest[builtInIconIndexProviderCheckResponse](t, res.Body.Bytes())
 	if response.Provider.Latest == nil || response.Provider.Latest.CommitSHA == nil || *response.Provider.Latest.CommitSHA != "abc1234567890abcdef" {
 		t.Fatalf("expected cached latest on Atom 304, got %#v", response.Provider.Latest)
 	}
@@ -235,10 +223,7 @@ func TestMediaIconIndexRefreshSuccessAndFailureKeepsPreviousRuntimeIndex(t *test
 	if res.Code != http.StatusOK {
 		t.Fatalf("expected refresh success 200, got %d: %s", res.Code, res.Body.String())
 	}
-	var success builtInIconIndexProviderRefreshResponse
-	if err := json.NewDecoder(res.Body).Decode(&success); err != nil {
-		t.Fatal(err)
-	}
+	success := decodeAPISuccessDataForTest[builtInIconIndexProviderRefreshResponse](t, res.Body.Bytes())
 	if success.Status.Source != "runtime" || success.Status.Refreshing || success.Provider.Refreshing || success.Status.ProviderCounts.TheSVG != 1 || success.Status.Hash == nil || success.Provider.Current == nil || success.Provider.Current.CommitSHA == nil {
 		t.Fatalf("unexpected success status: %#v", success.Status)
 	}
@@ -252,24 +237,28 @@ func TestMediaIconIndexRefreshSuccessAndFailureKeepsPreviousRuntimeIndex(t *test
 	if res.Code != http.StatusBadGateway {
 		t.Fatalf("expected refresh failure 502, got %d: %s", res.Code, res.Body.String())
 	}
-	var failure builtInIconIndexProviderRefreshResponse
-	if err := json.NewDecoder(res.Body).Decode(&failure); err != nil {
+	var failure apiErrorEnvelope
+	if err := json.Unmarshal(res.Body.Bytes(), &failure); err != nil {
 		t.Fatal(err)
 	}
-	if failure.Status.Source != "runtime" || failure.Status.Refreshing || failure.Provider.Refreshing || failure.Status.Hash == nil || *failure.Status.Hash != activeHash {
-		t.Fatalf("expected failure to keep old active hash %q, got %#v", activeHash, failure.Status)
+	if failure.Error.Code != "MEDIA_ICON_INDEX_REFRESH_FAILED" {
+		t.Fatalf("expected refresh failure error code, got %#v", failure)
 	}
-	if failure.Provider.LastError == nil || *failure.Provider.LastError == "" {
-		t.Fatalf("expected failure status to expose last error, got %#v", failure.Status)
+	details, ok := failure.Error.Details.(map[string]any)
+	rawResponseText, rawOK := details["rawResponseText"].(string)
+	if !ok || !rawOK || !strings.Contains(rawResponseText, "registry failed") {
+		t.Fatalf("expected current error response to include upstream details, got %#v", failure.Error.Details)
 	}
-	if failure.ErrorDetails == nil || failure.ErrorDetails.RawResponseText == nil {
-		t.Fatalf("expected current response to include upstream details, got %#v", failure.ErrorDetails)
+	failureStatus := builtInIconIndexStatus(app)
+	failureProvider := providerStatusFromResponse(failureStatus, "thesvg")
+	if failureStatus.Source != "runtime" || failureStatus.Refreshing || failureProvider.Refreshing || failureStatus.Hash == nil || *failureStatus.Hash != activeHash {
+		t.Fatalf("expected failure to keep old active hash %q, got %#v", activeHash, failureStatus)
 	}
-	if !strings.Contains(*failure.ErrorDetails.RawResponseText, "registry failed") {
-		t.Fatalf("expected upstream body in refresh failure details, got %#v", failure.ErrorDetails.RawResponseText)
+	if failureProvider.LastError == nil || *failureProvider.LastError == "" {
+		t.Fatalf("expected failure status to expose last error, got %#v", failureStatus)
 	}
-	if failure.Provider.Current == nil || failure.Provider.Current.CommitSHA == nil || *failure.Provider.Current.CommitSHA != *success.Provider.Current.CommitSHA {
-		t.Fatalf("expected failed refresh to keep previous current version, got %#v", failure.Provider.Current)
+	if failureProvider.Current == nil || failureProvider.Current.CommitSHA == nil || *failureProvider.Current.CommitSHA != *success.Provider.Current.CommitSHA {
+		t.Fatalf("expected failed refresh to keep previous current version, got %#v", failureProvider.Current)
 	}
 }
 
@@ -287,12 +276,12 @@ func TestMediaIconIndexRefreshReportsConcurrentLock(t *testing.T) {
 	if res.Code != http.StatusConflict {
 		t.Fatalf("expected locked refresh 409, got %d: %s", res.Code, res.Body.String())
 	}
-	var response builtInIconIndexProviderRefreshResponse
-	if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
+	var response apiErrorEnvelope
+	if err := json.Unmarshal(res.Body.Bytes(), &response); err != nil {
 		t.Fatal(err)
 	}
-	if !response.Status.Refreshing || !response.Provider.Refreshing {
-		t.Fatalf("expected locked status to report refreshing: %#v", response.Status)
+	if response.Error.Code != "MEDIA_ICON_INDEX_REFRESHING" {
+		t.Fatalf("expected locked refresh error code, got %#v", response)
 	}
 }
 
@@ -332,10 +321,7 @@ func TestMediaCandidatesUseRuntimeIconIndex(t *testing.T) {
 	if res.Code != http.StatusOK {
 		t.Fatalf("expected media candidates 200, got %d: %s", res.Code, res.Body.String())
 	}
-	var response mediaCandidateResolveResponse
-	if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
-		t.Fatal(err)
-	}
+	response := decodeAPISuccessDataForTest[mediaCandidateResolveResponse](t, res.Body.Bytes())
 	if len(response.Items) != 1 || len(response.Items[0].Candidates.BuiltIn) == 0 {
 		t.Fatalf("expected runtime built-in candidate, got %#v", response)
 	}

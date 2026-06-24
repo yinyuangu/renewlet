@@ -98,6 +98,8 @@ export function AuthorizedImage({ src, onError, ...props }: AuthorizedImageProps
     <img
       {...props}
       src={image.src}
+      loading={props.loading ?? "lazy"}
+      decoding={props.decoding ?? "async"}
       referrerPolicy={referrerPolicy}
       onError={() => {
         onError?.();

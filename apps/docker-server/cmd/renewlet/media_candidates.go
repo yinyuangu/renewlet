@@ -42,7 +42,7 @@ func mediaCandidates(e *core.RequestEvent) error {
 		items = append(items, resolveMediaCandidateItem(resolver, body.Kind, body.Mode, item, limit, settings.BuiltInIconSources))
 	}
 	setPrivateShortCache(e)
-	return e.JSON(http.StatusOK, mediaCandidateResolveResponse{Items: items})
+	return apiSuccessJSON(e, http.StatusOK, mediaCandidateResolveResponse{Items: items})
 }
 
 func resolveMediaCandidateItem(resolver builtInResolverIndex, kind string, mode string, item mediaCandidateResolveItem, limit int, sources builtInIconSourceSettings) mediaCandidateResolveItemResponse {

@@ -7,15 +7,15 @@
 import {
   AI_RECOGNITION_MAX_MODEL_LIST_MODELS,
   aiModelListErrorDetailsSchema,
+  aiModelListPayloadSchema,
   aiModelListRequestSchema,
-  aiModelListResponseSchema,
   type AiModelListItem,
   type AiModelListRequest,
   type AiRecognitionTransportProtocol,
 } from "@renewlet/shared/schemas/ai-recognition";
 import { resolveAIProviderEndpoint, type AIModelListResponseShape } from "@renewlet/shared/ai-provider-endpoints";
 import { requireAuth } from "./auth";
-import { HttpError, json, readJson, requestLocale } from "./http";
+import { HttpError, readJson, requestLocale, successJson } from "./http";
 import { serverText, type AppLocale } from "./server-i18n";
 import type { Env } from "./types";
 import { providerResponseFromFetchResponse } from "./ai-provider-response";
@@ -60,7 +60,7 @@ export async function listAIModels(request: Request, env: Env): Promise<Response
     const endpoint = buildAIModelListEndpoint(input);
     const raw = await fetchAIModelListJSON(endpoint, locale);
     const normalized = normalizeAIModelList(endpoint.modelListShape, raw);
-    return json(aiModelListResponseSchema.parse({
+    return successJson(aiModelListPayloadSchema.parse({
       providerType: endpoint.providerType,
       transportProtocol: endpoint.transportProtocol,
       models: normalized.models,

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AI_RECOGNITION_MAX_IMAGES } from "@renewlet/shared/schemas/ai-recognition";
+import { readSuccessData } from "./api-test-helpers";
 import { recognizeSubscriptions } from "./ai-recognition";
 import { generatedDraft } from "./ai-recognition.test-utils";
 import type { Env } from "./types";
@@ -155,9 +156,9 @@ describe("Cloudflare AI recognition image inputs", () => {
     });
 
     const response = await recognizeSubscriptions(requestForImages(1), envFixture());
-    const body = await response.json() as {
+    const body = await readSuccessData<{
       diagnostics: { request: { images: Array<{ mediaType: string; sizeBytes: number }> } };
-    };
+    }>(response);
     const text = JSON.stringify(body.diagnostics);
 
     expect(body.diagnostics.request.images).toEqual([{ mediaType: "image/png", sizeBytes: 4 }]);
@@ -175,9 +176,9 @@ describe("Cloudflare AI recognition image inputs", () => {
     });
 
     const response = await recognizeSubscriptions(requestForImages(AI_RECOGNITION_MAX_IMAGES), envFixture());
-    const body = await response.json() as {
+    const body = await readSuccessData<{
       diagnostics: { request: { images: Array<{ mediaType: string; sizeBytes: number }> } };
-    };
+    }>(response);
 
     expect(body.diagnostics.request.images).toHaveLength(5);
     await expect(

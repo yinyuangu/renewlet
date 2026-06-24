@@ -122,10 +122,7 @@ func TestTelegramBotCommandsInstallWebhookAndDelete(t *testing.T) {
 	if strings.Contains(installRes.Body.String(), settings.TelegramBotToken) || strings.Contains(installRes.Body.String(), "webhookSecretHash") {
 		t.Fatalf("install response leaked secret material: %s", installRes.Body.String())
 	}
-	var installBody telegramBotCommandsResponse
-	if err := json.Unmarshal(installRes.Body.Bytes(), &installBody); err != nil {
-		t.Fatal(err)
-	}
+	installBody := decodeAPISuccessDataForTest[telegramBotCommandsResponse](t, installRes.Body.Bytes())
 	if !installBody.Installed || installBody.Status != "installed" {
 		t.Fatalf("unexpected install response: %#v", installBody)
 	}

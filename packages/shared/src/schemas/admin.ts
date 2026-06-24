@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { authenticatorMfaMethodSchema } from "./auth";
 import { okResponseSchema } from "./common";
+import { apiSuccessResponseSchema } from "./api";
 
 /**
  * 管理员角色枚举。
@@ -30,13 +31,15 @@ export const adminUserSchema = z.object({
   updatedAt: z.string(),
 }).strict();
 
-export const adminUsersResponseSchema = z.object({
+export const adminUsersPayloadSchema = z.object({
   users: z.array(adminUserSchema),
 }).strict();
+export const adminUsersResponseSchema = apiSuccessResponseSchema(adminUsersPayloadSchema);
 
-export const adminUserResponseSchema = z.object({
+export const adminUserPayloadSchema = z.object({
   user: adminUserSchema,
 }).strict();
+export const adminUserResponseSchema = apiSuccessResponseSchema(adminUserPayloadSchema);
 
 export const adminPatchUserResponseSchema = okResponseSchema;
 export const adminDeleteUserResponseSchema = okResponseSchema;
@@ -69,4 +72,4 @@ export const adminPatchUserBodySchema = z.object({
 
 export type UserRole = z.infer<typeof userRoleSchema>;
 export type AdminUser = z.infer<typeof adminUserSchema>;
-export type AdminUsersResponse = z.infer<typeof adminUsersResponseSchema>;
+export type AdminUsersResponse = z.infer<typeof adminUsersPayloadSchema>;

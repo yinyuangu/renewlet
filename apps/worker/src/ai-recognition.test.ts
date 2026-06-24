@@ -3,6 +3,7 @@ import { createAnthropic } from "@ai-sdk/anthropic";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+import { readSuccessData } from "./api-test-helpers";
 import { recognizeSubscriptions, testAIRecognitionConnection } from "./ai-recognition";
 import { generatedDraft } from "./ai-recognition.test-utils";
 import type { Env } from "./types";
@@ -214,7 +215,7 @@ describe("Cloudflare AI recognition", () => {
     });
 
     const response = await recognizeSubscriptions(requestForText("dmit 15元 1个月"), envFixture());
-    const body = await response.json() as {
+    const body = await readSuccessData<{
       providerType: string;
       transportProtocol: string;
       model: string;
@@ -237,7 +238,7 @@ describe("Cloudflare AI recognition", () => {
         request: { providerType: string; transportProtocol: string; model: string; textCharCount: number; images: Array<{ mediaType: string; sizeBytes: number }> };
         response: { usage: unknown; finishReason: string | null; providerMetadata: unknown };
       };
-    };
+    }>(response);
 
     expect(response.status).toBe(200);
     expect(body.providerType).toBe("openai");
@@ -256,7 +257,7 @@ describe("Cloudflare AI recognition", () => {
       warnings: [],
     });
     expect(body.diagnostics.schemaName).toBe("renewlet_ai_subscription_recognition");
-    expect(body.diagnostics.prompt.system.value).toContain("Return exactly one JSON object");
+    expect(body.diagnostics.prompt.system.value).toContain("Return exactly one valid JSON object parseable by JSON.parse");
     expect(body.diagnostics.prompt.system.value).toContain("Do generate useful service and website metadata");
     expect(body.diagnostics.prompt.system.value).toContain("Examples show output shape and decision patterns only");
     expect(body.diagnostics.prompt.user.value).toContain("dmit 15元 1个月");
@@ -301,9 +302,9 @@ describe("Cloudflare AI recognition", () => {
     });
 
     const response = await recognizeSubscriptions(requestForText("dmit 2 months 15dollar", "en-US"), envFixture());
-    const body = await response.json() as {
+    const body = await readSuccessData<{
       diagnostics: { prompt: { user: { value: string } } };
-    };
+    }>(response);
 
     expect(response.status).toBe(200);
     expect(body.diagnostics.prompt.user.value).toContain("- User locale: en-US");
@@ -335,7 +336,7 @@ describe("Cloudflare AI recognition", () => {
     });
 
     const response = await recognizeSubscriptions(requestForText("dmit 15元 1个月"), envFixture());
-    const body = await response.json() as { diagnostics: { request: { thinkingControl: unknown } } };
+    const body = await readSuccessData<{ diagnostics: { request: { thinkingControl: unknown } } }>(response);
     const call = aiMocks.generateObject.mock.calls[0]?.[0] as { providerOptions?: unknown };
 
     expect(call.providerOptions).toBeUndefined();
@@ -355,7 +356,7 @@ describe("Cloudflare AI recognition", () => {
       requestForTextWithThinking("dmit 15元 1个月", JSON.stringify({ provider: "openai", effort: "high" })),
       envFixture(),
     );
-    const body = await response.json() as { diagnostics: { request: { thinkingControl: unknown } } };
+    const body = await readSuccessData<{ diagnostics: { request: { thinkingControl: unknown } } }>(response);
     const call = aiMocks.generateObject.mock.calls[0]?.[0] as { providerOptions?: unknown };
 
     expect(call.providerOptions).toEqual({ openai: { reasoningEffort: "high" } });
@@ -374,10 +375,10 @@ describe("Cloudflare AI recognition", () => {
       apiKey: "sk-test",
       defaultThinkingControl: { provider: "openai", effort: "high" },
     }), envFixture());
-    const body = await response.json() as { ok: boolean; providerType: string; transportProtocol: string; model: string };
+    const body = await readSuccessData<{ providerType: string; transportProtocol: string; model: string }>(response);
 
     expect(response.status).toBe(200);
-    expect(body).toEqual({ ok: true, providerType: "openai", transportProtocol: "openai-chat", model: "gpt-5.1" });
+    expect(body).toEqual({ providerType: "openai", transportProtocol: "openai-chat", model: "gpt-5.1" });
     expect(aiMocks.generateText).toHaveBeenCalledWith(expect.objectContaining({
       model: { provider: "openai.chat" },
       prompt: "Reply with OK.",
@@ -431,7 +432,7 @@ describe("Cloudflare AI recognition", () => {
       apiKey: "",
       defaultThinkingControl: null,
     }), envFixture());
-    const body = await response.json() as { providerType: string; transportProtocol: string };
+    const body = await readSuccessData<{ providerType: string; transportProtocol: string }>(response);
 
     expect(body).toMatchObject({ providerType: "openai-compatible", transportProtocol: "openai-chat" });
     expect(aiMocks.generateText).toHaveBeenCalledWith(expect.objectContaining({
@@ -467,7 +468,7 @@ describe("Cloudflare AI recognition", () => {
     });
 
     const response = await recognizeSubscriptions(requestForText("unknown app 12 1个月"), envFixture());
-    const body = await response.json() as { subscriptions: Array<{ notes: unknown; warnings: string[] }> };
+    const body = await readSuccessData<{ subscriptions: Array<{ notes: unknown; warnings: string[] }> }>(response);
 
     expect(body.subscriptions[0]?.notes).toBeNull();
     expect(body.subscriptions[0]?.warnings).toContain("AI_WARNING_WEBSITE_UNCERTAIN");
@@ -489,7 +490,7 @@ describe("Cloudflare AI recognition", () => {
     });
 
     const response = await recognizeSubscriptions(requestForText("locvps 15元 1个月"), envFixture());
-    const body = await response.json() as { subscriptions: Array<{ notes: { value: string; source: string } | null }> };
+    const body = await readSuccessData<{ subscriptions: Array<{ notes: { value: string; source: string } | null }> }>(response);
 
     expect(body.subscriptions[0]?.notes).toEqual({
       value: "LOCVPS 提供 VPS、云服务器和服务器托管服务",
@@ -516,7 +517,7 @@ describe("Cloudflare AI recognition", () => {
     });
 
     const response = await recognizeSubscriptions(requestForText("youtube 15刀 1年"), envFixture());
-    const body = await response.json() as { subscriptions: Array<{ notes: { value: string; source: string } | null; warnings: string[] }> };
+    const body = await readSuccessData<{ subscriptions: Array<{ notes: { value: string; source: string } | null; warnings: string[] }> }>(response);
 
     expect(body.subscriptions[0]?.notes).toEqual({
       value: "YouTube 是 Google 旗下的视频分享和流媒体平台。",
@@ -539,7 +540,7 @@ describe("Cloudflare AI recognition", () => {
     });
 
     const response = await recognizeSubscriptions(requestForText("HostDZire IN CloudVPS #5 FAT32 Special Debian 12 Mumbai"), envFixture());
-    const body = await response.json() as { subscriptions: Array<{ tags: string[] }> };
+    const body = await readSuccessData<{ subscriptions: Array<{ tags: string[] }> }>(response);
 
     expect(body.subscriptions[0]?.tags).toEqual(["VPS"]);
   });
@@ -558,7 +559,7 @@ describe("Cloudflare AI recognition", () => {
     });
 
     const response = await recognizeSubscriptions(requestForText("HostDZire IN CloudVPS #5 FAT32 Special Debian 12 Mumbai"), envFixture());
-    const body = await response.json() as { subscriptions: Array<{ tags: string[] }> };
+    const body = await readSuccessData<{ subscriptions: Array<{ tags: string[] }> }>(response);
 
     expect(body.subscriptions[0]?.tags).toEqual([]);
   });
@@ -577,7 +578,7 @@ describe("Cloudflare AI recognition", () => {
     });
 
     const response = await recognizeSubscriptions(requestForText("dmit 15元 1个月"), envFixture());
-    const body = await response.json() as { subscriptions: Array<{ tags: string[] }> };
+    const body = await readSuccessData<{ subscriptions: Array<{ tags: string[] }> }>(response);
 
     expect(body.subscriptions[0]?.tags).toEqual(["VPS", "云服务器"]);
   });
@@ -610,7 +611,7 @@ describe("Cloudflare AI recognition", () => {
     });
 
     const response = await recognizeSubscriptions(requestForText("HostDZire CloudVPS 15元 1个月"), envFixture());
-    const body = await response.json() as { subscriptions: Array<{ notes: unknown; warnings: string[] }> };
+    const body = await readSuccessData<{ subscriptions: Array<{ notes: unknown; warnings: string[] }> }>(response);
 
     expect(aiMocks.generateObject).toHaveBeenCalledTimes(2);
     expect(JSON.stringify(aiMocks.generateObject.mock.calls[1]?.[0])).toContain("Repair task:");
@@ -644,7 +645,7 @@ describe("Cloudflare AI recognition", () => {
     });
 
     const response = await recognizeSubscriptions(requestForText("HostDZire CloudVPS 15元 1个月"), envFixture());
-    const body = await response.json() as { subscriptions: Array<{ notes: unknown; warnings: string[] }> };
+    const body = await readSuccessData<{ subscriptions: Array<{ notes: unknown; warnings: string[] }> }>(response);
 
     expect(aiMocks.generateObject).toHaveBeenCalledTimes(2);
     expect(body.subscriptions[0]?.notes).toEqual({
@@ -671,7 +672,7 @@ describe("Cloudflare AI recognition", () => {
     });
 
     const response = await recognizeSubscriptions(requestForText("unknown app 12 1个月"), envFixture());
-    const body = await response.json() as { subscriptions: Array<{ notes: unknown; warnings: string[] }> };
+    const body = await readSuccessData<{ subscriptions: Array<{ notes: unknown; warnings: string[] }> }>(response);
 
     expect(aiMocks.generateObject).toHaveBeenCalledTimes(1);
     expect(body.subscriptions[0]?.notes).toBeNull();
@@ -696,10 +697,10 @@ describe("Cloudflare AI recognition", () => {
     ].join("\n")));
 
     const response = await recognizeSubscriptions(requestForText("locvps 20元 1个月"), envFixture());
-    const body = await response.json() as {
+    const body = await readSuccessData<{
       subscriptions: Array<{ name: string; website: unknown }>;
       diagnostics: { output: { rawModelText: { value: string } | null; rawObjectJson: { value: string } | null } };
-    };
+    }>(response);
     const payload = JSON.stringify(body);
 
     expect(body.subscriptions[0]).toMatchObject({ name: "LocVPS", website: null });

@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createDefaultAppSettings } from "@renewlet/shared/settings-defaults";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { readSuccessData } from "./api-test-helpers";
 import { updateSettings } from "./settings";
 import {
   deleteTelegramBotCommands,
@@ -223,7 +224,7 @@ describe("Cloudflare Telegram Bot commands", () => {
     const telegramCalls = captureTelegramFetch();
 
     const status = await readTelegramBotCommands(authorizedRequest("/api/app/telegram-bot/commands"), env);
-    await expect(status.json()).resolves.toMatchObject({ status: "not_installed", installed: false, configComplete: true });
+    await expect(readSuccessData(status)).resolves.toMatchObject({ status: "not_installed", installed: false, configComplete: true });
 
     await expect(installTelegramBotCommands(authorizedRequest("/api/app/telegram-bot/commands", { method: "POST", url: "http://renewlet.test" }), env))
       .rejects.toMatchObject({ status: 400, code: "TELEGRAM_BOT_HTTPS_REQUIRED" });
@@ -233,7 +234,7 @@ describe("Cloudflare Telegram Bot commands", () => {
 
     const install = await installTelegramBotCommands(authorizedRequest("/api/app/telegram-bot/commands", { method: "POST" }), env);
 
-    const installBody = await install.json() as Record<string, unknown>;
+    const installBody = await readSuccessData<Record<string, unknown>>(install);
     expect(installBody).toMatchObject({ status: "installed", installed: true });
     expect(installBody).not.toHaveProperty("commandsVersion");
     expect(env.__state.bindings).toHaveLength(1);
@@ -256,7 +257,7 @@ describe("Cloudflare Telegram Bot commands", () => {
 
     env.__state.settingsJson = JSON.stringify(settings({ telegramBotToken: "123456:another-token" }));
     const mismatched = await readTelegramBotCommands(authorizedRequest("/api/app/telegram-bot/commands"), env);
-    await expect(mismatched.json()).resolves.toMatchObject({
+    await expect(readSuccessData(mismatched)).resolves.toMatchObject({
       status: "not_installed",
       installed: false,
     });

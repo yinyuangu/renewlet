@@ -3,7 +3,6 @@ package main
 // 系统版本 route 测试单独承载权限投影，避免通用 routes_test 继续膨胀并掩盖更新边界。
 
 import (
-	"encoding/json"
 	"io"
 	"net/http"
 	"os"
@@ -83,10 +82,7 @@ func TestSystemVersionRouteIsReadableBySignedInUsers(t *testing.T) {
 				t.Fatalf("expected version auth status %d, got %d: %s", tc.wantCode, res.Code, res.Body.String())
 			}
 			if tc.name == "admin" {
-				var body systemVersionResponse
-				if err := json.Unmarshal(res.Body.Bytes(), &body); err != nil {
-					t.Fatalf("expected version response to decode: %v", err)
-				}
+				body := decodeAPISuccessDataForTest[systemVersionResponse](t, res.Body.Bytes())
 				if !body.HasUpdate || body.LatestVersion != "1.1.0" {
 					t.Fatalf("expected admin version response to keep release facts, got %#v", body)
 				}
@@ -95,10 +91,7 @@ func TestSystemVersionRouteIsReadableBySignedInUsers(t *testing.T) {
 				}
 			}
 			if tc.name == "non admin" {
-				var body systemVersionResponse
-				if err := json.Unmarshal(res.Body.Bytes(), &body); err != nil {
-					t.Fatalf("expected version response to decode: %v", err)
-				}
+				body := decodeAPISuccessDataForTest[systemVersionResponse](t, res.Body.Bytes())
 				if body.UpdateSupported || body.UnsupportedReason != readOnlyReason || body.ErrorDetails != nil {
 					t.Fatalf("expected non-admin version response to be read-only, got %#v", body)
 				}
@@ -136,10 +129,7 @@ func TestSystemVersionRouteHidesRawDetailsFromNonAdmins(t *testing.T) {
 	if admin.Code != http.StatusOK {
 		t.Fatalf("expected admin version status 200, got %d: %s", admin.Code, admin.Body.String())
 	}
-	var adminBody systemVersionResponse
-	if err := json.Unmarshal(admin.Body.Bytes(), &adminBody); err != nil {
-		t.Fatalf("expected admin version response to decode: %v", err)
-	}
+	adminBody := decodeAPISuccessDataForTest[systemVersionResponse](t, admin.Body.Bytes())
 	if adminBody.ErrorDetails == nil || adminBody.ErrorDetails.RawResponseText == nil || *adminBody.ErrorDetails.RawResponseText != "release feed unavailable" {
 		t.Fatalf("expected admin version response to keep one-shot raw details, got %#v", adminBody.ErrorDetails)
 	}
@@ -148,10 +138,7 @@ func TestSystemVersionRouteHidesRawDetailsFromNonAdmins(t *testing.T) {
 	if user.Code != http.StatusOK {
 		t.Fatalf("expected non-admin version status 200, got %d: %s", user.Code, user.Body.String())
 	}
-	var userBody systemVersionResponse
-	if err := json.Unmarshal(user.Body.Bytes(), &userBody); err != nil {
-		t.Fatalf("expected non-admin version response to decode: %v", err)
-	}
+	userBody := decodeAPISuccessDataForTest[systemVersionResponse](t, user.Body.Bytes())
 	if userBody.ErrorDetails != nil || userBody.UpdateSupported || userBody.UnsupportedReason != serverText(defaultAppLocale, "auth.adminRequiredShort") {
 		t.Fatalf("expected non-admin version response to hide raw details and update ability, got %#v", userBody)
 	}

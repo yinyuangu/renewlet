@@ -32,13 +32,8 @@ type cloudBackupCreateSnapshotResponse struct {
 }
 
 type cloudBackupTestResponse struct {
-	OK        bool   `json:"ok"`
 	CheckedAt string `json:"checkedAt"`
 	Message   string `json:"message,omitempty"`
-}
-
-type cloudBackupDeleteSnapshotResponse struct {
-	OK bool `json:"ok"`
 }
 
 type cloudBackupConfigDTO struct {

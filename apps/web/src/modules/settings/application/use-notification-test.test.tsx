@@ -37,7 +37,7 @@ describe("useNotificationTest", () => {
   });
 
   it("does not show a loading toast before sending the test notification", async () => {
-    mocks.apiFetch.mockResolvedValue({ ok: true });
+    mocks.apiFetch.mockResolvedValue({});
     const { result } = renderHook(() => useNotificationTest(DEFAULT_SETTINGS));
 
     await act(async () => {

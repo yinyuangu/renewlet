@@ -4,7 +4,6 @@ package main
 // 这些入口会被 Telegram/CLI/Shortcuts 复用，不能退化成登录 session 或公开页 token 的别名。
 
 import (
-	"encoding/json"
 	"net/http"
 	"strings"
 	"testing"
@@ -69,10 +68,7 @@ func TestPublicAPITokenLifecycleAndReadRoutes(t *testing.T) {
 	if createRes.Header().Get("Cache-Control") != "no-store" {
 		t.Fatalf("expected token create to be no-store, got %#v", createRes.Header())
 	}
-	var createBody apiTokenCreateResponse
-	if err := json.Unmarshal(createRes.Body.Bytes(), &createBody); err != nil {
-		t.Fatal(err)
-	}
+	createBody := decodeAPISuccessDataForTest[apiTokenCreateResponse](t, createRes.Body.Bytes())
 	if !publicAPITokenRe.MatchString(createBody.PlainToken) {
 		t.Fatalf("plainToken does not match public API token shape: %q", createBody.PlainToken)
 	}
@@ -132,10 +128,7 @@ func TestPublicAPITokenLifecycleAndReadRoutes(t *testing.T) {
 	if listPublicRes.Code != http.StatusOK {
 		t.Fatalf("expected public subscriptions 200, got %d: %s", listPublicRes.Code, listPublicRes.Body.String())
 	}
-	var listBody subscriptionsListResponse
-	if err := json.Unmarshal(listPublicRes.Body.Bytes(), &listBody); err != nil {
-		t.Fatal(err)
-	}
+	listBody := decodeAPISuccessDataForTest[subscriptionsListResponse](t, listPublicRes.Body.Bytes())
 	if listBody.Total != 3 || len(listBody.Subscriptions) != 1 || listBody.NextCursor == nil {
 		t.Fatalf("unexpected paged subscriptions response: %#v", listBody)
 	}
@@ -147,10 +140,7 @@ func TestPublicAPITokenLifecycleAndReadRoutes(t *testing.T) {
 	if listAllRes.Code != http.StatusOK {
 		t.Fatalf("expected full public subscriptions 200, got %d: %s", listAllRes.Code, listAllRes.Body.String())
 	}
-	var listAllBody subscriptionsListResponse
-	if err := json.Unmarshal(listAllRes.Body.Bytes(), &listAllBody); err != nil {
-		t.Fatal(err)
-	}
+	listAllBody := decodeAPISuccessDataForTest[subscriptionsListResponse](t, listAllRes.Body.Bytes())
 	if !publicAPITestListContainsStartDateNull(listAllBody.Subscriptions, renewal.Id) {
 		t.Fatalf("expected public API list to preserve startDate null, got %#v", listAllBody.Subscriptions)
 	}
@@ -159,10 +149,7 @@ func TestPublicAPITokenLifecycleAndReadRoutes(t *testing.T) {
 	if detailRes.Code != http.StatusOK || !strings.Contains(detailRes.Body.String(), `"name":"Renewal Plan"`) {
 		t.Fatalf("expected own subscription detail 200, got %d: %s", detailRes.Code, detailRes.Body.String())
 	}
-	var detailBody subscriptionResponse
-	if err := json.Unmarshal(detailRes.Body.Bytes(), &detailBody); err != nil {
-		t.Fatal(err)
-	}
+	detailBody := decodeAPISuccessDataForTest[subscriptionResponse](t, detailRes.Body.Bytes())
 	if value, ok := detailBody.Subscription["startDate"]; !ok || value != nil {
 		t.Fatalf("expected public subscription detail to preserve startDate null, got %#v", detailBody.Subscription)
 	}
@@ -175,10 +162,7 @@ func TestPublicAPITokenLifecycleAndReadRoutes(t *testing.T) {
 	if statusRes.Code != http.StatusOK {
 		t.Fatalf("expected public status 200, got %d: %s", statusRes.Code, statusRes.Body.String())
 	}
-	var statusBody publicAPIStatusResponse
-	if err := json.Unmarshal(statusRes.Body.Bytes(), &statusBody); err != nil {
-		t.Fatal(err)
-	}
+	statusBody := decodeAPISuccessDataForTest[publicAPIStatusResponse](t, statusRes.Body.Bytes())
 	if statusBody.Total != 3 || statusBody.ByStatus["active"] != 2 || statusBody.ByStatus["trial"] != 1 {
 		t.Fatalf("unexpected status summary: %#v", statusBody)
 	}
@@ -187,10 +171,7 @@ func TestPublicAPITokenLifecycleAndReadRoutes(t *testing.T) {
 	if dueRes.Code != http.StatusOK {
 		t.Fatalf("expected public due 200, got %d: %s", dueRes.Code, dueRes.Body.String())
 	}
-	var dueBody publicAPIDueResponse
-	if err := json.Unmarshal(dueRes.Body.Bytes(), &dueBody); err != nil {
-		t.Fatal(err)
-	}
+	dueBody := decodeAPISuccessDataForTest[publicAPIDueResponse](t, dueRes.Body.Bytes())
 	if dueBody.Days != 30 || len(dueBody.Items) != 3 {
 		t.Fatalf("unexpected due response: %#v", dueBody)
 	}

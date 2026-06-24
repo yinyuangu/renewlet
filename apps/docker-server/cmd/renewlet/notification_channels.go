@@ -22,6 +22,47 @@ import (
 
 var serverChanSCTPSendKeyRe = regexp.MustCompile(`^sctp(\d+)t`)
 
+type notificationSender interface {
+	Send(core.App, appSettings, notificationMessage) error
+}
+
+type notificationSenderFunc func(core.App, appSettings, notificationMessage) error
+
+func (fn notificationSenderFunc) Send(app core.App, settings appSettings, message notificationMessage) error {
+	return fn(app, settings, message)
+}
+
+// notificationSenders 是 Go 运行面的渠道 registry；调度 job 幂等、失败重试和 raw details 剥离不在这里分叉。
+var notificationSenders = map[string]notificationSender{
+	"telegram": notificationSenderFunc(func(_ core.App, settings appSettings, message notificationMessage) error {
+		return sendTelegram(settings, message)
+	}),
+	"notifyx": notificationSenderFunc(func(_ core.App, settings appSettings, message notificationMessage) error {
+		return sendNotifyx(settings, message)
+	}),
+	"webhook": notificationSenderFunc(func(_ core.App, settings appSettings, message notificationMessage) error {
+		return sendWebhook(settings, message)
+	}),
+	"wechat": notificationSenderFunc(func(_ core.App, settings appSettings, message notificationMessage) error {
+		return sendWeChatWork(settings, message)
+	}),
+	"email": notificationSenderFunc(func(_ core.App, settings appSettings, message notificationMessage) error {
+		return sendEmail(settings, message)
+	}),
+	"bark": notificationSenderFunc(func(_ core.App, settings appSettings, message notificationMessage) error {
+		return sendBark(settings, message)
+	}),
+	"serverchan": notificationSenderFunc(func(_ core.App, settings appSettings, message notificationMessage) error {
+		return sendServerChan(settings, message)
+	}),
+	"discord": notificationSenderFunc(func(_ core.App, settings appSettings, message notificationMessage) error {
+		return sendDiscord(settings, message)
+	}),
+	"pushplus": notificationSenderFunc(func(_ core.App, settings appSettings, message notificationMessage) error {
+		return sendPushPlus(settings, message)
+	}),
+}
+
 func sendToChannels(app core.App, channels []string, settings appSettings, message notificationMessage) sendSummary {
 	summary := sendSummary{
 		Attempted: append([]string(nil), channels...),
@@ -42,30 +83,12 @@ func sendToChannels(app core.App, channels []string, settings appSettings, messa
 // sendToChannel 将统一消息分发到具体通知渠道。
 // 注意： 新增渠道时必须同步 knownChannels、settings schema、前端渠道枚举和 history result schema。
 func sendToChannel(app core.App, channel string, settings appSettings, message notificationMessage) error {
-	_ = app
 	locale := normalizeAppLocale(settings.Locale)
-	switch channel {
-	case "telegram":
-		return sendTelegram(settings, message)
-	case "notifyx":
-		return sendNotifyx(settings, message)
-	case "webhook":
-		return sendWebhook(settings, message)
-	case "wechat":
-		return sendWeChatWork(settings, message)
-	case "email":
-		return sendEmail(settings, message)
-	case "bark":
-		return sendBark(settings, message)
-	case "serverchan":
-		return sendServerChan(settings, message)
-	case "discord":
-		return sendDiscord(settings, message)
-	case "pushplus":
-		return sendPushPlus(settings, message)
-	default:
+	sender, ok := notificationSenders[channel]
+	if !ok {
 		return errors.New(serverFormat(locale, "notification.channelUnknown", map[string]interface{}{"channel": channel}))
 	}
+	return sender.Send(app, settings, message)
 }
 
 // sendTelegram 发送 Telegram Bot 消息。

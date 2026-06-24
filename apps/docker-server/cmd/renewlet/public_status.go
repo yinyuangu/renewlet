@@ -110,7 +110,7 @@ func handlePublicStatusPageStatus(app core.App, e *core.RequestEvent) error {
 	if err != nil {
 		return e.InternalServerError(serverText(requestLocale(e.Request), "common.internalError"), err)
 	}
-	return e.JSON(http.StatusOK, publicStatusPageStatusResponse{PublicStatusPage: publicStatusPageStatusFromRecord(e.Request, record)})
+	return apiSuccessJSON(e, http.StatusOK, publicStatusPageStatusResponse{PublicStatusPage: publicStatusPageStatusFromRecord(e.Request, record)})
 }
 
 func handlePublicStatusPageCreate(app core.App, e *core.RequestEvent) error {
@@ -123,7 +123,7 @@ func handlePublicStatusPageCreate(app core.App, e *core.RequestEvent) error {
 		return e.InternalServerError(serverText(locale, "common.internalError"), err)
 	}
 	// 创建接口可重复调用；已存在 token 时只回显状态，避免刷新页面意外轮换公开 URL。
-	return e.JSON(http.StatusOK, publicStatusPageCreateResponse{PublicStatusPage: publicStatusPageCreateStatus{
+	return apiSuccessJSON(e, http.StatusOK, publicStatusPageCreateResponse{PublicStatusPage: publicStatusPageCreateStatus{
 		Enabled:    true,
 		CreatedAt:  record.GetDateTime("created").Time().UTC().Format(time.RFC3339),
 		PageURL:    publicStatusPageURL(e.Request, record.GetString("token")),
@@ -149,7 +149,7 @@ func handlePublicStatusPageUpdate(app core.App, e *core.RequestEvent) error {
 	if err := app.Save(record); err != nil {
 		return e.InternalServerError(serverText(locale, "common.internalError"), err)
 	}
-	return e.JSON(http.StatusOK, publicStatusPageStatusResponse{PublicStatusPage: publicStatusPageStatusFromRecord(e.Request, record)})
+	return apiSuccessJSON(e, http.StatusOK, publicStatusPageStatusResponse{PublicStatusPage: publicStatusPageStatusFromRecord(e.Request, record)})
 }
 
 func handlePublicStatusPageDelete(app core.App, e *core.RequestEvent) error {
@@ -163,7 +163,7 @@ func handlePublicStatusPageDelete(app core.App, e *core.RequestEvent) error {
 			return e.InternalServerError(serverText(requestLocale(e.Request), "common.internalError"), err)
 		}
 	}
-	return e.JSON(http.StatusOK, newOKResponse())
+	return apiEmptySuccessJSON(e, http.StatusOK)
 }
 
 func handlePublicStatusRead(app core.App, e *core.RequestEvent) error {
@@ -178,7 +178,7 @@ func handlePublicStatusRead(app core.App, e *core.RequestEvent) error {
 		return e.InternalServerError(serverText(locale, "common.internalError"), err)
 	}
 	setPublicStatusHeaders(e.Response.Header())
-	return e.JSON(http.StatusOK, response)
+	return apiSuccessJSON(e, http.StatusOK, response)
 }
 
 func handlePublicStatusAssetRead(app core.App, e *core.RequestEvent) error {

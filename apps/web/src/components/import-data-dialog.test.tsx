@@ -180,7 +180,6 @@ describe("ImportDataDialog", () => {
     }));
     mocks.createAsset.mockResolvedValue({ url: "/api/app/assets/import_logo" });
     mocks.applyChunked.mockImplementation(async (payload) => ({
-      ok: true,
       summary: {
         total: payload.subscriptions.length,
         creates: payload.subscriptions.length,

@@ -39,7 +39,7 @@ func handleNotificationCron(app core.App, e *core.RequestEvent) error {
 	if err != nil {
 		return e.InternalServerError(serverText(locale, "notification.cronRunFailed"), err)
 	}
-	return e.JSON(http.StatusOK, result)
+	return apiSuccessJSON(e, http.StatusOK, result)
 }
 
 func cronBearerSecretMatches(expected string, authorization string) bool {
@@ -72,7 +72,7 @@ func handleNotificationTest(app core.App, e *core.RequestEvent) error {
 	if err := sendToChannel(app, body.Channel, settings, message); err != nil {
 		return apiErrorJSON(e, http.StatusBadRequest, "NOTIFICATION_TEST_FAILED", serverFormat(locale, "notification.testFailed", map[string]interface{}{"error": err.Error()}), notificationChannelErrorDetails(err))
 	}
-	return e.JSON(http.StatusOK, newOKResponse())
+	return apiEmptySuccessJSON(e, http.StatusOK)
 }
 
 // handleNotificationRun 为当前用户手动触发一次通知。
@@ -99,14 +99,14 @@ func handleNotificationRun(app core.App, e *core.RequestEvent) error {
 	message := buildDueNotification(time.Now(), settings, subscriptions, true)
 	if !message.HasPayload && !body.Force {
 		// 手动运行需要给前端一个可判别的 skipped 响应，避免 UI 通过 message 文案猜测结果。
-		return e.JSON(http.StatusOK, notificationRunSkippedResponse{OK: true, Sent: false, Reason: "no_due_items"})
+		return apiSuccessJSON(e, http.StatusOK, notificationRunSkippedResponse{Sent: false, Reason: "no_due_items"})
 	}
 	if len(settings.EnabledChannels) == 0 {
 		return e.BadRequestError(serverText(locale, "notification.noEnabledChannels"), nil)
 	}
 
 	summary := sendToChannels(app, settings.EnabledChannels, settings, message)
-	return e.JSON(http.StatusOK, notificationRunSentResponse{OK: true, Sent: true, Summary: summary})
+	return apiSuccessJSON(e, http.StatusOK, notificationRunSentResponse{Sent: true, Summary: summary})
 }
 
 // handleNotificationHistory 返回调度预览和分页历史。
@@ -157,7 +157,7 @@ func handleNotificationHistory(app core.App, e *core.RequestEvent) error {
 	latestJob, _ := latestNotificationJob(app, e.Auth.Id, "")
 	latestFailedJob, _ := latestNotificationJob(app, e.Auth.Id, notificationStatusFailed)
 
-	return e.JSON(http.StatusOK, notificationHistoryResponse{
+	return apiSuccessJSON(e, http.StatusOK, notificationHistoryResponse{
 		Summary: notificationHistorySummaryResponse{
 			NextCheck:        overview.NextCheck,
 			NextContentBatch: overview.NextContentBatch,

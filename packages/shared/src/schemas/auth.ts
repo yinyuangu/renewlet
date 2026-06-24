@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { apiSuccessResponseSchema } from "./api";
 
 /** 登录态用户安全视图；密码 hash、reset token 和 session 元数据不能进入前端。 */
 export interface AuthUserResponse {
@@ -38,7 +39,7 @@ export const authUserSchema: z.ZodType<AuthUserResponse> = z.object({
   banned: z.boolean(),
 }).strict();
 
-export const sessionResponseSchema = z.object({
+export const sessionPayloadSchema = z.object({
   type: z.literal("session"),
   session: z.object({
     id: z.string().min(1),
@@ -46,20 +47,23 @@ export const sessionResponseSchema = z.object({
   }).strict(),
   user: authUserSchema,
 }).strict() satisfies z.ZodType<SessionResponse>;
+export const sessionResponseSchema = apiSuccessResponseSchema(sessionPayloadSchema);
 
 export const authenticatorMfaMethodSchema: z.ZodType<AuthenticatorMfaMethod> = z.enum(["totp", "recovery_code"]);
 
-export const mfaRequiredResponseSchema = z.object({
+export const mfaRequiredPayloadSchema = z.object({
   type: z.literal("mfa_required"),
   ticketId: z.string().min(1),
   expiresAt: z.iso.datetime(),
   methods: z.array(authenticatorMfaMethodSchema).min(1),
 }).strict() satisfies z.ZodType<MfaRequiredResponse>;
+export const mfaRequiredResponseSchema = apiSuccessResponseSchema(mfaRequiredPayloadSchema);
 
-export const loginResponseSchema = z.discriminatedUnion("type", [
-  sessionResponseSchema,
-  mfaRequiredResponseSchema,
+export const loginPayloadSchema = z.discriminatedUnion("type", [
+  sessionPayloadSchema,
+  mfaRequiredPayloadSchema,
 ]) satisfies z.ZodType<LoginResponse>;
+export const loginResponseSchema = apiSuccessResponseSchema(loginPayloadSchema);
 
 /** 首装创建管理员只能在后端再次确认 setup 可用时生效；schema 只负责请求形状和密码上限。 */
 export const setupCreateBodySchema = z.object({
@@ -74,22 +78,24 @@ export const loginBodySchema = z.object({
   password: z.string().min(1).max(72),
 }).strict();
 
-export const mfaStatusResponseSchema = z.object({
+export const mfaStatusPayloadSchema = z.object({
   enabled: z.boolean(),
   // 身份验证器状态只描述 TOTP 与恢复码；Passkey 作为独立登录方式通过 passkeyCount 暴露。
   methods: z.array(authenticatorMfaMethodSchema),
   recoveryCodesRemaining: z.number().int().min(0),
   passkeyCount: z.number().int().min(0),
 }).strict();
-export type MfaStatusResponse = z.infer<typeof mfaStatusResponseSchema>;
+export const mfaStatusResponseSchema = apiSuccessResponseSchema(mfaStatusPayloadSchema);
+export type MfaStatusResponse = z.infer<typeof mfaStatusPayloadSchema>;
 
-export const mfaTotpSetupResponseSchema = z.object({
+export const mfaTotpSetupPayloadSchema = z.object({
   setupId: z.string().min(1),
   secret: z.string().min(1),
   otpauthUrl: z.string().min(1),
   expiresAt: z.iso.datetime(),
 }).strict();
-export type MfaTotpSetupResponse = z.infer<typeof mfaTotpSetupResponseSchema>;
+export const mfaTotpSetupResponseSchema = apiSuccessResponseSchema(mfaTotpSetupPayloadSchema);
+export type MfaTotpSetupResponse = z.infer<typeof mfaTotpSetupPayloadSchema>;
 
 export const mfaTotpEnableBodySchema = z.object({
   setupId: z.string().min(1),
@@ -103,9 +109,10 @@ export type MfaRecoveryCodesResponse = SessionResponse & {
 };
 
 // 启用/重建恢复码属于账号安全状态切换：响应必须同时续签产品 session，避免旧 bearer 被废弃后前端掉登录。
-export const mfaRecoveryCodesResponseSchema = sessionResponseSchema.extend({
+export const mfaRecoveryCodesPayloadSchema = sessionPayloadSchema.extend({
   recoveryCodes: z.array(z.string().min(1)).min(1),
 }).strict() satisfies z.ZodType<MfaRecoveryCodesResponse>;
+export const mfaRecoveryCodesResponseSchema = apiSuccessResponseSchema(mfaRecoveryCodesPayloadSchema);
 
 export const mfaCurrentPasswordBodySchema = z.object({
   currentPassword: z.string().min(1).max(72),
@@ -121,18 +128,20 @@ export const passkeySchema = z.object({
 }).strict();
 export type Passkey = z.infer<typeof passkeySchema>;
 
-export const passkeysResponseSchema = z.object({
+export const passkeysPayloadSchema = z.object({
   passkeys: z.array(passkeySchema),
 }).strict();
-export type PasskeysResponse = z.infer<typeof passkeysResponseSchema>;
+export const passkeysResponseSchema = apiSuccessResponseSchema(passkeysPayloadSchema);
+export type PasskeysResponse = z.infer<typeof passkeysPayloadSchema>;
 
-export const passkeyWebAuthnOptionsResponseSchema = z.object({
+export const passkeyWebAuthnOptionsPayloadSchema = z.object({
   challengeId: z.string().min(1),
   expiresAt: z.iso.datetime(),
   // WebAuthn options 是浏览器/库之间的 opaque JSON；shared 只校验外层 challenge 生命周期，密码学验证在后端库完成。
   options: webAuthnJsonSchema,
 }).strict();
-export type PasskeyWebAuthnOptionsResponse = z.infer<typeof passkeyWebAuthnOptionsResponseSchema>;
+export const passkeyWebAuthnOptionsResponseSchema = apiSuccessResponseSchema(passkeyWebAuthnOptionsPayloadSchema);
+export type PasskeyWebAuthnOptionsResponse = z.infer<typeof passkeyWebAuthnOptionsPayloadSchema>;
 
 export const passkeyRegisterOptionsBodySchema = z.object({
   name: z.string().trim().min(1).max(80),

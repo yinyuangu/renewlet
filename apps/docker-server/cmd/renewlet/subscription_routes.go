@@ -46,7 +46,7 @@ func handleSubscriptionRenew(app core.App, e *core.RequestEvent) error {
 	if err := app.Save(record); err != nil {
 		return e.BadRequestError("SUBSCRIPTION_RENEW_FAILED", err)
 	}
-	return e.JSON(http.StatusOK, subscriptionResponse{Subscription: subscriptionAPIFromRecord(record)})
+	return apiSuccessJSON(e, http.StatusOK, subscriptionResponse{Subscription: subscriptionAPIFromRecord(record)})
 }
 
 func subscriptionAPIFromRecord(record *core.Record) map[string]interface{} {

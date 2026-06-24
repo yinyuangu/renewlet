@@ -216,11 +216,7 @@ func requestNotificationHistory(t *testing.T, app core.App, token string) notifi
 	if res.Code != http.StatusOK {
 		t.Fatalf("expected notification history 200, got %d: %s", res.Code, res.Body.String())
 	}
-	var body notificationHistoryResponse
-	if err := json.Unmarshal(res.Body.Bytes(), &body); err != nil {
-		t.Fatal(err)
-	}
-	return body
+	return decodeAPISuccessDataForTest[notificationHistoryResponse](t, res.Body.Bytes())
 }
 
 func createNotificationHistoryJobRecord(t *testing.T, app core.App, userID string, result interface{}) *core.Record {

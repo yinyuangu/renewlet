@@ -1,6 +1,7 @@
 // Worker 日历 Feed 测试保护 D1 token scope、公开 ICS 路由和撤销语义，必须与 Go 后端行为保持一致。
 import { describe, expect, it } from "vitest";
 import { createDefaultAppSettings } from "@renewlet/shared/settings-defaults";
+import { readSuccessData } from "./api-test-helpers";
 import type { SubscriptionRow, UserRow, Env, CalendarFeedRow, SessionAuthRow } from "./types";
 import {
   calendarFeedIcs,
@@ -50,7 +51,7 @@ describe("calendar feed worker handlers", () => {
 
     const createResponse = await createCalendarFeed(request, env);
     expect(createResponse.status).toBe(200);
-    const created = await createResponse.json() as { calendarFeed: { feedUrl: string; enabled: boolean } };
+    const created = await readSuccessData<{ calendarFeed: { feedUrl: string; enabled: boolean } }>(createResponse);
     expect(created.calendarFeed.enabled).toBe(true);
     expect(created.calendarFeed.feedUrl).toMatch(/^https:\/\/renewlet\.example\/calendar\/renewals\.ics\?token=/);
 
@@ -61,7 +62,7 @@ describe("calendar feed worker handlers", () => {
     expect(storedFeed?.token).toBe(token);
 
     const statusResponse = await readCalendarFeed(authorizedRequest("https://renewlet.example/api/app/calendar-feed"), env);
-    const status = await statusResponse.json() as { calendarFeed: Record<string, unknown> };
+    const status = await readSuccessData<{ calendarFeed: Record<string, unknown> }>(statusResponse);
     expect(status.calendarFeed).toMatchObject({ enabled: true, feedUrl: created.calendarFeed.feedUrl });
 
     const icsResponse = await calendarFeedIcs(new Request(created.calendarFeed.feedUrl), env);
@@ -92,7 +93,7 @@ describe("calendar feed worker handlers", () => {
       body: "{}",
       method: "POST",
     }), env);
-    const rotated = await rotateResponse.json() as { calendarFeed: { feedUrl: string } };
+    const rotated = await readSuccessData<{ calendarFeed: { feedUrl: string } }>(rotateResponse);
     expect(rotated.calendarFeed.feedUrl).toBe(created.calendarFeed.feedUrl);
 
     const deleteResponse = await deleteCalendarFeed(authorizedRequest("https://renewlet.example/api/app/calendar-feed", { method: "DELETE" }), env);
@@ -111,8 +112,8 @@ describe("calendar feed worker handlers", () => {
       body: "{}",
       method: "POST",
     }), env, "sub_paused");
-    const first = await firstResponse.json() as { calendarFeed: { feedUrl: string } };
-    const second = await secondResponse.json() as { calendarFeed: { feedUrl: string } };
+    const first = await readSuccessData<{ calendarFeed: { feedUrl: string } }>(firstResponse);
+    const second = await readSuccessData<{ calendarFeed: { feedUrl: string } }>(secondResponse);
 
     expect(first.calendarFeed.feedUrl).toBe(second.calendarFeed.feedUrl);
     expect(env.__state.feeds.filter((feed) => feed.scope === "subscription" && feed.subscription_id === "sub_paused")).toHaveLength(1);
@@ -151,7 +152,7 @@ describe("calendar feed worker handlers", () => {
       method: "POST",
     }), env, "sub_fixed_term");
     expect(fixedTermResponse.status).toBe(200);
-    const fixedTerm = await fixedTermResponse.json() as { calendarFeed: { feedUrl: string } };
+    const fixedTerm = await readSuccessData<{ calendarFeed: { feedUrl: string } }>(fixedTermResponse);
     const ics = await (await calendarFeedIcs(new Request(fixedTerm.calendarFeed.feedUrl), env)).text();
     const unfoldedIcs = unfoldIcsText(ics);
 
@@ -248,7 +249,7 @@ describe("calendar feed worker handlers", () => {
       body: "{}",
       method: "POST",
     }), env, "sub_active");
-    const created = await response.json() as { calendarFeed: { feedUrl: string } };
+    const created = await readSuccessData<{ calendarFeed: { feedUrl: string } }>(response);
 
     env.__state.subscriptions = env.__state.subscriptions.filter((subscription) => subscription.id !== "sub_active");
 
@@ -264,7 +265,7 @@ describe("calendar feed worker handlers", () => {
     });
 
     const createResponse = await createCalendarFeed(request, env);
-    const created = await createResponse.json() as { calendarFeed: { feedUrl: string; enabled: boolean } };
+    const created = await readSuccessData<{ calendarFeed: { feedUrl: string; enabled: boolean } }>(createResponse);
 
     expect(createResponse.status).toBe(200);
     expect(created.calendarFeed.enabled).toBe(true);
@@ -337,7 +338,7 @@ describe("calendar feed worker handlers", () => {
       headers: { "accept-language": "zh-CN" },
       method: "POST",
     }), env);
-    const created = await response.json() as { calendarFeed: { feedUrl: string } };
+    const created = await readSuccessData<{ calendarFeed: { feedUrl: string } }>(response);
 
     const ics = await (await calendarFeedIcs(new Request(created.calendarFeed.feedUrl), env)).text();
     const unfoldedIcs = unfoldIcsText(ics);
@@ -365,7 +366,7 @@ describe("calendar feed worker handlers", () => {
       headers: { "accept-language": "zh-CN" },
       method: "POST",
     }), env);
-    const created = await response.json() as { calendarFeed: { feedUrl: string } };
+    const created = await readSuccessData<{ calendarFeed: { feedUrl: string } }>(response);
 
     const ics = await (await calendarFeedIcs(new Request(created.calendarFeed.feedUrl), env)).text();
     const unfoldedIcs = unfoldIcsText(ics);
@@ -392,7 +393,7 @@ describe("calendar feed worker handlers", () => {
       headers: { "accept-language": "zh-CN" },
       method: "POST",
     }), env);
-    const created = await response.json() as { calendarFeed: { feedUrl: string } };
+    const created = await readSuccessData<{ calendarFeed: { feedUrl: string } }>(response);
 
     const ics = await (await calendarFeedIcs(new Request(created.calendarFeed.feedUrl), env)).text();
     const unfoldedIcs = unfoldIcsText(ics);
@@ -418,7 +419,7 @@ describe("calendar feed worker handlers", () => {
       headers: { "accept-language": "en-US" },
       method: "POST",
     }), env);
-    const created = await response.json() as { calendarFeed: { feedUrl: string } };
+    const created = await readSuccessData<{ calendarFeed: { feedUrl: string } }>(response);
 
     const ics = await (await calendarFeedIcs(new Request(created.calendarFeed.feedUrl), env)).text();
     const unfoldedIcs = unfoldIcsText(ics);

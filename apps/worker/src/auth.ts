@@ -1,26 +1,27 @@
 import { changePasswordBodySchema } from "@renewlet/shared/schemas/account";
 import {
   loginBodySchema,
+  loginPayloadSchema,
   mfaCurrentPasswordBodySchema,
-  mfaRecoveryCodesResponseSchema,
-  mfaStatusResponseSchema,
+  mfaRecoveryCodesPayloadSchema,
+  mfaStatusPayloadSchema,
   mfaTotpEnableBodySchema,
-  mfaTotpSetupResponseSchema,
+  mfaTotpSetupPayloadSchema,
   mfaVerifyBodySchema,
   passkeyAuthenticateOptionsBodySchema,
   passkeyAuthenticateVerifyBodySchema,
   passkeyDeleteBodySchema,
   passkeyRegisterOptionsBodySchema,
   passkeyRegisterVerifyBodySchema,
-  passkeysResponseSchema,
-  passkeyWebAuthnOptionsResponseSchema,
-  sessionResponseSchema,
+  passkeysPayloadSchema,
+  passkeyWebAuthnOptionsPayloadSchema,
+  sessionPayloadSchema,
   setupCreateBodySchema,
   type SessionResponse,
 } from "@renewlet/shared/schemas/auth";
-import { appStatusResponseSchema } from "@renewlet/shared/schemas/app";
-import { adminCreateUserBodySchema, adminPatchUserBodySchema } from "@renewlet/shared/schemas/admin";
-import { bearerToken, HttpError, json, ok, readJson, requestLocale, type AppLocale } from "./http";
+import { appStatusPayloadSchema, passwordResetStatusPayloadSchema, setupStatusPayloadSchema } from "@renewlet/shared/schemas/app";
+import { adminCreateUserBodySchema, adminPatchUserBodySchema, adminUserPayloadSchema, adminUsersPayloadSchema } from "@renewlet/shared/schemas/admin";
+import { bearerToken, HttpError, ok, readJson, requestLocale, successJson, type AppLocale } from "./http";
 import { serverText } from "./server-i18n";
 import {
   enabledAdminCount,
@@ -65,7 +66,7 @@ const DEFAULT_SESSION_TTL_DAYS = 30;
  * Cloudflare v1 不支持 Docker Demo Mode，但仍必须返回同一契约，避免前端 capability 判断按运行面分叉。
  */
 async function buildAppStatus(env: Env) {
-  return appStatusResponseSchema.parse({
+  return appStatusPayloadSchema.parse({
     setupRequired: !(await hasEnabledAdmin(env)),
     setupEnabled: setupEnabled(env),
     demoMode: false,
@@ -73,7 +74,7 @@ async function buildAppStatus(env: Env) {
 }
 
 export async function appStatus(_request: Request, env: Env): Promise<Response> {
-  return json(await buildAppStatus(env));
+  return successJson(await buildAppStatus(env));
 }
 
 /**
@@ -83,10 +84,10 @@ export async function appStatus(_request: Request, env: Env): Promise<Response> 
  */
 export async function setupStatus(_request: Request, env: Env): Promise<Response> {
   const status = await buildAppStatus(env);
-  return json({
+  return successJson(setupStatusPayloadSchema.parse({
     setupRequired: status.setupRequired,
     setupEnabled: status.setupEnabled,
-  });
+  }));
 }
 
 /**
@@ -131,12 +132,12 @@ export async function login(request: Request, env: Env): Promise<Response> {
   if (mfaMethods.length > 0) {
     // MFA 用户密码正确后只签短期 ticket，不签产品 session；第二因素完成前前端仍是未登录态。
     const ticket = await createMfaAuthTicket(env, user.id, mfaMethods);
-    return json({
+    return successJson(loginPayloadSchema.parse({
       type: "mfa_required",
       ticketId: ticket.ticketId,
       expiresAt: ticket.expiresAt,
       methods: ticket.methods,
-    });
+    }));
   }
   const token = randomToken();
   const timestamp = nowIso();
@@ -146,7 +147,7 @@ export async function login(request: Request, env: Env): Promise<Response> {
     INSERT INTO sessions (id, token_hash, user_id, expires_at, created_at, last_seen_at)
     VALUES (?, ?, ?, ?, ?, ?)
   `).bind(newId("ses"), await sha256(token), user.id, expires, timestamp, timestamp).run();
-  return json(toSessionResponse(token, user, expires));
+  return successJson(sessionPayloadSchema.parse(toSessionResponse(token, user, expires)));
 }
 
 /**
@@ -156,7 +157,7 @@ export async function login(request: Request, env: Env): Promise<Response> {
  */
 export async function session(request: Request, env: Env): Promise<Response> {
   const auth = await requireAuth(request, env);
-  return json(toSessionResponse(auth.token, auth.user, auth.session.expires_at));
+  return successJson(sessionPayloadSchema.parse(toSessionResponse(auth.token, auth.user, auth.session.expires_at)));
 }
 
 /**
@@ -185,13 +186,13 @@ export async function mfaVerify(request: Request, env: Env): Promise<Response> {
 
 export async function mfaStatus(request: Request, env: Env): Promise<Response> {
   const auth = await requireAuth(request, env);
-  return json(mfaStatusResponseSchema.parse(await mfaStatusForUser(env, auth.user.id)));
+  return successJson(mfaStatusPayloadSchema.parse(await mfaStatusForUser(env, auth.user.id)));
 }
 
 export async function mfaTotpSetup(request: Request, env: Env): Promise<Response> {
   const auth = await requireAuth(request, env);
   // setup 只生成短期加密 seed；真正启用还要当前密码和验证码，避免打开弹窗就改变账号安全状态。
-  return json(mfaTotpSetupResponseSchema.parse(await startTotpSetup(env, auth.user)));
+  return successJson(mfaTotpSetupPayloadSchema.parse(await startTotpSetup(env, auth.user)));
 }
 
 export async function mfaTotpEnable(request: Request, env: Env): Promise<Response> {
@@ -205,7 +206,7 @@ export async function mfaTotpEnable(request: Request, env: Env): Promise<Respons
   const response = await enableTotp(env, auth.user, body.setupId, body.code).catch(() => {
     throw new HttpError(400, serverText(locale, "common.invalidRequestParameters"));
   });
-  return json(mfaRecoveryCodesResponseSchema.parse(response));
+  return successJson(mfaRecoveryCodesPayloadSchema.parse(response));
 }
 
 export async function mfaRecoveryRegenerate(request: Request, env: Env): Promise<Response> {
@@ -220,12 +221,12 @@ export async function mfaRecoveryRegenerate(request: Request, env: Env): Promise
   }
   // 恢复码明文只在这次响应出现；重新生成同时续签 session，让旧 bearer 和旧恢复码一起失效。
   const response = await regenerateRecoveryCodes(env, auth.user);
-  return json(mfaRecoveryCodesResponseSchema.parse(response));
+  return successJson(mfaRecoveryCodesPayloadSchema.parse(response));
 }
 
 export async function passkeys(request: Request, env: Env): Promise<Response> {
   const auth = await requireAuth(request, env);
-  return json(passkeysResponseSchema.parse(await listPasskeysForUser(env, auth.user.id)));
+  return successJson(passkeysPayloadSchema.parse(await listPasskeysForUser(env, auth.user.id)));
 }
 
 export async function passkeyRegisterOptions(request: Request, env: Env): Promise<Response> {
@@ -239,7 +240,7 @@ export async function passkeyRegisterOptions(request: Request, env: Env): Promis
   const response = await startPasskeyRegistration(env, request, auth.user).catch(() => {
     throw new HttpError(400, serverText(locale, "common.invalidRequestParameters"));
   });
-  return json(passkeyWebAuthnOptionsResponseSchema.parse(response));
+  return successJson(passkeyWebAuthnOptionsPayloadSchema.parse(response));
 }
 
 export async function passkeyRegisterVerify(request: Request, env: Env): Promise<Response> {
@@ -249,7 +250,7 @@ export async function passkeyRegisterVerify(request: Request, env: Env): Promise
   const response = await finishPasskeyRegistration(env, request, auth.user, body.challengeId, body.name, body.response).catch(() => {
     throw new HttpError(400, serverText(locale, "common.invalidRequestParameters"));
   });
-  return json(sessionResponseSchema.parse(response));
+  return successJson(sessionPayloadSchema.parse(response));
 }
 
 export async function passkeyAuthenticateOptions(request: Request, env: Env): Promise<Response> {
@@ -259,7 +260,7 @@ export async function passkeyAuthenticateOptions(request: Request, env: Env): Pr
   const response = await startPasskeyAuthentication(env, request).catch(() => {
     throw new HttpError(400, serverText(locale, "common.invalidRequestParameters"));
   });
-  return json(passkeyWebAuthnOptionsResponseSchema.parse(response));
+  return successJson(passkeyWebAuthnOptionsPayloadSchema.parse(response));
 }
 
 export async function passkeyAuthenticateVerify(request: Request, env: Env): Promise<Response> {
@@ -269,7 +270,7 @@ export async function passkeyAuthenticateVerify(request: Request, env: Env): Pro
     if (isAccountSecuritySchemaError(error)) throw error;
     throw new HttpError(401, serverText(locale, "auth.sessionExpired"));
   });
-  return json(sessionResponseSchema.parse(response));
+  return successJson(sessionPayloadSchema.parse(response));
 }
 
 export async function passkeyDelete(request: Request, env: Env, passkeyId: string): Promise<Response> {
@@ -282,7 +283,7 @@ export async function passkeyDelete(request: Request, env: Env, passkeyId: strin
   const response = await deletePasskeyForCurrentUser(env, auth.user, passkeyId).catch(() => {
     throw new HttpError(400, serverText(locale, "common.invalidRequestParameters"));
   });
-  return json(sessionResponseSchema.parse(response));
+  return successJson(sessionPayloadSchema.parse(response));
 }
 
 export async function mfaDisable(request: Request, env: Env): Promise<Response> {
@@ -294,7 +295,7 @@ export async function mfaDisable(request: Request, env: Env): Promise<Response> 
   }
   // 关闭 MFA 是敏感账号生命周期操作；自助路径续签当前 session，管理员 reset 才全量踢下线。
   const response = await disableAuthenticatorMfaForCurrentUser(env, auth.user);
-  return json(sessionResponseSchema.parse(response));
+  return successJson(sessionPayloadSchema.parse(response));
 }
 
 /**
@@ -326,7 +327,7 @@ export async function changePassword(request: Request, env: Env): Promise<Respon
  */
 export async function passwordResetStatus(): Promise<Response> {
   // Cloudflare 版不接收部署级 SMTP secrets；账号恢复走管理员用户管理里的重置密码。
-  return json({ enabled: false });
+  return successJson(passwordResetStatusPayloadSchema.parse({ enabled: false }));
 }
 
 /**
@@ -337,7 +338,7 @@ export async function passwordResetStatus(): Promise<Response> {
 export async function adminListUsers(request: Request, env: Env): Promise<Response> {
   await requireAdmin(request, env);
   const users = await listUsers(env);
-  return json({
+  return successJson(adminUsersPayloadSchema.parse({
     users: await Promise.all(users.map(async (user) => {
       const status = await mfaStatusForUser(env, user.id);
       return toAdminUser(user, {
@@ -347,7 +348,7 @@ export async function adminListUsers(request: Request, env: Env): Promise<Respon
         passkeyCount: status.passkeyCount,
       });
     })),
-  });
+  }));
 }
 
 /**
@@ -377,7 +378,7 @@ export async function adminCreateUser(request: Request, env: Env): Promise<Respo
     INSERT INTO users (id, email, name, role, banned, ban_reason, password_hash, created_at, updated_at)
     VALUES (?, ?, ?, ?, 0, '', ?, ?, ?)
   `).bind(user.id, user.email, user.name, user.role, user.password_hash, timestamp, timestamp).run();
-  return json({ user: toAdminUser(user) }, { status: 201 });
+  return successJson(adminUserPayloadSchema.parse({ user: toAdminUser(user) }), { status: 201 });
 }
 
 /**

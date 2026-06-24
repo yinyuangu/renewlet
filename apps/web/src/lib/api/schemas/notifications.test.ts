@@ -2,6 +2,8 @@
 import { describe, expect, it } from "vitest";
 import { notificationChannelSchema, notificationHistoryResponseSchema } from "./notifications";
 
+const success = <T>(data: T) => ({ ok: true, data });
+
 const skippedJob = {
   id: "job-1",
   scheduledLocalDate: "2026-05-17",
@@ -125,11 +127,12 @@ describe("notification API schemas", () => {
       },
     };
 
-    expect(notificationHistoryResponseSchema.safeParse(response).success).toBe(true);
+    expect(notificationHistoryResponseSchema.safeParse(success(response)).success).toBe(true);
   });
 
   it("accepts normalized skipped history responses with empty arrays", () => {
-    expect(notificationHistoryResponseSchema.safeParse(normalizedSkippedHistoryResponse).success).toBe(true);
+    expect(notificationHistoryResponseSchema.safeParse(success(normalizedSkippedHistoryResponse)).success).toBe(true);
+    expect(notificationHistoryResponseSchema.safeParse(normalizedSkippedHistoryResponse).success).toBe(false);
   });
 
   it("rejects legacy null channel arrays so the server contract stays strict", () => {
@@ -150,7 +153,7 @@ describe("notification API schemas", () => {
       },
     };
 
-    expect(notificationHistoryResponseSchema.safeParse(legacyNullResponse).success).toBe(false);
+    expect(notificationHistoryResponseSchema.safeParse(success(legacyNullResponse)).success).toBe(false);
   });
 
   it("accepts repeat reminder snapshots on notification items", () => {
@@ -186,7 +189,7 @@ describe("notification API schemas", () => {
       },
     };
 
-    expect(notificationHistoryResponseSchema.safeParse(response).success).toBe(true);
+    expect(notificationHistoryResponseSchema.safeParse(success(response)).success).toBe(true);
   });
 
   it("rejects inherited reminder sentinel values in notification history payloads", () => {
@@ -218,6 +221,6 @@ describe("notification API schemas", () => {
       },
     };
 
-    expect(notificationHistoryResponseSchema.safeParse(response).success).toBe(false);
+    expect(notificationHistoryResponseSchema.safeParse(success(response)).success).toBe(false);
   });
 });

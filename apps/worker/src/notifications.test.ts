@@ -3,6 +3,7 @@ import { createDefaultAppSettings } from "@renewlet/shared/settings-defaults";
 import type { ApiAppSettings } from "@renewlet/shared/schemas/settings";
 import type { ApiSubscription } from "@renewlet/shared/schemas/subscriptions";
 import { collectNotificationItemsForLocalDate, notificationHistory, runScheduledNotifications } from "./notifications";
+import { readSuccessData } from "./api-test-helpers";
 import { createCronJobResult } from "./notification-jobs";
 import { sendServerChan, serverChanEndpoint } from "./notification-serverchan";
 import { notificationChannelErrorDetails } from "./notification-errors";
@@ -296,10 +297,10 @@ describe("Cloudflare notifications", () => {
     const response = await notificationHistory(new Request("https://renewlet.test/api/app/notifications/history?status=all&limit=20&offset=0", {
       headers: { authorization: "Bearer test" },
     }), env);
-    const body = await response.json() as {
+    const body = await readSuccessData<{
       summary: { latestJob: { result: { schedule: Record<string, unknown> } } | null };
       history: { jobs: Array<{ result: { schedule: Record<string, unknown> } }> };
-    };
+    }>(response);
     const latestSchedule = body.summary.latestJob?.result.schedule;
     const historySchedule = body.history.jobs[0]?.result.schedule;
 

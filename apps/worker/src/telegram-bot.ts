@@ -1,9 +1,9 @@
-import { telegramBotCommandsResponseSchema } from "@renewlet/shared/schemas/telegram-bot";
+import { telegramBotCommandsPayloadSchema } from "@renewlet/shared/schemas/telegram-bot";
 import type { PublicApiDueItem } from "@renewlet/shared/schemas/public-api";
 import { requireAuth } from "./auth";
 import { getSettings, getTelegramBotBinding, newId, nowIso, TELEGRAM_BOT_BINDING_COLUMNS } from "./db";
 import { randomToken, sha256 } from "./crypto";
-import { HttpError, json, ok, requireEmptyBody, requestLocale } from "./http";
+import { HttpError, json, requireEmptyBody, requestLocale, successJson } from "./http";
 import { requestOrigin } from "./request-origin";
 import { normalizeServerLocale, serverFormat, serverText, type AppLocale } from "./server-i18n";
 import {
@@ -43,7 +43,7 @@ export async function readTelegramBotCommands(request: Request, env: Env): Promi
   const settings = await getSettings(env, auth.user.id);
   const binding = await getTelegramBotBinding(env, auth.user.id);
   const bindingMatches = binding ? await bindingMatchesSettings(binding, settings) : false;
-  return noStoreJson(telegramBotCommandsDto(settings, binding, bindingMatches));
+  return noStoreSuccessJson(telegramBotCommandsDto(settings, binding, bindingMatches));
 }
 
 export async function installTelegramBotCommands(request: Request, env: Env): Promise<Response> {
@@ -116,7 +116,7 @@ export async function installTelegramBotCommands(request: Request, env: Env): Pr
     throw telegramApiHttpError(error, locale);
   }
 
-  return noStoreJson(telegramBotCommandsDto(settings, await getTelegramBotBinding(env, auth.user.id), true));
+  return noStoreSuccessJson(telegramBotCommandsDto(settings, await getTelegramBotBinding(env, auth.user.id), true));
 }
 
 export async function deleteTelegramBotCommands(request: Request, env: Env): Promise<Response> {
@@ -134,7 +134,7 @@ export async function deleteTelegramBotCommands(request: Request, env: Env): Pro
     throw telegramApiHttpError(error, locale);
   }
   await env.DB.prepare("DELETE FROM telegram_bot_bindings WHERE user_id = ? AND id = ?").bind(auth.user.id, binding.id).run();
-  return noStoreJson({ ok: true });
+  return noStoreSuccessJson({});
 }
 
 export async function telegramWebhook(request: Request, env: Env, bindingId: string): Promise<Response> {
@@ -182,7 +182,7 @@ function telegramBotCommandsDto(settings: ApiAppSettings, binding: TelegramBotBi
     status = "not_configured";
     installed = false;
   }
-  return telegramBotCommandsResponseSchema.parse({
+  return telegramBotCommandsPayloadSchema.parse({
     configComplete: Boolean(config),
     installed,
     status,
@@ -502,8 +502,15 @@ function noStoreJson(value: unknown, init: ResponseInit = {}): Response {
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }
 
+function noStoreSuccessJson(value: unknown, init: ResponseInit = {}): Response {
+  const response = successJson(value, init);
+  const headers = new Headers(response.headers);
+  headers.set("cache-control", "no-store");
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+}
+
 function telegramWebhookOk(): Response {
-  const response = ok();
+  const response = json({ ok: true });
   const headers = new Headers(response.headers);
   headers.set("cache-control", "no-store");
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });

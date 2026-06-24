@@ -1,6 +1,7 @@
 // Worker 系统更新测试保护 Cloudflare 只读升级契约，避免前端误暴露 Docker 页面内更新入口。
 import rootPackageJson from "../../../package.json";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { readSuccessData } from "./api-test-helpers";
 import { systemRestart, systemUpdate, systemVersion } from "./system";
 import type { Env } from "./types";
 
@@ -38,7 +39,7 @@ describe("Cloudflare system update contract", () => {
     }), envFixture());
 
     expect(response.status).toBe(200);
-    const body = await response.json() as Record<string, unknown>;
+    const body = await readSuccessData<Record<string, unknown>>(response);
     expect(body).toMatchObject({
       currentVersion: "1.2.3",
       latestVersion: "1.2.3",
@@ -80,7 +81,7 @@ describe("Cloudflare system update contract", () => {
     }), env);
 
     expect(response.status).toBe(200);
-    const body = await response.json() as Record<string, unknown>;
+    const body = await readSuccessData<Record<string, unknown>>(response);
     expect(body).toMatchObject({
       currentVersion: rootPackageJson.version,
       latestVersion: rootPackageJson.version,
@@ -112,7 +113,7 @@ describe("Cloudflare system update contract", () => {
     }), env);
 
     expect(response.status).toBe(200);
-    const body = await response.json() as Record<string, unknown>;
+    const body = await readSuccessData<Record<string, unknown>>(response);
     expect(body).toMatchObject({
       currentVersion: rootPackageJson.version,
       latestVersion: rootPackageJson.version,
@@ -141,7 +142,7 @@ describe("Cloudflare system update contract", () => {
     }), env);
 
     expect(response.status).toBe(200);
-    const body = await response.json() as Record<string, unknown>;
+    const body = await readSuccessData<Record<string, unknown>>(response);
     expect(body).toMatchObject({
       currentVersion: rootPackageJson.version,
       latestVersion: rootPackageJson.version,
@@ -169,7 +170,7 @@ describe("Cloudflare system update contract", () => {
     }), env);
 
     expect(response.status).toBe(200);
-    const body = await response.json() as Record<string, unknown>;
+    const body = await readSuccessData<Record<string, unknown>>(response);
     const expectedVersion = `${rootPackageJson.version}-dev+504c168`;
     expect(body).toMatchObject({
       currentVersion: expectedVersion,
@@ -198,7 +199,7 @@ describe("Cloudflare system update contract", () => {
     }), env);
 
     expect(response.status).toBe(200);
-    const body = await response.json() as Record<string, unknown>;
+    const body = await readSuccessData<Record<string, unknown>>(response);
     expect(body).toMatchObject({
       currentVersion: "0.1.0-dev+d0059b5",
       latestVersion: "0.1.1",
@@ -222,7 +223,7 @@ describe("Cloudflare system update contract", () => {
     }), envFixture({ RENEWLET_VERSION: "1.2.2" }));
 
     expect(response.status).toBe(200);
-    const body = await response.json() as Record<string, unknown>;
+    const body = await readSuccessData<Record<string, unknown>>(response);
     expect(body).toMatchObject({
       currentVersion: "1.2.2",
       latestVersion: "1.2.3",
@@ -248,7 +249,7 @@ describe("Cloudflare system update contract", () => {
     }), env);
 
     expect(response.status).toBe(200);
-    const body = await response.json() as Record<string, unknown>;
+    const body = await readSuccessData<Record<string, unknown>>(response);
     expect(body).toMatchObject({
       currentVersion: rootPackageJson.version,
       latestVersion: rootPackageJson.version,
@@ -278,7 +279,7 @@ describe("Cloudflare system update contract", () => {
     }), envFixture());
 
     expect(response.status).toBe(200);
-    const body = await response.json() as Record<string, unknown>;
+    const body = await readSuccessData<Record<string, unknown>>(response);
     expect(body).toMatchObject({
       deployment: "cloudflare",
       updateMode: "cloudflare-deploy",

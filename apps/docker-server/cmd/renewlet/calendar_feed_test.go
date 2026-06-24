@@ -4,7 +4,6 @@ package main
 // 外部日历客户端不带登录态，所以这些用例必须证明 token 是唯一公开读取入口。
 
 import (
-	"encoding/json"
 	"net/http"
 	"net/url"
 	"strings"
@@ -60,10 +59,7 @@ func TestCalendarFeedLifecycleAndICSRoute(t *testing.T) {
 	if createRes.Code != http.StatusOK {
 		t.Fatalf("expected calendar feed create 200, got %d: %s", createRes.Code, createRes.Body.String())
 	}
-	var createBody calendarFeedCreateResponse
-	if err := json.Unmarshal(createRes.Body.Bytes(), &createBody); err != nil {
-		t.Fatal(err)
-	}
+	createBody := decodeAPISuccessDataForTest[calendarFeedCreateResponse](t, createRes.Body.Bytes())
 	if !createBody.CalendarFeed.Enabled || createBody.CalendarFeed.FeedURL == "" {
 		t.Fatalf("unexpected create response: %#v", createBody)
 	}
@@ -126,10 +122,7 @@ func TestCalendarFeedLifecycleAndICSRoute(t *testing.T) {
 	if reuseRes.Code != http.StatusOK {
 		t.Fatalf("expected calendar feed reuse 200, got %d: %s", reuseRes.Code, reuseRes.Body.String())
 	}
-	var reuseBody calendarFeedCreateResponse
-	if err := json.Unmarshal(reuseRes.Body.Bytes(), &reuseBody); err != nil {
-		t.Fatal(err)
-	}
+	reuseBody := decodeAPISuccessDataForTest[calendarFeedCreateResponse](t, reuseRes.Body.Bytes())
 	if reuseBody.CalendarFeed.FeedURL != createBody.CalendarFeed.FeedURL {
 		t.Fatal("expected repeated create to return the existing feed URL")
 	}
@@ -145,10 +138,7 @@ func TestCalendarFeedLifecycleAndICSRoute(t *testing.T) {
 	if regenerateRes.Code != http.StatusOK {
 		t.Fatalf("expected regenerated calendar feed create 200, got %d: %s", regenerateRes.Code, regenerateRes.Body.String())
 	}
-	var regenerateBody calendarFeedCreateResponse
-	if err := json.Unmarshal(regenerateRes.Body.Bytes(), &regenerateBody); err != nil {
-		t.Fatal(err)
-	}
+	regenerateBody := decodeAPISuccessDataForTest[calendarFeedCreateResponse](t, regenerateRes.Body.Bytes())
 	if regenerateBody.CalendarFeed.FeedURL == createBody.CalendarFeed.FeedURL {
 		t.Fatal("expected delete then create to issue a new feed URL")
 	}
@@ -207,14 +197,8 @@ func TestSubscriptionCalendarFeedLifecycleAndICSRoute(t *testing.T) {
 	if firstRes.Code != http.StatusOK || secondRes.Code != http.StatusOK {
 		t.Fatalf("expected subscription calendar feed create 200, got %d/%d: %s %s", firstRes.Code, secondRes.Code, firstRes.Body.String(), secondRes.Body.String())
 	}
-	var firstBody calendarFeedCreateResponse
-	var secondBody calendarFeedCreateResponse
-	if err := json.Unmarshal(firstRes.Body.Bytes(), &firstBody); err != nil {
-		t.Fatal(err)
-	}
-	if err := json.Unmarshal(secondRes.Body.Bytes(), &secondBody); err != nil {
-		t.Fatal(err)
-	}
+	firstBody := decodeAPISuccessDataForTest[calendarFeedCreateResponse](t, firstRes.Body.Bytes())
+	secondBody := decodeAPISuccessDataForTest[calendarFeedCreateResponse](t, secondRes.Body.Bytes())
 	if firstBody.CalendarFeed.FeedURL != secondBody.CalendarFeed.FeedURL {
 		t.Fatal("expected repeated subscription feed create to return the existing URL")
 	}
@@ -258,10 +242,7 @@ func TestSubscriptionCalendarFeedLifecycleAndICSRoute(t *testing.T) {
 	if fixedTermRes.Code != http.StatusOK {
 		t.Fatalf("expected fixed-term one-time subscription feed create 200, got %d: %s", fixedTermRes.Code, fixedTermRes.Body.String())
 	}
-	var fixedTermBody calendarFeedCreateResponse
-	if err := json.Unmarshal(fixedTermRes.Body.Bytes(), &fixedTermBody); err != nil {
-		t.Fatal(err)
-	}
+	fixedTermBody := decodeAPISuccessDataForTest[calendarFeedCreateResponse](t, fixedTermRes.Body.Bytes())
 	fixedTermICS := unfoldCalendarTestICS(serveTestRequest(t, app, http.MethodGet, calendarFeedRequestTarget(t, fixedTermBody.CalendarFeed.FeedURL), "", "").Body.String())
 	if !strings.Contains(fixedTermICS, "SUMMARY:Fixed Term Plan") || !strings.Contains(fixedTermICS, "UID:renewlet-expiry-") {
 		t.Fatalf("expected explicit fixed-term subscription feed to include expiry item, got:\n%s", fixedTermICS)
@@ -431,10 +412,7 @@ func TestCalendarFeedUsesBuiltInLabelsWhenCustomConfigIsMissing(t *testing.T) {
 	if createRes.Code != http.StatusOK {
 		t.Fatalf("expected calendar feed create 200, got %d: %s", createRes.Code, createRes.Body.String())
 	}
-	var createBody calendarFeedCreateResponse
-	if err := json.Unmarshal(createRes.Body.Bytes(), &createBody); err != nil {
-		t.Fatal(err)
-	}
+	createBody := decodeAPISuccessDataForTest[calendarFeedCreateResponse](t, createRes.Body.Bytes())
 
 	icsRes := serveTestRequest(t, app, http.MethodGet, calendarFeedRequestTarget(t, createBody.CalendarFeed.FeedURL), "", "")
 	if icsRes.Code != http.StatusOK {
@@ -481,10 +459,7 @@ func TestCalendarFeedDescribesCustomCycleUnit(t *testing.T) {
 	if createRes.Code != http.StatusOK {
 		t.Fatalf("expected calendar feed create 200, got %d: %s", createRes.Code, createRes.Body.String())
 	}
-	var createBody calendarFeedCreateResponse
-	if err := json.Unmarshal(createRes.Body.Bytes(), &createBody); err != nil {
-		t.Fatal(err)
-	}
+	createBody := decodeAPISuccessDataForTest[calendarFeedCreateResponse](t, createRes.Body.Bytes())
 
 	icsRes := serveTestRequest(t, app, http.MethodGet, calendarFeedRequestTarget(t, createBody.CalendarFeed.FeedURL), "", "")
 	if icsRes.Code != http.StatusOK {
@@ -524,10 +499,7 @@ func TestCalendarFeedUsesBuiltInLabelsWhenCustomConfigMissesEntry(t *testing.T) 
 	if createRes.Code != http.StatusOK {
 		t.Fatalf("expected calendar feed create 200, got %d: %s", createRes.Code, createRes.Body.String())
 	}
-	var createBody calendarFeedCreateResponse
-	if err := json.Unmarshal(createRes.Body.Bytes(), &createBody); err != nil {
-		t.Fatal(err)
-	}
+	createBody := decodeAPISuccessDataForTest[calendarFeedCreateResponse](t, createRes.Body.Bytes())
 
 	icsRes := serveTestRequest(t, app, http.MethodGet, calendarFeedRequestTarget(t, createBody.CalendarFeed.FeedURL), "", "")
 	if icsRes.Code != http.StatusOK {
@@ -574,10 +546,7 @@ func TestCalendarFeedPreservesUnknownConfigValues(t *testing.T) {
 	if createRes.Code != http.StatusOK {
 		t.Fatalf("expected calendar feed create 200, got %d: %s", createRes.Code, createRes.Body.String())
 	}
-	var createBody calendarFeedCreateResponse
-	if err := json.Unmarshal(createRes.Body.Bytes(), &createBody); err != nil {
-		t.Fatal(err)
-	}
+	createBody := decodeAPISuccessDataForTest[calendarFeedCreateResponse](t, createRes.Body.Bytes())
 
 	icsRes := serveTestRequest(t, app, http.MethodGet, calendarFeedRequestTarget(t, createBody.CalendarFeed.FeedURL), "", "")
 	if icsRes.Code != http.StatusOK {

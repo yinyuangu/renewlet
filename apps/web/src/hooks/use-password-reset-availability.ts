@@ -31,7 +31,7 @@ export function usePasswordResetAvailability(): boolean {
         const payload: unknown = await response.json();
         const parsed = passwordResetStatusResponseSchema.safeParse(payload);
         // 登录前接口不走 apiFetch，因此这里必须显式 schema parse；响应漂移时保守隐藏入口。
-        if (!cancelled) setEnabled(parsed.success ? parsed.data.enabled : false);
+        if (!cancelled) setEnabled(parsed.success ? parsed.data.data.enabled : false);
       } catch {
         if (!cancelled) setEnabled(false);
       }

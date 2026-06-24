@@ -19,23 +19,35 @@ import type { LocalTime } from '@/lib/time/local-time';
 import type { CostSharing } from '@renewlet/shared/cost-sharing';
 import { createDefaultAppSettings } from "@renewlet/shared/settings-defaults";
 import {
+  BILLING_CYCLES as SHARED_BILLING_CYCLES,
   CUSTOM_CYCLE_UNITS as SHARED_CUSTOM_CYCLE_UNITS,
   DEFAULT_NOTIFICATION_REMINDER_DAYS,
   DISABLED_REMINDER_DAYS,
   INHERIT_REMINDER_DAYS,
   MAX_REMINDER_DAYS,
+  NOTIFICATION_CHANNELS as SHARED_NOTIFICATION_CHANNELS,
+  REPEAT_REMINDER_INTERVALS as SHARED_REPEAT_REMINDER_INTERVALS,
+  REPEAT_REMINDER_WINDOWS as SHARED_REPEAT_REMINDER_WINDOWS,
+  SUBSCRIPTION_STATUSES as SHARED_SUBSCRIPTION_STATUSES,
+  type BillingCycle as SharedBillingCycle,
   type CustomCycleUnit as SharedCustomCycleUnit,
+  type NotificationChannel as SharedNotificationChannel,
+  type RepeatReminderInterval as SharedRepeatReminderInterval,
+  type RepeatReminderWindow as SharedRepeatReminderWindow,
+  type SubscriptionStatus as SharedSubscriptionStatus,
 } from "@renewlet/shared/runtime";
+import type { ApiSubscription } from "@renewlet/shared/schemas/subscriptions";
 
 export { DEFAULT_NOTIFICATION_REMINDER_DAYS, DISABLED_REMINDER_DAYS, INHERIT_REMINDER_DAYS, MAX_REMINDER_DAYS };
+export type { ApiSubscription };
 
-export const SUBSCRIPTION_STATUSES = ['trial', 'active', 'expired', 'paused', 'cancelled'] as const;
+export const SUBSCRIPTION_STATUSES = SHARED_SUBSCRIPTION_STATUSES;
 /** 订阅状态（影响展示、统计与提醒逻辑）。 */
-export type SubscriptionStatus = (typeof SUBSCRIPTION_STATUSES)[number];
+export type SubscriptionStatus = SharedSubscriptionStatus;
 
-export const BILLING_CYCLES = ['weekly', 'monthly', 'quarterly', 'semi-annual', 'annual', 'custom', 'one-time'] as const;
+export const BILLING_CYCLES = SHARED_BILLING_CYCLES;
 /** 扣费周期（用于计算月度/年度支出与续费日期；one-time 表示买断/一次性购买）。 */
-export type BillingCycle = (typeof BILLING_CYCLES)[number];
+export type BillingCycle = SharedBillingCycle;
 
 export const CUSTOM_CYCLE_UNITS = SHARED_CUSTOM_CYCLE_UNITS;
 /** 自定义扣费周期单位；仅 billingCycle=custom 时有效，旧记录缺省按 day 解释。 */
@@ -123,17 +135,17 @@ export type BuiltInPaymentMethod = (typeof PAYMENT_METHODS)[number];
  */
 export type PaymentMethod = BuiltInPaymentMethod | (string & {});
 
-export const NOTIFICATION_CHANNELS = ['telegram', 'notifyx', 'webhook', 'wechat', 'email', 'bark', 'serverchan', 'discord', 'pushplus'] as const;
+export const NOTIFICATION_CHANNELS = SHARED_NOTIFICATION_CHANNELS;
 /** 通知渠道（用于配置页选择 + 后续通知任务）。 */
-export type NotificationChannel = (typeof NOTIFICATION_CHANNELS)[number];
+export type NotificationChannel = SharedNotificationChannel;
 
-export const REPEAT_REMINDER_INTERVALS = ['1h', '3h', '6h', '12h', '24h'] as const;
+export const REPEAT_REMINDER_INTERVALS = SHARED_REPEAT_REMINDER_INTERVALS;
 /** 重复提醒间隔（按小时计，用于重要订阅的后续提醒）。 */
-export type RepeatReminderInterval = (typeof REPEAT_REMINDER_INTERVALS)[number];
+export type RepeatReminderInterval = SharedRepeatReminderInterval;
 
-export const REPEAT_REMINDER_WINDOWS = ['24h', '48h', '72h', 'full'] as const;
+export const REPEAT_REMINDER_WINDOWS = SHARED_REPEAT_REMINDER_WINDOWS;
 /** 重复提醒窗口；full 表示从首次提醒后一直重复到目标日期通知时间。 */
-export type RepeatReminderWindow = (typeof REPEAT_REMINDER_WINDOWS)[number];
+export type RepeatReminderWindow = SharedRepeatReminderWindow;
 
 /** 单个订阅允许的标签数量保护上限；正常使用体验上不主动强调。 */
 export const MAX_SUBSCRIPTION_TAGS = 100;

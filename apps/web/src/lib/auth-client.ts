@@ -69,8 +69,17 @@ async function fetchAuthJson(input: RequestInfo, init?: RequestInit): Promise<un
   const response = await fetch(input, { ...init, headers, credentials: "include" });
   const payload = await response.json().catch(() => null) as unknown;
   if (!response.ok) {
-    const message = payload && typeof payload === "object" && "message" in payload && typeof payload.message === "string"
-      ? payload.message
+    const message = payload && typeof payload === "object" && !Array.isArray(payload)
+      ? "error" in payload
+        && payload.error
+        && typeof payload.error === "object"
+        && !Array.isArray(payload.error)
+        && "message" in payload.error
+        && typeof payload.error.message === "string"
+          ? payload.error.message
+          : "message" in payload && typeof payload.message === "string"
+            ? payload.message
+            : response.statusText
       : response.statusText;
     throw new Error(message || "Request failed");
   }
@@ -82,14 +91,14 @@ async function fetchSession(input: RequestInfo, init?: RequestInit): Promise<Ses
   const parsed = sessionResponseSchema.safeParse(payload);
   // session 响应决定私有路由是否放行；未知 JSON 必须中断，不能降级成“已登录”。
   if (!parsed.success) throw new Error("Invalid session response");
-  return parsed.data;
+  return parsed.data.data;
 }
 
 async function fetchLogin(input: RequestInfo, init?: RequestInit): Promise<LoginResponse> {
   const payload = await fetchAuthJson(input, init);
   const parsed = loginResponseSchema.safeParse(payload);
   if (!parsed.success) throw new Error("Invalid login response");
-  return parsed.data;
+  return parsed.data.data;
 }
 
 async function refreshSession(): Promise<SessionData | null> {

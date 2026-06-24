@@ -1,7 +1,7 @@
-import { customConfigResponseSchema } from "@renewlet/shared/schemas/custom-config";
-import { settingsUpdateBodySchema } from "@renewlet/shared/schemas/settings";
+import { customConfigPayloadSchema } from "@renewlet/shared/schemas/custom-config";
+import { settingsPayloadSchema, settingsUpdateBodySchema } from "@renewlet/shared/schemas/settings";
 import { ensureSettings, getCustomConfig, getTelegramBotBinding, mergeSettingsPatch, putCustomConfig, putSettings } from "./db";
-import { HttpError, json, readJson, requestLocale } from "./http";
+import { HttpError, readJson, requestLocale, successJson } from "./http";
 import { requireAuth } from "./auth";
 import { serverText } from "./server-i18n";
 import type { Env } from "./types";
@@ -13,7 +13,7 @@ import type { Env } from "./types";
  */
 export async function readSettings(request: Request, env: Env): Promise<Response> {
   const auth = await requireAuth(request, env);
-  return json({ settings: await ensureSettings(env, auth.user.id, requestLocale(request)) });
+  return successJson(settingsPayloadSchema.parse({ settings: await ensureSettings(env, auth.user.id, requestLocale(request)) }));
 }
 
 /**
@@ -29,7 +29,7 @@ export async function updateSettings(request: Request, env: Env): Promise<Respon
   // PATCH 语义由“当前设置 + 局部字段”合成，最终仍过完整 schema，防止删除隐式默认项。
   const next = mergeSettingsPatch(current, patch);
   await rejectInstalledTelegramBotSettingsChange(env, auth.user.id, current, next, locale);
-  return json({ settings: await putSettings(env, auth.user.id, next) });
+  return successJson(settingsPayloadSchema.parse({ settings: await putSettings(env, auth.user.id, next) }));
 }
 
 /**
@@ -40,7 +40,7 @@ export async function updateSettings(request: Request, env: Env): Promise<Respon
 export async function readCustomConfig(request: Request, env: Env): Promise<Response> {
   const auth = await requireAuth(request, env);
   const config = await getCustomConfig(env, auth.user.id);
-  return json(customConfigResponseSchema.parse({ config }));
+  return successJson(customConfigPayloadSchema.parse({ config }));
 }
 
 /**
@@ -51,9 +51,9 @@ export async function readCustomConfig(request: Request, env: Env): Promise<Resp
 export async function updateCustomConfig(request: Request, env: Env): Promise<Response> {
   const locale = requestLocale(request);
   const auth = await requireAuth(request, env);
-  const body = await readJson(request, customConfigResponseSchema, locale);
+  const body = await readJson(request, customConfigPayloadSchema, locale);
   const config = await putCustomConfig(env, auth.user.id, body.config);
-  return json(customConfigResponseSchema.parse({ config }));
+  return successJson(customConfigPayloadSchema.parse({ config }));
 }
 
 async function rejectInstalledTelegramBotSettingsChange(

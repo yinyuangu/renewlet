@@ -1,6 +1,7 @@
 // Worker 公开展示页测试保护 bearer token、字段 allowlist、隐藏过滤和 R2 私有资产代理边界。
 import { createDefaultAppSettings } from "@renewlet/shared/settings-defaults";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { readSuccessData } from "./api-test-helpers";
 import {
   createPublicStatusPage,
   deletePublicStatusPage,
@@ -270,14 +271,14 @@ describe("public status worker handlers", () => {
     const env = createEnv();
 
     const disabledResponse = await readPublicStatusPage(authorizedRequest("/api/app/public-status-page"), env);
-    expect(await disabledResponse.json()).toEqual({ publicStatusPage: { enabled: false, showPrices: false } });
+    expect(await readSuccessData(disabledResponse)).toEqual({ publicStatusPage: { enabled: false, showPrices: false } });
 
     const createResponse = await createPublicStatusPage(authorizedRequest("/api/app/public-status-page", {
       method: "POST",
       body: "{}",
       headers: { "x-forwarded-host": "evil.example", "x-forwarded-proto": "http" },
     }), env);
-    const created = await createResponse.json() as { publicStatusPage: { enabled: boolean; pageUrl: string; showPrices: boolean } };
+    const created = await readSuccessData<{ publicStatusPage: { enabled: boolean; pageUrl: string; showPrices: boolean } }>(createResponse);
     expect(created.publicStatusPage).toMatchObject({
       enabled: true,
       pageUrl: `https://renewlet.test/status/${TOKEN}`,
@@ -289,7 +290,7 @@ describe("public status worker handlers", () => {
       method: "PATCH",
       body: JSON.stringify({ showPrices: true }),
     }), env);
-    expect(await updateResponse.json()).toMatchObject({ publicStatusPage: { enabled: true, showPrices: true } });
+    expect(await readSuccessData(updateResponse)).toMatchObject({ publicStatusPage: { enabled: true, showPrices: true } });
 
     const deleteResponse = await deletePublicStatusPage(authorizedRequest("/api/app/public-status-page", { method: "DELETE" }), env);
     expect(deleteResponse.status).toBe(200);
@@ -309,7 +310,7 @@ describe("public status worker handlers", () => {
     });
 
     const response = await readPublicStatus(publicRequest(`/api/public/status/${TOKEN}`), env, TOKEN);
-    const data = await response.json() as { subscriptions: Array<Record<string, unknown>>; page: { showPrices: boolean; currency?: string } };
+    const data = await readSuccessData<{ subscriptions: Array<Record<string, unknown>>; page: { showPrices: boolean; currency?: string } }>(response);
 
     expect(response.headers.get("cache-control")).toBe("no-store");
     expect(response.headers.get("x-content-type-options")).toBe("nosniff");
@@ -342,7 +343,7 @@ describe("public status worker handlers", () => {
       settingsJson: JSON.stringify(pricedSettings),
     });
     const pricedResponse = await readPublicStatus(publicRequest(`/api/public/status/${TOKEN}`), pricedEnv, TOKEN);
-    expect(await pricedResponse.json()).toMatchObject({
+    expect(await readSuccessData(pricedResponse)).toMatchObject({
       page: { showPrices: true, currency: "USD" },
       subscriptions: [{ price: 12, currency: "USD", billingCycle: "monthly" }],
     });
@@ -362,7 +363,7 @@ describe("public status worker handlers", () => {
     });
 
     const response = await readPublicStatus(publicRequest(`/api/public/status/${TOKEN}`), env, TOKEN);
-    const data = await response.json() as { subscriptions: Array<{ startDate: string | null; nextBillingDate: string }> };
+    const data = await readSuccessData<{ subscriptions: Array<{ startDate: string | null; nextBillingDate: string }> }>(response);
 
     expect(data.subscriptions[0]).toMatchObject({
       startDate: null,
@@ -379,7 +380,7 @@ describe("public status worker handlers", () => {
     const env = createEnv({ pages: [publicPage()], subscriptions });
 
     const response = await readPublicStatus(publicRequest(`/api/public/status/${TOKEN}`), env, TOKEN);
-    const data = await response.json() as { subscriptions: unknown[]; page: { truncated: boolean } };
+    const data = await readSuccessData<{ subscriptions: unknown[]; page: { truncated: boolean } }>(response);
 
     expect(data.subscriptions).toHaveLength(500);
     expect(data.page.truncated).toBe(true);

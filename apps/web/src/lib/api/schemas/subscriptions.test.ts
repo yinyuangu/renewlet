@@ -2,6 +2,8 @@
 import { describe, expect, it } from "vitest";
 import { apiSubscriptionSchema, subscriptionsListResponseSchema, subscriptionCreateBodySchema } from "./subscriptions";
 
+const success = <T>(data: T) => ({ ok: true, data });
+
 const validSubscriptionCreateBody = {
   name: "Logo Test",
   logo: null,
@@ -388,14 +390,20 @@ describe("subscription API schemas", () => {
   });
 
   it("requires paginated subscription list responses", () => {
+    expect(subscriptionsListResponseSchema.safeParse(success({
+      subscriptions: [validSubscriptionResponseBody],
+      nextCursor: null,
+      total: 1,
+    })).success).toBe(true);
+
     expect(subscriptionsListResponseSchema.safeParse({
       subscriptions: [validSubscriptionResponseBody],
       nextCursor: null,
       total: 1,
-    }).success).toBe(true);
-
-    expect(subscriptionsListResponseSchema.safeParse({
-      subscriptions: [validSubscriptionResponseBody],
     }).success).toBe(false);
+
+    expect(subscriptionsListResponseSchema.safeParse(success({
+      subscriptions: [validSubscriptionResponseBody],
+    })).success).toBe(false);
   });
 });

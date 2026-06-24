@@ -94,10 +94,7 @@ func TestMediaCandidatesAutoMatchesBuiltInWithTokenReduction(t *testing.T) {
 	if res.Code != http.StatusOK {
 		t.Fatalf("expected media candidates 200, got %d: %s", res.Code, res.Body.String())
 	}
-	var response mediaCandidateResolveResponse
-	if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
-		t.Fatalf("failed to decode media candidates response: %v", err)
-	}
+	response := decodeAPISuccessDataForTest[mediaCandidateResolveResponse](t, res.Body.Bytes())
 	byID := map[string]mediaCandidateResolveItemResponse{}
 	for _, item := range response.Items {
 		byID[item.ID] = item
@@ -145,10 +142,7 @@ func TestMediaCandidatesSearchReturnsBuiltInAndFaviconFallback(t *testing.T) {
 			if cache := res.Header().Get("Cache-Control"); cache != "private, max-age=300" {
 				t.Fatalf("unexpected cache-control %q", cache)
 			}
-			var response mediaCandidateResolveResponse
-			if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
-				t.Fatalf("failed to decode media candidates response: %v", err)
-			}
+			response := decodeAPISuccessDataForTest[mediaCandidateResolveResponse](t, res.Body.Bytes())
 			if len(response.Items) != 1 {
 				t.Fatalf("expected one response item, got %#v", response.Items)
 			}
@@ -197,10 +191,7 @@ func TestMediaCandidatesSearchUsesReducedBuiltInQuery(t *testing.T) {
 			if res.Code != http.StatusOK {
 				t.Fatalf("expected media candidates 200, got %d: %s", res.Code, res.Body.String())
 			}
-			var response mediaCandidateResolveResponse
-			if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
-				t.Fatalf("failed to decode media candidates response: %v", err)
-			}
+			response := decodeAPISuccessDataForTest[mediaCandidateResolveResponse](t, res.Body.Bytes())
 			if len(response.Items) != 1 {
 				t.Fatalf("expected one response item, got %#v", response.Items)
 			}
@@ -295,10 +286,7 @@ func TestMediaCandidatesSearchExpandsBuiltInVariants(t *testing.T) {
 		t.Fatalf("expected media candidates 200, got %d: %s", res.Code, res.Body.String())
 	}
 
-	var response mediaCandidateResolveResponse
-	if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
-		t.Fatalf("failed to decode media candidates response: %v", err)
-	}
+	response := decodeAPISuccessDataForTest[mediaCandidateResolveResponse](t, res.Body.Bytes())
 	if len(response.Items) != 1 {
 		t.Fatalf("expected one response item, got %#v", response.Items)
 	}
@@ -358,10 +346,7 @@ func TestMediaCandidatesRespectsBuiltInIconSourceSettings(t *testing.T) {
 		t.Fatalf("expected media candidates 200, got %d: %s", res.Code, res.Body.String())
 	}
 
-	var response mediaCandidateResolveResponse
-	if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
-		t.Fatalf("failed to decode media candidates response: %v", err)
-	}
+	response := decodeAPISuccessDataForTest[mediaCandidateResolveResponse](t, res.Body.Bytes())
 	builtIn := response.Items[0].Candidates.BuiltIn
 	if len(builtIn) == 0 {
 		t.Fatalf("expected selfh.st candidates, got %#v", response.Items[0].Candidates)
@@ -397,10 +382,7 @@ func TestMediaCandidatesAutoKeepsPreferredBuiltInVariant(t *testing.T) {
 		t.Fatalf("expected media candidates 200, got %d: %s", res.Code, res.Body.String())
 	}
 
-	var response mediaCandidateResolveResponse
-	if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
-		t.Fatalf("failed to decode media candidates response: %v", err)
-	}
+	response := decodeAPISuccessDataForTest[mediaCandidateResolveResponse](t, res.Body.Bytes())
 	item := response.Items[0]
 	if item.AutoCandidate == nil || item.AutoCandidate.Variant == nil || item.AutoCandidate.ID != "builtin:thesvg:google:default" || *item.AutoCandidate.Variant != "default" {
 		t.Fatalf("expected auto candidate to keep google default variant, got %#v", item.AutoCandidate)

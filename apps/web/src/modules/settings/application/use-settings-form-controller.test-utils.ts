@@ -414,7 +414,7 @@ export function setupSettingsFormControllerTestEnvironment() {
       updatedAt: "2026-05-29T00:00:00Z",
       feedUrl: "https://example.com/calendar/renewals.ics?token=secret",
     });
-    mocks.deleteCalendarFeedMutateAsync.mockResolvedValue({ ok: true });
+    mocks.deleteCalendarFeedMutateAsync.mockResolvedValue({});
     mocks.createPublicStatusPageMutateAsync.mockResolvedValue({
       enabled: true,
       createdAt: "2026-06-07T00:00:00Z",
@@ -429,7 +429,7 @@ export function setupSettingsFormControllerTestEnvironment() {
       pageUrl: "https://example.com/status/secret",
       showPrices: true,
     });
-    mocks.deletePublicStatusPageMutateAsync.mockResolvedValue({ ok: true });
+    mocks.deletePublicStatusPageMutateAsync.mockResolvedValue({});
     mocks.createPublicApiTokenMutateAsync.mockResolvedValue({
       token: {
         id: "tok_test",
@@ -440,7 +440,7 @@ export function setupSettingsFormControllerTestEnvironment() {
       },
       plainToken: "rlt_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNO12",
     });
-    mocks.deletePublicApiTokenMutateAsync.mockResolvedValue({ ok: true });
+    mocks.deletePublicApiTokenMutateAsync.mockResolvedValue({});
     mocks.installTelegramBotCommandsMutateAsync.mockResolvedValue({
       configComplete: true,
       installed: true,

@@ -70,7 +70,7 @@ function createWrapper() {
 }
 
 function sessionResponse(session: SessionData) {
-  return new Response(JSON.stringify(session), { status: 200 });
+  return new Response(JSON.stringify({ ok: true, data: session }), { status: 200 });
 }
 
 function createDeferred<T>() {

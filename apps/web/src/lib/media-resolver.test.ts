@@ -20,6 +20,7 @@ const builtInIconSearchIndex = JSON.parse(
   gunzipSync(readFileSync(path.resolve(process.cwd(), "public/built-in-icons/search-index.json.gz"))).toString("utf8"),
 ) as BuiltInIconSearchIndex;
 const resolver = createMediaResolverFromSearchIndex(builtInIconSearchIndex, mediaResolverConfig);
+const success = <T>(data: T) => ({ ok: true, data });
 
 describe("shared media resolver", () => {
   it("matches fixture expectations and keeps responses inside the shared schema", () => {
@@ -36,7 +37,7 @@ describe("shared media resolver", () => {
         clampMediaCandidateLimit(mediaResolverConfig, fixture.limit),
       );
 
-      mediaCandidateResolveResponseSchema.parse({ items: [item] });
+      mediaCandidateResolveResponseSchema.parse(success({ items: [item] }));
       if ("expectedAutoLabel" in fixture) {
         expect(item.autoCandidate?.label ?? null, fixture.id).toBe(fixture.expectedAutoLabel);
       }

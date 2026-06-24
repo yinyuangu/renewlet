@@ -14,6 +14,7 @@ import {
 } from "./cloud-backup";
 import { CloudBackupRemoteError, sha256Hex, type CloudBackupRemoteClient } from "./cloud-backup-remote";
 import { deleteCloudBackupFromTargets, type CloudBackupTarget } from "./cloud-backup-snapshot-resolve";
+import { readSuccessData } from "./api-test-helpers";
 import { HttpError } from "./http";
 import type { CloudBackupTargetRow, Env, UserRow } from "./types";
 
@@ -315,7 +316,7 @@ describe("Cloudflare cloud backup", () => {
         },
       }),
     }), env);
-    const body = await response.json() as { config: Record<string, unknown> };
+    const body = await readSuccessData<{ config: Record<string, unknown> }>(response);
 
     expect(rows[0]?.credential_json).toContain("plain-secret");
     expect(rows[0]?.schedule_time).toBe("02:15");
@@ -369,13 +370,13 @@ describe("Cloudflare cloud backup", () => {
         },
       }),
     }), env);
-    const body = await response.json() as {
+    const body = await readSuccessData<{
       config: {
         credentialSetByProvider: unknown;
         s3?: Record<string, unknown>;
         policyByProvider: Record<"webdav" | "s3", { scheduleTime: string; scheduleWeekday: string; retention: number }>;
       };
-    };
+    }>(response);
 
     expect(rows).toHaveLength(2);
     expect(rows.find((row) => row.provider === "webdav")?.credential_json).toContain("webdav-secret");
@@ -396,7 +397,7 @@ describe("Cloudflare cloud backup", () => {
       method: "POST",
       body: JSON.stringify({ provider: "s3" }),
     }), env);
-    const body = await response.json() as { snapshots: Array<{ provider: string }> };
+    const body = await readSuccessData<{ snapshots: Array<{ provider: string }> }>(response);
 
     expect(response.status).toBe(201);
     expect(body.snapshots.map((snapshot) => snapshot.provider)).toEqual(["s3"]);
@@ -599,7 +600,7 @@ describe("Cloudflare cloud backup", () => {
     }));
 
     const response = await listCloudBackups(authorizedRequest("/api/app/cloud-backups?provider=webdav"), env);
-    const body = await response.json() as { snapshots: unknown[] };
+    const body = await readSuccessData<{ snapshots: unknown[] }>(response);
 
     expect(response.status).toBe(200);
     expect(body.snapshots).toEqual([]);

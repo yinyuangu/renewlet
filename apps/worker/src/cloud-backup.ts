@@ -3,16 +3,15 @@ import {
   CLOUD_BACKUP_DEFAULT_SCHEDULE_TIME,
   CLOUD_BACKUP_DEFAULT_SCHEDULE_WEEKDAY,
   CLOUD_BACKUP_MAX_SNAPSHOT_BYTES,
-  cloudBackupConfigResponseSchema,
+  cloudBackupConfigPayloadSchema,
   cloudBackupConfigUpdateSchema,
   cloudBackupCreateSnapshotRequestSchema,
-  cloudBackupCreateSnapshotResponseSchema,
-  cloudBackupDeleteSnapshotResponseSchema,
+  cloudBackupCreateSnapshotPayloadSchema,
   cloudBackupPolicySchema,
   cloudBackupS3ConfigSchema,
   cloudBackupSnapshotManifestSchema,
-  cloudBackupSnapshotsResponseSchema,
-  cloudBackupTestResponseSchema,
+  cloudBackupSnapshotsPayloadSchema,
+  cloudBackupTestPayloadSchema,
   cloudBackupWebDavConfigSchema,
   type CloudBackupConfig,
   type CloudBackupConfigUpdate,
@@ -37,7 +36,7 @@ import {
   toApiSubscription,
 } from "./db";
 import { requireAuth } from "./auth";
-import { HttpError, json, readJson, requestLocale, type AppLocale } from "./http";
+import { HttpError, ok, readJson, requestLocale, successJson, type AppLocale } from "./http";
 import { DEFAULT_SERVER_I18N_LOCALE, serverText } from "./server-i18n";
 import { createStoredZip } from "./zip-store";
 import {
@@ -157,7 +156,7 @@ const SECRET_SETTING_KEYS: Array<keyof ApiAppSettings> = [
 export async function readCloudBackupConfig(request: Request, env: Env): Promise<Response> {
   const auth = await requireAuth(request, env);
   const config = await getCloudBackupConfig(env, auth.user.id);
-  return json(cloudBackupConfigResponseSchema.parse({ config: toConfigDTO(config) }));
+  return successJson(cloudBackupConfigPayloadSchema.parse({ config: toConfigDTO(config) }));
 }
 
 export async function updateCloudBackupConfig(request: Request, env: Env): Promise<Response> {
@@ -165,7 +164,7 @@ export async function updateCloudBackupConfig(request: Request, env: Env): Promi
   const auth = await requireAuth(request, env);
   const body = await readJson(request, cloudBackupConfigUpdateSchema, locale);
   const saved = await saveCloudBackupConfig(env, auth.user.id, body);
-  return json(cloudBackupConfigResponseSchema.parse({ config: toConfigDTO(saved) }));
+  return successJson(cloudBackupConfigPayloadSchema.parse({ config: toConfigDTO(saved) }));
 }
 
 export async function testCloudBackupConfig(request: Request, env: Env): Promise<Response> {
@@ -178,8 +177,7 @@ export async function testCloudBackupConfig(request: Request, env: Env): Promise
   await client.test().catch((error: unknown) => {
     throw cloudBackupOperationError(locale, "cloudBackup.testFailed", "CLOUD_BACKUP_TEST_FAILED", error);
   });
-  return json(cloudBackupTestResponseSchema.parse({
-    ok: true,
+  return successJson(cloudBackupTestPayloadSchema.parse({
     checkedAt: nowIso(),
   }));
 }
@@ -198,7 +196,7 @@ export async function listCloudBackups(request: Request, env: Env): Promise<Resp
   });
   const snapshots: CloudBackupSnapshot[] = snapshotsFromManifests(target.provider, manifests);
   snapshots.sort((left, right) => right.createdAt.localeCompare(left.createdAt));
-  return json(cloudBackupSnapshotsResponseSchema.parse({ snapshots }));
+  return successJson(cloudBackupSnapshotsPayloadSchema.parse({ snapshots }));
 }
 
 export async function createCloudBackup(request: Request, env: Env): Promise<Response> {
@@ -207,7 +205,7 @@ export async function createCloudBackup(request: Request, env: Env): Promise<Res
   const body = await readCloudBackupCreateRequest(request, locale);
   try {
     const snapshots = await createCloudBackupForUserProvider(env, auth.user, locale, body.provider);
-    return json(cloudBackupCreateSnapshotResponseSchema.parse({ snapshots }), { status: 201 });
+    return successJson(cloudBackupCreateSnapshotPayloadSchema.parse({ snapshots }), { status: 201 });
   } catch (error) {
     await markCloudBackupStatus(env, auth.user.id, body.provider, "failed", persistedCloudBackupErrorMessage(error));
     throw cloudBackupOperationError(locale, "cloudBackup.createFailed", "CLOUD_BACKUP_CREATE_FAILED", error);
@@ -275,7 +273,7 @@ export async function deleteCloudBackup(request: Request, env: Env, id: string):
       throw cloudBackupOperationError(locale, messageKey, "CLOUD_BACKUP_DELETE_FAILED", error);
     });
   }
-  return json(cloudBackupDeleteSnapshotResponseSchema.parse({ ok: true }));
+  return ok();
 }
 
 export async function runDueCloudBackups(env: Env, now = new Date()): Promise<void> {
@@ -533,7 +531,7 @@ function targetFromUpdate(userId: string, body: CloudBackupConfigUpdate, current
 }
 
 function toConfigDTO(config: ResolvedCloudBackupConfig): CloudBackupConfig {
-  return cloudBackupConfigResponseSchema.parse({
+  return cloudBackupConfigPayloadSchema.parse({
     config: {
       provider: config.provider,
       ...(config.targets.webdav?.webdav ? { webdav: config.targets.webdav.webdav } : {}),

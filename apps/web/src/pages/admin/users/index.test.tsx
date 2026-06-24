@@ -268,7 +268,7 @@ describe("AdminUsersPage", () => {
         return refreshRequest.promise;
       }
       if (input === "/api/app/admin/users/editable-user" && init?.method === "PATCH") {
-        return Promise.resolve({ ok: true });
+        return Promise.resolve({});
       }
       return Promise.reject(new Error(`Unexpected request: ${input}`));
     });
@@ -299,7 +299,7 @@ describe("AdminUsersPage", () => {
     });
     mocks.apiFetch.mockImplementation((input: string, _responseSchema: unknown, init?: RequestInit) => {
       if (input === "/api/app/admin/users") return Promise.resolve({ users: [currentAdmin] });
-      if (input === "/api/app/account/password" && init?.method === "PUT") return Promise.resolve({ ok: true });
+      if (input === "/api/app/account/password" && init?.method === "PUT") return Promise.resolve({});
       return Promise.reject(new Error(`Unexpected request: ${input}`));
     });
 
@@ -341,7 +341,7 @@ describe("AdminUsersPage", () => {
         return Promise.resolve({ users: [otherUser] });
       }
       if (input === "/api/app/admin/users/editable-user" && init?.method === "PATCH") {
-        return Promise.resolve({ ok: true });
+        return Promise.resolve({});
       }
       return Promise.reject(new Error(`Unexpected request: ${input}`));
     });
@@ -383,7 +383,7 @@ describe("AdminUsersPage", () => {
         return Promise.resolve({ users: [passkeyUser] });
       }
       if (input === "/api/app/admin/users/passkey-user/passkeys/reset" && init?.method === "POST") {
-        return Promise.resolve({ ok: true });
+        return Promise.resolve({});
       }
       return Promise.reject(new Error(`Unexpected request: ${input}`));
     });

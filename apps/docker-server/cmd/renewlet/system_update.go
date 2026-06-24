@@ -143,7 +143,6 @@ func (service *systemUpdateService) PerformUpdate(ctx context.Context, locale ap
 	service.clearCache()
 	service.markRestartPending()
 	return &systemUpdateResponse{
-		OK:             true,
 		CurrentVersion: Version,
 		TargetVersion:  release.dto.Version,
 		NeedsRestart:   true,

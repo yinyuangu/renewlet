@@ -38,19 +38,19 @@ type localizedValidator interface {
 	Validate(appLocale) error
 }
 
-// okResponse 是“无额外数据”的成功响应。
-// 注意： 需要携带业务字段时应新增专用 response struct，不要扩宽这个公共契约。
-type okResponse struct {
-	OK bool `json:"ok"`
+// apiSuccessResponse 是产品 JSON API 的唯一成功 envelope。
+// 业务 payload 放在 data 内，错误响应继续走 apiErrorEnvelope，避免前端同时维护双成功形状。
+type apiSuccessResponse struct {
+	OK   bool `json:"ok"`
+	Data any  `json:"data"`
 }
 
-// emptyJSONPayload 表示数据库 JSON 字段的空对象。
+// emptyJSONPayload 表示产品 API 的空对象 payload。
 // 它用于避免 nil/null 在前端 schema 中被误解成“字段缺失”。
 type emptyJSONPayload struct{}
 
 // healthResponse 是 healthcheck 的稳定响应结构。
 type healthResponse struct {
-	OK   bool   `json:"ok"`
 	Time string `json:"time"`
 }
 
@@ -409,7 +409,6 @@ type systemVersionResponse struct {
 
 // systemUpdateResponse 表示二进制已经替换完成，等待管理员在前端确认重启。
 type systemUpdateResponse struct {
-	OK             bool   `json:"ok"`
 	CurrentVersion string `json:"currentVersion"`
 	TargetVersion  string `json:"targetVersion"`
 	NeedsRestart   bool   `json:"needsRestart"`
@@ -650,15 +649,32 @@ func isValidEmailAddress(value string) bool {
 	return err == nil && address.Address == value
 }
 
-// newOKResponse 返回通用成功响应。
-func newOKResponse() okResponse {
-	return okResponse{OK: true}
+// newAPISuccessResponse 返回产品 JSON API 成功 envelope。
+func newAPISuccessResponse(data any) apiSuccessResponse {
+	if data == nil {
+		data = emptyJSONPayload{}
+	}
+	return apiSuccessResponse{OK: true, Data: data}
+}
+
+// apiSuccessJSON 是 Docker 产品 JSON API 的唯一成功写出 helper；协议型 route 必须显式不用它。
+func apiSuccessJSON(e *core.RequestEvent, status int, data any) error {
+	return e.JSON(status, newAPISuccessResponse(data))
+}
+
+// newAPIEmptySuccessResponse 返回无额外业务数据的成功 envelope。
+func newAPIEmptySuccessResponse() apiSuccessResponse {
+	return newAPISuccessResponse(emptyJSONPayload{})
+}
+
+// apiEmptySuccessJSON 返回 `{ ok:true, data:{} }`，用于无业务 payload 的写入动作。
+func apiEmptySuccessJSON(e *core.RequestEvent, status int) error {
+	return e.JSON(status, newAPIEmptySuccessResponse())
 }
 
 // newHealthResponse 返回带 UTC 时间戳的 healthcheck 响应。
 func newHealthResponse() healthResponse {
 	return healthResponse{
-		OK:   true,
 		Time: time.Now().UTC().Format(time.RFC3339Nano),
 	}
 }

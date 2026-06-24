@@ -16,6 +16,7 @@ import {
   passkeyDelete,
   passkeyRegisterVerify,
 } from "./auth";
+import { readSuccessData } from "./api-test-helpers";
 import { AccountSecuritySchemaError } from "./account-security-schema";
 import type { Env, UserRow } from "./types";
 
@@ -219,7 +220,7 @@ describe("Cloudflare auth settings initialization", () => {
     }, { "x-renewlet-locale": "zh-CN" }), envFixture(run));
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({
+    await expect(readSuccessData(response)).resolves.toEqual({
       type: "mfa_required",
       ticketId: "ticket-second-factor",
       expiresAt: "2026-06-03T00:05:00.000Z",
@@ -250,7 +251,7 @@ describe("Cloudflare account security session renewal", () => {
     }, { authorization: "Bearer session-token" }), envFixture(vi.fn()));
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({
+    await expect(readSuccessData(response)).resolves.toMatchObject({
       type: "session",
       session: { id: "totp-enable-session" },
       recoveryCodes: ["ABCD-EFGH-IJKL"],
@@ -266,7 +267,7 @@ describe("Cloudflare account security session renewal", () => {
     }, { authorization: "Bearer session-token" }), envFixture(vi.fn()));
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({
+    await expect(readSuccessData(response)).resolves.toMatchObject({
       type: "session",
       session: { id: "recovery-regenerate-session" },
       recoveryCodes: ["MNOP-QRST-UVWX"],
@@ -289,9 +290,9 @@ describe("Cloudflare account security session renewal", () => {
       currentPassword: "password123",
     }, { authorization: "Bearer session-token" }), env);
 
-    await expect(registerResponse.json()).resolves.toMatchObject({ session: { id: "passkey-register-session" } });
-    await expect(deleteResponse.json()).resolves.toMatchObject({ session: { id: "passkey-delete-session" } });
-    await expect(disableResponse.json()).resolves.toMatchObject({ session: { id: "mfa-disable-session" } });
+    await expect(readSuccessData(registerResponse)).resolves.toMatchObject({ session: { id: "passkey-register-session" } });
+    await expect(readSuccessData(deleteResponse)).resolves.toMatchObject({ session: { id: "passkey-delete-session" } });
+    await expect(readSuccessData(disableResponse)).resolves.toMatchObject({ session: { id: "mfa-disable-session" } });
     expect(mocks.finishPasskeyRegistration).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.objectContaining({ id: "usr_admin" }), "challenge-1", "MacBook Touch ID", expect.anything());
     expect(mocks.deletePasskeyForCurrentUser).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ id: "usr_admin" }), "pkey_1");
     expect(mocks.disableAuthenticatorMfaForCurrentUser).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ id: "usr_admin" }));
@@ -314,7 +315,7 @@ describe("Cloudflare passkey authenticate options boundary", () => {
     );
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({
+    await expect(readSuccessData(response)).resolves.toEqual({
       challengeId: "challenge-1",
       expiresAt: "2026-06-03T00:05:00.000Z",
       options: { challenge: "challenge-value" },
@@ -419,7 +420,7 @@ describe("Cloudflare app status", () => {
     const response = await appStatus(new Request("https://renewlet.example/api/app/status"), envFixture(vi.fn()));
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({
+    await expect(readSuccessData(response)).resolves.toEqual({
       setupRequired: true,
       setupEnabled: true,
       demoMode: false,

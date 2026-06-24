@@ -75,7 +75,7 @@ func handleAuthLogin(app core.App, e *core.RequestEvent) error {
 		if err != nil {
 			return e.InternalServerError(serverText(locale, "common.internalError"), err)
 		}
-		return e.JSON(200, mfaRequiredResponse{
+		return apiSuccessJSON(e, 200, mfaRequiredResponse{
 			Type:      "mfa_required",
 			TicketID:  ticket,
 			ExpiresAt: expiresAt,
@@ -86,7 +86,7 @@ func handleAuthLogin(app core.App, e *core.RequestEvent) error {
 	if err != nil {
 		return e.InternalServerError(serverText(locale, "common.internalError"), err)
 	}
-	return e.JSON(200, response)
+	return apiSuccessJSON(e, 200, response)
 }
 
 func handleAuthSession(app core.App, e *core.RequestEvent) error {
@@ -95,7 +95,7 @@ func handleAuthSession(app core.App, e *core.RequestEvent) error {
 	if err != nil || user == nil || session == nil {
 		return e.UnauthorizedError(serverText(requestLocale(e.Request), "auth.sessionExpired"), err)
 	}
-	return e.JSON(200, sessionResponseFromRecord(token, session.GetString("expiresAt"), user))
+	return apiSuccessJSON(e, 200, sessionResponseFromRecord(token, session.GetString("expiresAt"), user))
 }
 
 func handleAuthLogout(app core.App, e *core.RequestEvent) error {
@@ -103,7 +103,7 @@ func handleAuthLogout(app core.App, e *core.RequestEvent) error {
 	if token != "" {
 		_ = deleteAppSessionByToken(app, token)
 	}
-	return e.JSON(200, newOKResponse())
+	return apiEmptySuccessJSON(e, 200)
 }
 
 func handleMFAVerify(app core.App, e *core.RequestEvent) error {
@@ -117,7 +117,7 @@ func handleMFAVerify(app core.App, e *core.RequestEvent) error {
 		// ticket 过期、方法不匹配和 OTP/恢复码错误统一为 sessionExpired，避免枚举认证器状态。
 		return e.UnauthorizedError(serverText(locale, "auth.sessionExpired"), nil)
 	}
-	return e.JSON(200, response)
+	return apiSuccessJSON(e, 200, response)
 }
 
 func handleMFAStatus(app core.App, e *core.RequestEvent) error {
@@ -125,7 +125,7 @@ func handleMFAStatus(app core.App, e *core.RequestEvent) error {
 	if err != nil {
 		return e.InternalServerError(serverText(requestLocale(e.Request), "common.internalError"), err)
 	}
-	return e.JSON(200, status)
+	return apiSuccessJSON(e, 200, status)
 }
 
 func handleMFATOTPSetup(app core.App, e *core.RequestEvent) error {
@@ -137,7 +137,7 @@ func handleMFATOTPSetup(app core.App, e *core.RequestEvent) error {
 	if err != nil {
 		return e.InternalServerError(serverText(locale, "common.internalError"), err)
 	}
-	return e.JSON(200, response)
+	return apiSuccessJSON(e, 200, response)
 }
 
 func handleMFATOTPEnable(app core.App, e *core.RequestEvent) error {
@@ -156,7 +156,7 @@ func handleMFATOTPEnable(app core.App, e *core.RequestEvent) error {
 	if err != nil {
 		return e.BadRequestError(serverText(locale, "common.invalidRequestParameters"), nil)
 	}
-	return e.JSON(200, response)
+	return apiSuccessJSON(e, 200, response)
 }
 
 func handleMFARecoveryRegenerate(app core.App, e *core.RequestEvent) error {
@@ -182,7 +182,7 @@ func handleMFARecoveryRegenerate(app core.App, e *core.RequestEvent) error {
 	if err != nil {
 		return e.InternalServerError(serverText(locale, "common.internalError"), err)
 	}
-	return e.JSON(200, response)
+	return apiSuccessJSON(e, 200, response)
 }
 
 func handlePasskeys(app core.App, e *core.RequestEvent) error {
@@ -190,7 +190,7 @@ func handlePasskeys(app core.App, e *core.RequestEvent) error {
 	if err != nil {
 		return e.InternalServerError(serverText(requestLocale(e.Request), "common.internalError"), err)
 	}
-	return e.JSON(200, response)
+	return apiSuccessJSON(e, 200, response)
 }
 
 func handlePasskeyRegisterOptions(app core.App, e *core.RequestEvent) error {
@@ -209,7 +209,7 @@ func handlePasskeyRegisterOptions(app core.App, e *core.RequestEvent) error {
 	if err != nil {
 		return e.BadRequestError(serverText(locale, "common.invalidRequestParameters"), nil)
 	}
-	return e.JSON(200, response)
+	return apiSuccessJSON(e, 200, response)
 }
 
 func handlePasskeyRegisterVerify(app core.App, e *core.RequestEvent) error {
@@ -225,7 +225,7 @@ func handlePasskeyRegisterVerify(app core.App, e *core.RequestEvent) error {
 	if err != nil {
 		return e.BadRequestError(serverText(locale, "common.invalidRequestParameters"), nil)
 	}
-	return e.JSON(200, response)
+	return apiSuccessJSON(e, 200, response)
 }
 
 func handlePasskeyAuthenticateOptions(app core.App, e *core.RequestEvent) error {
@@ -238,7 +238,7 @@ func handlePasskeyAuthenticateOptions(app core.App, e *core.RequestEvent) error 
 	if err != nil {
 		return e.BadRequestError(serverText(locale, "common.invalidRequestParameters"), nil)
 	}
-	return e.JSON(200, response)
+	return apiSuccessJSON(e, 200, response)
 }
 
 func handlePasskeyAuthenticateVerify(app core.App, e *core.RequestEvent) error {
@@ -251,7 +251,7 @@ func handlePasskeyAuthenticateVerify(app core.App, e *core.RequestEvent) error {
 	if err != nil {
 		return e.UnauthorizedError(serverText(locale, "auth.sessionExpired"), nil)
 	}
-	return e.JSON(200, response)
+	return apiSuccessJSON(e, 200, response)
 }
 
 func handlePasskeyDelete(app core.App, e *core.RequestEvent) error {
@@ -270,7 +270,7 @@ func handlePasskeyDelete(app core.App, e *core.RequestEvent) error {
 	if err != nil {
 		return e.BadRequestError(serverText(locale, "common.invalidRequestParameters"), nil)
 	}
-	return e.JSON(200, response)
+	return apiSuccessJSON(e, 200, response)
 }
 
 func handleMFADisable(app core.App, e *core.RequestEvent) error {
@@ -289,7 +289,7 @@ func handleMFADisable(app core.App, e *core.RequestEvent) error {
 	if err != nil {
 		return e.InternalServerError(serverText(locale, "common.internalError"), err)
 	}
-	return e.JSON(200, response)
+	return apiSuccessJSON(e, 200, response)
 }
 
 func createAppSessionResponse(app core.App, user *core.Record) (sessionResponse, error) {

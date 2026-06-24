@@ -1,5 +1,6 @@
-// 订阅 service 测试保护 PocketBase/Worker 响应进入前端 domain 前的运行时归一化边界。
+// 订阅 service 测试保护产品 API DTO 进入前端 domain 前的运行时校验边界。
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { ApiSubscription } from "@/lib/api/schemas/subscriptions";
 import { fromApiSubscription, subscriptionService, toSubscriptionWritePayload } from "./subscription-service";
 
 const mocks = vi.hoisted(() => ({
@@ -71,7 +72,7 @@ const apiSubscription = {
   repeatReminderInterval: "1h",
   repeatReminderWindow: "72h",
   extra: {},
-} as const;
+} satisfies ApiSubscription;
 
 beforeEach(() => {
   mocks.apiFetch.mockReset();
@@ -79,29 +80,30 @@ beforeEach(() => {
 });
 
 describe("subscription service normalization", () => {
-  it("ignores legacy custom fields on fixed PocketBase cycles", () => {
-    const subscription = fromApiSubscription(legacyPocketBaseRow);
+  it("rejects legacy PocketBase records at the product API boundary", () => {
+    expect(() => fromApiSubscription(legacyPocketBaseRow as unknown as typeof apiSubscription)).toThrow();
+  });
+
+  it("ignores custom fields on fixed product API cycles", () => {
+    const subscription = fromApiSubscription({
+      ...apiSubscription,
+      customDays: 45,
+      customCycleUnit: "year",
+    });
 
     expect(subscription).toMatchObject({
       billingCycle: "monthly",
       customDays: undefined,
       customCycleUnit: undefined,
-      name: "Perplexity Pro",
+      name: "API Subscription",
     });
   });
 
-  it("defaults legacy PocketBase rows without autoRenew to manual renewal", () => {
-    expect(fromApiSubscription(legacyPocketBaseRow).autoRenew).toBe(false);
-    expect(fromApiSubscription({ ...legacyPocketBaseRow, autoRenew: true }).autoRenew).toBe(true);
-    expect(fromApiSubscription({ ...legacyPocketBaseRow, autoRenew: false }).autoRenew).toBe(false);
-  });
-
-  it("defaults legacy custom PocketBase rows without a unit to day", () => {
+  it("defaults custom product API rows without a unit to day", () => {
     const subscription = fromApiSubscription({
-      ...legacyPocketBaseRow,
+      ...apiSubscription,
       billingCycle: "custom",
       customDays: 45,
-      customCycleUnit: "",
     });
 
     expect(subscription).toMatchObject({
@@ -113,7 +115,7 @@ describe("subscription service normalization", () => {
 
   it("keeps supported custom cycle units", () => {
     const subscription = fromApiSubscription({
-      ...legacyPocketBaseRow,
+      ...apiSubscription,
       billingCycle: "custom",
       customDays: 3,
       customCycleUnit: "year",
@@ -222,7 +224,7 @@ describe("subscription service API calls", () => {
   });
 
   it("renews with an explicit empty JSON object and deletes through the product API", async () => {
-    mocks.apiFetch.mockResolvedValueOnce({ subscription: apiSubscription }).mockResolvedValueOnce({ ok: true });
+    mocks.apiFetch.mockResolvedValueOnce({ subscription: apiSubscription }).mockResolvedValueOnce({});
 
     await subscriptionService.renew("sub_api");
     await subscriptionService.delete("sub_api");

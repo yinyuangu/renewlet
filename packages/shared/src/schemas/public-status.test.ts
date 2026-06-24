@@ -6,9 +6,11 @@ import {
 } from "./public-status";
 import { appSettingsSchema } from "./settings";
 
+const success = <T>(data: T) => ({ ok: true, data });
+
 describe("public status schemas", () => {
   it("accepts minimal public status rows without prices", () => {
-    expect(publicStatusResponseSchema.parse({
+    expect(publicStatusResponseSchema.parse(success({
       page: {
         title: "Renewlet",
         showPrices: false,
@@ -24,11 +26,15 @@ describe("public status schemas", () => {
         nextBillingDate: "2026-07-01",
         updatedAt: "2026-06-07T00:00:00.000Z",
       }],
-    }).subscriptions[0]?.price).toBeUndefined();
+    })).data.subscriptions[0]?.price).toBeUndefined();
+    expect(publicStatusResponseSchema.safeParse({
+      page: { title: "Renewlet", showPrices: false, generatedAt: "2026-06-07T00:00:00.000Z", truncated: false },
+      subscriptions: [],
+    }).success).toBe(false);
   });
 
   it("accepts public status rows with unknown recurring start dates", () => {
-    expect(publicStatusResponseSchema.parse({
+    expect(publicStatusResponseSchema.parse(success({
       page: {
         title: "Renewlet",
         showPrices: false,
@@ -43,12 +49,12 @@ describe("public status schemas", () => {
         nextBillingDate: "2026-07-01",
         updatedAt: "2026-06-07T00:00:00.000Z",
       }],
-    }).subscriptions[0]?.startDate).toBeNull();
+    })).data.subscriptions[0]?.startDate).toBeNull();
   });
 
   it("requires price and currency to be exposed together", () => {
     // showPrices 是公开账单字段唯一开关；schema 让金额、币种和周期同进同出，避免半公开账单信息。
-    expect(publicStatusResponseSchema.safeParse({
+    expect(publicStatusResponseSchema.safeParse(success({
       page: {
         title: "Renewlet",
         showPrices: true,
@@ -65,11 +71,11 @@ describe("public status schemas", () => {
         updatedAt: "2026-06-07T00:00:00.000Z",
         price: 9.99,
       }],
-    }).success).toBe(false);
+    })).success).toBe(false);
   });
 
   it("requires public page currency and billing cycle only when prices are visible", () => {
-    expect(publicStatusResponseSchema.safeParse({
+    expect(publicStatusResponseSchema.safeParse(success({
       page: {
         title: "Renewlet",
         showPrices: true,
@@ -88,9 +94,9 @@ describe("public status schemas", () => {
         currency: "USD",
         billingCycle: "annual",
       }],
-    }).success).toBe(true);
+    })).success).toBe(true);
 
-    expect(publicStatusResponseSchema.safeParse({
+    expect(publicStatusResponseSchema.safeParse(success({
       page: {
         title: "Renewlet",
         showPrices: false,
@@ -99,7 +105,7 @@ describe("public status schemas", () => {
         truncated: false,
       },
       subscriptions: [],
-    }).success).toBe(false);
+    })).success).toBe(false);
   });
 
   it("accepts inherited or explicit public status currency settings", () => {
@@ -109,7 +115,7 @@ describe("public status schemas", () => {
   });
 
   it("keeps management create responses on bearer URL shape", () => {
-    expect(publicStatusPageCreateResponseSchema.safeParse({
+    expect(publicStatusPageCreateResponseSchema.safeParse(success({
       publicStatusPage: {
         enabled: true,
         createdAt: "2026-06-07T00:00:00.000Z",
@@ -117,6 +123,6 @@ describe("public status schemas", () => {
         pageUrl: "https://renewlet.example/status/abc123abc123abc123abc123abc123abc123abc123a",
         showPrices: false,
       },
-    }).success).toBe(true);
+    })).success).toBe(true);
   });
 });

@@ -9,5 +9,14 @@ describe("AuthorizedImage", () => {
 
     expect(screen.getByAltText("Example")).toHaveAttribute("src", "https://example.com/logo.png");
     expect(screen.getByAltText("Example")).toHaveAttribute("referrerpolicy", "no-referrer");
+    expect(screen.getByAltText("Example")).toHaveAttribute("loading", "lazy");
+    expect(screen.getByAltText("Example")).toHaveAttribute("decoding", "async");
+  });
+
+  it("allows callers to override loading and decoding when a hero image needs it", () => {
+    render(<AuthorizedImage src="https://example.com/logo.png" alt="Hero" loading="eager" decoding="sync" />);
+
+    expect(screen.getByAltText("Hero")).toHaveAttribute("loading", "eager");
+    expect(screen.getByAltText("Hero")).toHaveAttribute("decoding", "sync");
   });
 });

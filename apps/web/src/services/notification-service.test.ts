@@ -13,7 +13,7 @@ vi.mock("@/lib/api-client", () => ({
 describe("notificationService", () => {
   beforeEach(() => {
     mocks.apiFetch.mockReset();
-    mocks.apiFetch.mockResolvedValue({ ok: true });
+    mocks.apiFetch.mockResolvedValue({});
   });
 
   it("keeps notification test timeout longer than the Worker provider timeout", async () => {

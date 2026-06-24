@@ -1,4 +1,4 @@
-import { healthResponseSchema } from "@renewlet/shared/schemas/app";
+import { healthPayloadSchema } from "@renewlet/shared/schemas/app";
 import { Hono, type Context } from "hono";
 import {
   adminCreateUser,
@@ -83,7 +83,7 @@ import {
   telegramWebhook,
 } from "./telegram-bot";
 import { systemRestart, systemUpdate, systemVersion } from "./system";
-import { errorResponse, methodNotAllowed, requestLocale, toResponse, type AppLocale } from "./http";
+import { errorResponse, methodNotAllowed, requestLocale, successJson, toResponse, type AppLocale } from "./http";
 import { serverText } from "./server-i18n";
 import type { Env } from "./types";
 
@@ -368,9 +368,7 @@ function redactScheduledPhaseError(message: string): string {
 
 /** health 返回最小可缓存外的存活信息；不读取 D1/R2，避免健康检查放大平台短暂抖动。 */
 function health(): Response {
-  return Response.json(healthResponseSchema.parse({ ok: true, time: new Date().toISOString() }), {
-    headers: { "x-content-type-options": "nosniff" },
-  });
+  return successJson(healthPayloadSchema.parse({ time: new Date().toISOString() }));
 }
 
 async function ready(env: Env): Promise<Response> {

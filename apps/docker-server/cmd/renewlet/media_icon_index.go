@@ -150,7 +150,7 @@ func loadEmbeddedBuiltInResolver() (builtInResolverIndex, error) {
 }
 
 func handleBuiltInIconIndexStatus(app core.App, e *core.RequestEvent) error {
-	return e.JSON(http.StatusOK, builtInIconIndexStatus(app))
+	return apiSuccessJSON(e, http.StatusOK, builtInIconIndexStatus(app))
 }
 
 func handleBuiltInIconIndexProviderCheck(app core.App, e *core.RequestEvent) error {
@@ -163,9 +163,7 @@ func handleBuiltInIconIndexProviderCheck(app core.App, e *core.RequestEvent) err
 		return e.BadRequestError(validationErrorMessage(locale, "common.invalidRequestBody", err), err)
 	}
 	if !acquireBuiltInIconIndexOperation(provider) {
-		status := builtInIconIndexStatus(app)
-		markProviderRefreshing(&status, provider)
-		return e.JSON(http.StatusConflict, builtInIconIndexProviderCheckResponse{Status: status, Provider: providerStatusFromResponse(status, provider)})
+		return apiErrorJSON(e, http.StatusConflict, "MEDIA_ICON_INDEX_REFRESHING", "Built-in icon index refresh is already running", nil)
 	}
 	operationActive := true
 	defer func() {
@@ -184,7 +182,7 @@ func handleBuiltInIconIndexProviderCheck(app core.App, e *core.RequestEvent) err
 		operationActive = false
 		status := builtInIconIndexStatus(app)
 		// check 只更新 provider 可见状态；GitHub 限流/断网时仍返回同形状 body，让前端展示失败 badge 而不是把弹层流程打断。
-		return e.JSON(http.StatusOK, builtInIconIndexProviderCheckResponse{Status: status, Provider: providerStatusFromResponse(status, provider), ErrorDetails: upstreamErrorDetailsFromError(err)})
+		return apiSuccessJSON(e, http.StatusOK, builtInIconIndexProviderCheckResponse{Status: status, Provider: providerStatusFromResponse(status, provider), ErrorDetails: upstreamErrorDetailsFromError(err)})
 	}
 	if err := saveMediaIconProviderLatest(app, provider, checkedAt, version, etag); err != nil {
 		return e.InternalServerError(serverText(locale, "common.internalError"), err)
@@ -192,7 +190,7 @@ func handleBuiltInIconIndexProviderCheck(app core.App, e *core.RequestEvent) err
 	releaseBuiltInIconIndexOperation()
 	operationActive = false
 	status := builtInIconIndexStatus(app)
-	return e.JSON(http.StatusOK, builtInIconIndexProviderCheckResponse{Status: status, Provider: providerStatusFromResponse(status, provider)})
+	return apiSuccessJSON(e, http.StatusOK, builtInIconIndexProviderCheckResponse{Status: status, Provider: providerStatusFromResponse(status, provider)})
 }
 
 func handleBuiltInIconIndexProviderRefresh(app core.App, e *core.RequestEvent) error {
@@ -205,9 +203,7 @@ func handleBuiltInIconIndexProviderRefresh(app core.App, e *core.RequestEvent) e
 		return e.BadRequestError(validationErrorMessage(locale, "common.invalidRequestBody", err), err)
 	}
 	if !acquireBuiltInIconIndexOperation(provider) {
-		status := builtInIconIndexStatus(app)
-		markProviderRefreshing(&status, provider)
-		return e.JSON(http.StatusConflict, builtInIconIndexProviderRefreshResponse{Status: status, Provider: providerStatusFromResponse(status, provider)})
+		return apiErrorJSON(e, http.StatusConflict, "MEDIA_ICON_INDEX_REFRESHING", "Built-in icon index refresh is already running", nil)
 	}
 	operationActive := true
 	defer func() {
@@ -224,16 +220,14 @@ func handleBuiltInIconIndexProviderRefresh(app core.App, e *core.RequestEvent) e
 		saveMediaIconProviderFailure(app, provider, checkedAt, err)
 		releaseBuiltInIconIndexOperation()
 		operationActive = false
-		status := builtInIconIndexStatus(app)
-		return e.JSON(http.StatusBadGateway, builtInIconIndexProviderRefreshResponse{Status: status, Provider: providerStatusFromResponse(status, provider), ErrorDetails: upstreamErrorDetailsFromError(err)})
+		return apiErrorJSON(e, http.StatusBadGateway, "MEDIA_ICON_INDEX_REFRESH_FAILED", "Built-in icon index refresh failed", upstreamErrorDetailsFromError(err))
 	}
 	if version == nil || version.CommitSHA == nil || *version.CommitSHA == "" {
 		err := errors.New("latest provider commit is unavailable")
 		saveMediaIconProviderFailure(app, provider, checkedAt, err)
 		releaseBuiltInIconIndexOperation()
 		operationActive = false
-		status := builtInIconIndexStatus(app)
-		return e.JSON(http.StatusBadGateway, builtInIconIndexProviderRefreshResponse{Status: status, Provider: providerStatusFromResponse(status, provider), ErrorDetails: upstreamErrorDetailsFromError(err)})
+		return apiErrorJSON(e, http.StatusBadGateway, "MEDIA_ICON_INDEX_REFRESH_FAILED", "Built-in icon index refresh failed", upstreamErrorDetailsFromError(err))
 	}
 	sourceRef := builtInIconProviderSourceRef{
 		Provider: provider,
@@ -244,8 +238,7 @@ func handleBuiltInIconIndexProviderRefresh(app core.App, e *core.RequestEvent) e
 		saveMediaIconProviderFailure(app, provider, checkedAt, err)
 		releaseBuiltInIconIndexOperation()
 		operationActive = false
-		status := builtInIconIndexStatus(app)
-		return e.JSON(http.StatusBadGateway, builtInIconIndexProviderRefreshResponse{Status: status, Provider: providerStatusFromResponse(status, provider), ErrorDetails: upstreamErrorDetailsFromError(err)})
+		return apiErrorJSON(e, http.StatusBadGateway, "MEDIA_ICON_INDEX_REFRESH_FAILED", "Built-in icon index refresh failed", upstreamErrorDetailsFromError(err))
 	}
 	activeIcons := activeBuiltInIconIndex(app)
 	icons, err := replaceBuiltInIconProviderIndex(activeIcons, provider, providerIcons)
@@ -253,16 +246,14 @@ func handleBuiltInIconIndexProviderRefresh(app core.App, e *core.RequestEvent) e
 		saveMediaIconProviderFailure(app, provider, checkedAt, err)
 		releaseBuiltInIconIndexOperation()
 		operationActive = false
-		status := builtInIconIndexStatus(app)
-		return e.JSON(http.StatusBadGateway, builtInIconIndexProviderRefreshResponse{Status: status, Provider: providerStatusFromResponse(status, provider), ErrorDetails: upstreamErrorDetailsFromError(err)})
+		return apiErrorJSON(e, http.StatusBadGateway, "MEDIA_ICON_INDEX_REFRESH_FAILED", "Built-in icon index refresh failed", upstreamErrorDetailsFromError(err))
 	}
 	encoded, err := encodeBuiltInIconIndex(icons)
 	if err != nil {
 		saveMediaIconProviderFailure(app, provider, checkedAt, err)
 		releaseBuiltInIconIndexOperation()
 		operationActive = false
-		status := builtInIconIndexStatus(app)
-		return e.JSON(http.StatusBadGateway, builtInIconIndexProviderRefreshResponse{Status: status, Provider: providerStatusFromResponse(status, provider), ErrorDetails: upstreamErrorDetailsFromError(err)})
+		return apiErrorJSON(e, http.StatusBadGateway, "MEDIA_ICON_INDEX_REFRESH_FAILED", "Built-in icon index refresh failed", upstreamErrorDetailsFromError(err))
 	}
 	if err := saveMediaIconProviderRefreshSuccess(app, provider, checkedAt, encoded, icons, version, etag); err != nil {
 		return e.InternalServerError(serverText(locale, "common.internalError"), err)
@@ -270,7 +261,7 @@ func handleBuiltInIconIndexProviderRefresh(app core.App, e *core.RequestEvent) e
 	releaseBuiltInIconIndexOperation()
 	operationActive = false
 	status := builtInIconIndexStatus(app)
-	return e.JSON(http.StatusOK, builtInIconIndexProviderRefreshResponse{Status: status, Provider: providerStatusFromResponse(status, provider)})
+	return apiSuccessJSON(e, http.StatusOK, builtInIconIndexProviderRefreshResponse{Status: status, Provider: providerStatusFromResponse(status, provider)})
 }
 
 func builtInIconIndexStatus(app core.App) builtInIconIndexStatusResponse {

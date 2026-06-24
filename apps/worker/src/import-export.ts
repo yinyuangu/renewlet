@@ -1,10 +1,10 @@
 import { z } from "zod";
 import {
+  importApplyPayloadSchema,
   importApplyRequestSchema,
-  importApplyResponseSchema,
   IMPORT_APPLY_SUBSCRIPTION_LIMIT,
+  importPreviewPayloadSchema,
   importPreviewRequestSchema,
-  importPreviewResponseSchema,
   type ImportConflictMode,
   type ImportPayload,
   type ImportPreviewItem,
@@ -13,7 +13,7 @@ import {
 } from "@renewlet/shared/schemas/import-export";
 import { customConfigSchema } from "@renewlet/shared/schemas/custom-config";
 import { getSettings, listSubscriptions, mergeSettingsPatch, newId, nowIso, parseJsonObject } from "./db";
-import { requestLocale, json, readJsonWithLimit, HttpError, type AppLocale } from "./http";
+import { requestLocale, readJsonWithLimit, HttpError, successJson, type AppLocale } from "./http";
 import { serverText } from "./server-i18n";
 import { requireAuth } from "./auth";
 import { normalizeSubscriptionBodyForStorage, subscriptionRowValues, toSubscriptionRow, type SubscriptionBody } from "./subscriptions";
@@ -50,7 +50,7 @@ export async function previewImport(request: Request, env: Env): Promise<Respons
   const body = await readJsonWithLimit(request, importPreviewRequestSchema, locale, IMPORT_JSON_LIMIT_BYTES);
   assertValidSkipIndexes(body.skipIndexes, body.payload.subscriptions.length, locale);
   const existing = await listSubscriptions(env, auth.user.id);
-  return json(importPreviewResponseSchema.parse(publicPreview(buildPreview(body.payload, body.conflictMode, existing, body.skipIndexes))));
+  return successJson(importPreviewPayloadSchema.parse(publicPreview(buildPreview(body.payload, body.conflictMode, existing, body.skipIndexes))));
 }
 
 /** 应用导入会重新计算 preview，避免客户端篡改 action 结果后直接写库。 */
@@ -153,7 +153,7 @@ export async function applyImport(request: Request, env: Env): Promise<Response>
   if (wroteSubscriptions) {
     await refreshSubscriptionSchedulerState(env, auth.user.id, { resetAutoRenewCheck: true });
   }
-  return json(importApplyResponseSchema.parse({ ok: true, ...publicPreview(preview) }));
+  return successJson(importApplyPayloadSchema.parse(publicPreview(preview)));
 }
 
 function assertApplyPayloadSize(count: number, locale: AppLocale): void {

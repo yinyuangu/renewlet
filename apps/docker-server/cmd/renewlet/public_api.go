@@ -72,7 +72,6 @@ type publicAPIAuthContext struct {
 }
 
 type publicAPIMeResponse struct {
-	OK     bool     `json:"ok"`
 	Scopes []string `json:"scopes"`
 }
 
@@ -104,7 +103,7 @@ func handleAPITokensList(app core.App, e *core.RequestEvent) error {
 		tokens = append(tokens, apiTokenDTOFromRecord(row))
 	}
 	setPublicAPIHeaders(e.Response.Header())
-	return e.JSON(http.StatusOK, apiTokensListResponse{Tokens: tokens})
+	return apiSuccessJSON(e, http.StatusOK, apiTokensListResponse{Tokens: tokens})
 }
 
 func handleAPITokenCreate(app core.App, e *core.RequestEvent) error {
@@ -119,7 +118,7 @@ func handleAPITokenCreate(app core.App, e *core.RequestEvent) error {
 	}
 	// 明文 token 只在创建响应出现一次；列表和数据库都只保留 prefix/hash。
 	setPublicAPIHeaders(e.Response.Header())
-	return e.JSON(http.StatusCreated, apiTokenCreateResponse{
+	return apiSuccessJSON(e, http.StatusCreated, apiTokenCreateResponse{
 		Token:      apiTokenDTOFromRecord(record),
 		PlainToken: plainToken,
 	})
@@ -136,7 +135,7 @@ func handleAPITokenDelete(app core.App, e *core.RequestEvent) error {
 		return e.InternalServerError(serverText(locale, "common.internalError"), err)
 	}
 	setPublicAPIHeaders(e.Response.Header())
-	return e.JSON(http.StatusOK, newOKResponse())
+	return apiEmptySuccessJSON(e, http.StatusOK)
 }
 
 func handlePublicAPIMe(app core.App, e *core.RequestEvent) error {
@@ -145,7 +144,7 @@ func handlePublicAPIMe(app core.App, e *core.RequestEvent) error {
 		return publicAPIAuthError(e, err)
 	}
 	setPublicAPIHeaders(e.Response.Header())
-	return e.JSON(http.StatusOK, publicAPIMeResponse{OK: true, Scopes: auth.Scopes})
+	return apiSuccessJSON(e, http.StatusOK, publicAPIMeResponse{Scopes: auth.Scopes})
 }
 
 func handlePublicAPISubscriptionsList(app core.App, e *core.RequestEvent) error {
@@ -166,7 +165,7 @@ func handlePublicAPISubscriptionsList(app core.App, e *core.RequestEvent) error 
 		return e.InternalServerError(serverText(locale, "common.internalError"), err)
 	}
 	setPublicAPIHeaders(e.Response.Header())
-	return e.JSON(http.StatusOK, response)
+	return apiSuccessJSON(e, http.StatusOK, response)
 }
 
 func handlePublicAPISubscriptionDetail(app core.App, e *core.RequestEvent) error {
@@ -179,7 +178,7 @@ func handlePublicAPISubscriptionDetail(app core.App, e *core.RequestEvent) error
 		return e.NotFoundError(serverText(requestLocale(e.Request), "subscription.notFound"), err)
 	}
 	setPublicAPIHeaders(e.Response.Header())
-	return e.JSON(http.StatusOK, subscriptionResponse{Subscription: subscriptionAPIFromRecord(record)})
+	return apiSuccessJSON(e, http.StatusOK, subscriptionResponse{Subscription: subscriptionAPIFromRecord(record)})
 }
 
 func handlePublicAPIStatus(app core.App, e *core.RequestEvent) error {
@@ -192,7 +191,7 @@ func handlePublicAPIStatus(app core.App, e *core.RequestEvent) error {
 		return e.InternalServerError(serverText(requestLocale(e.Request), "common.internalError"), err)
 	}
 	setPublicAPIHeaders(e.Response.Header())
-	return e.JSON(http.StatusOK, response)
+	return apiSuccessJSON(e, http.StatusOK, response)
 }
 
 func handlePublicAPIDue(app core.App, e *core.RequestEvent) error {
@@ -210,7 +209,7 @@ func handlePublicAPIDue(app core.App, e *core.RequestEvent) error {
 		return e.InternalServerError(serverText(locale, "common.internalError"), err)
 	}
 	setPublicAPIHeaders(e.Response.Header())
-	return e.JSON(http.StatusOK, response)
+	return apiSuccessJSON(e, http.StatusOK, response)
 }
 
 func publicAPISubscriptionsForUser(app core.App, userID string, limit int, rawCursor string) (subscriptionsListResponse, error) {

@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resolveMediaCandidateItem } from "@renewlet/shared/media-resolver";
 import type { BuiltInIconIndexProviderRefreshResponse, BuiltInIconIndexStatus } from "@renewlet/shared/schemas/media";
+import { readSuccessData } from "./api-test-helpers";
 import {
   builtInIconIndexStatus,
   checkBuiltInIconIndexProvider,
@@ -33,7 +34,7 @@ describe("Cloudflare media icon index", () => {
     const response = await builtInIconIndexStatus(requestFixture("GET"), env);
 
     expect(response.status).toBe(200);
-    const body = await response.json() as BuiltInIconIndexStatus;
+    const body = await readSuccessData<BuiltInIconIndexStatus>(response);
     expect(body).toMatchObject({ source: "embedded", refreshing: false });
     expectSeedProviderVersions(body);
   });
@@ -54,7 +55,7 @@ describe("Cloudflare media icon index", () => {
     const response = await checkBuiltInIconIndexProvider(requestFixture("POST"), env, "thesvg");
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({
+    await expect(readSuccessData<Record<string, unknown>>(response)).resolves.toMatchObject({
       status: {
         refreshing: false,
       },
@@ -83,7 +84,7 @@ describe("Cloudflare media icon index", () => {
     const response = await checkBuiltInIconIndexProvider(requestFixture("POST"), env, "selfhst");
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({
+    await expect(readSuccessData<Record<string, unknown>>(response)).resolves.toMatchObject({
       status: {
         source: "embedded",
         refreshing: false,
@@ -109,7 +110,7 @@ describe("Cloudflare media icon index", () => {
     const response = await refreshBuiltInIconIndexProvider(requestFixture("POST"), env, "thesvg");
 
     expect(response.status).toBe(200);
-    const body = await response.json() as BuiltInIconIndexProviderRefreshResponse;
+    const body = await readSuccessData<BuiltInIconIndexProviderRefreshResponse>(response);
     expect(body).toMatchObject({
       status: {
         source: "runtime",
@@ -158,21 +159,11 @@ describe("Cloudflare media icon index", () => {
     const activeHash = env.testState.row?.hash;
 
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("failed", { status: 500 })));
-    const failure = await refreshBuiltInIconIndexProvider(requestFixture("POST"), env, "thesvg");
 
-    expect(failure.status).toBe(502);
-    await expect(failure.json()).resolves.toMatchObject({
-      status: {
-        source: "runtime",
-        hash: activeHash,
-        refreshing: false,
-      },
-      provider: {
-        provider: "thesvg",
-        refreshing: false,
-        lastError: expect.stringContaining("HTTP 500"),
-      },
-      errorDetails: {
+    await expect(refreshBuiltInIconIndexProvider(requestFixture("POST"), env, "thesvg")).rejects.toMatchObject({
+      status: 502,
+      code: "MEDIA_ICON_INDEX_REFRESH_FAILED",
+      details: {
         rawResponseText: "failed",
       },
     });
@@ -189,12 +180,8 @@ describe("Cloudflare media icon index", () => {
 
     expect(response.status).toBe(409);
     await expect(response.json()).resolves.toMatchObject({
-      status: {
-        refreshing: true,
-      },
-      provider: {
-        provider: "thesvg",
-        refreshing: true,
+      error: {
+        code: "MEDIA_ICON_INDEX_REFRESHING",
       },
     });
     expect(env.testState.objects.size).toBe(0);

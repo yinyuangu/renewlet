@@ -1,5 +1,6 @@
 import { apiFetch } from "@/lib/api-client";
 import {
+  importApplyPayloadSchema,
   importApplyResponseSchema,
   importPreviewResponseSchema,
   type ImportApplyResponse,
@@ -74,8 +75,7 @@ export const importExportService = {
       onProgress?.(done, payload.subscriptions.length);
     }
 
-    return importApplyResponseSchema.parse({
-      ok: true,
+    return importApplyPayloadSchema.parse({
       summary,
       items,
       includesSettings: Boolean(payload.settings),

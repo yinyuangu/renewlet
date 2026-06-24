@@ -26,6 +26,7 @@ import { getAuthHeader } from "@/lib/pocketbase";
 import { clearAuthSession } from "@/lib/auth-session";
 import { getApiLocale, getLocaleHeaders } from "@/i18n/api-locale";
 import { translate } from "@/i18n/messages";
+import type { ApiSuccessResponse } from "@renewlet/shared/schemas/api";
 import { apiErrorResponseSchema } from "@renewlet/shared/schemas/errors";
 import { z } from "zod";
 
@@ -53,6 +54,9 @@ export class ApiError extends Error {
 }
 
 export type ApiAuthMode = "required" | "optional" | "none";
+type ApiSuccessResponseSchema = z.ZodType<ApiSuccessResponse<unknown>>;
+type ApiSuccessData<Schema extends ApiSuccessResponseSchema> =
+  z.infer<Schema> extends ApiSuccessResponse<infer Data> ? Data : never;
 
 /** 请求级 fetch 配置；`timeoutMs`、`streamIdleTimeoutMs` 和 `authMode` 只在本 client 内消费。 */
 export type ApiFetchInit = RequestInit & {
@@ -371,11 +375,11 @@ async function fetchWithApiBoundary(input: RequestInfo, init?: ApiFetchInit): Pr
  * - 非 2xx 时抛出 `ApiError`
  * - 2xx 响应必须通过调用方传入的 Zod schema，否则抛出 `ApiError`
  */
-export async function apiFetch<Schema extends z.ZodType>(
+export async function apiFetch<Schema extends ApiSuccessResponseSchema>(
   input: RequestInfo,
   responseSchema: Schema,
   init?: ApiFetchInit,
-): Promise<z.infer<Schema>> {
+): Promise<ApiSuccessData<Schema>> {
   const { abort, authMode, tokenSnapshot, response: res } = await fetchWithApiBoundary(input, init);
   try {
     const payload = await readResponsePayload(res);
@@ -402,7 +406,8 @@ export async function apiFetch<Schema extends z.ZodType>(
       );
     }
 
-    return parsed.data;
+    // 所有产品 JSON API 成功响应都必须是 shared success envelope；业务层只消费 data。
+    return parsed.data.data as ApiSuccessData<Schema>;
   } finally {
     abort.cleanup();
   }

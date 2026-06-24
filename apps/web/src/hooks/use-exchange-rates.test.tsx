@@ -1,10 +1,12 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { StrictMode, type ReactNode } from "react";
-import { useExchangeRates } from "./use-exchange-rates";
+import { createExchangeRateStore } from "./exchange-rate-store";
+import { createUseExchangeRates } from "./use-exchange-rates";
 import { SUPPORTED_EXCHANGE_RATE_CURRENCIES } from "@/lib/currency-data";
 
 const EXCHANGE_RATE_LOG_PREFIX = "Failed to fetch exchange rates";
+const CACHE_KEY_PREFIX = "exchange_rates_cache_v4";
 
 const supportedRates = Object.fromEntries(
   SUPPORTED_EXCHANGE_RATE_CURRENCIES.map((code, index) => [
@@ -127,10 +129,16 @@ function createExchangeRateLogCapture() {
 
 describe("useExchangeRates", () => {
   let exchangeRateLogs: ReturnType<typeof createExchangeRateLogCapture>;
+  let useExchangeRates: ReturnType<typeof createUseExchangeRates>;
 
   beforeEach(() => {
     localStorage.clear();
     vi.stubGlobal("fetch", vi.fn());
+    useExchangeRates = createUseExchangeRates(createExchangeRateStore({
+      fetch: globalThis.fetch.bind(globalThis) as typeof fetch,
+      storage: localStorage,
+      now: () => Date.now(),
+    }));
     exchangeRateLogs = createExchangeRateLogCapture();
   });
 
@@ -142,7 +150,7 @@ describe("useExchangeRates", () => {
   });
 
   it("uses a valid localStorage cache for the requested provider without calling the network", async () => {
-    localStorage.setItem("exchange_rates_cache_v3", JSON.stringify({
+    localStorage.setItem(`${CACHE_KEY_PREFIX}:exchange-api`, JSON.stringify({
       base: "USD",
       date: "2026-01-01",
       rates: { ...supportedRates, CNY: 7, USD: 1 },
@@ -160,8 +168,8 @@ describe("useExchangeRates", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it("ignores the old v2 cache key and fetches current default rates", async () => {
-    localStorage.setItem("exchange_rates_cache_v2", JSON.stringify({
+  it("ignores old cache keys and fetches current default rates", async () => {
+    localStorage.setItem("exchange_rates_cache_v3", JSON.stringify({
       base: "USD",
       date: "2026-01-01",
       rates: { EUR: 0.9, CNY: 7, USD: 1 },
@@ -192,7 +200,7 @@ describe("useExchangeRates", () => {
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(requestPath(0)).toBe("https://www.floatrates.com/daily/usd.json");
 
-    const cached = JSON.parse(localStorage.getItem("exchange_rates_cache_v3") ?? "{}") as {
+    const cached = JSON.parse(localStorage.getItem(`${CACHE_KEY_PREFIX}:floatrates`) ?? "{}") as {
       base?: string;
       provider?: string;
       requestedProvider?: string;
@@ -252,7 +260,7 @@ describe("useExchangeRates", () => {
     exchangeRateLogs.expectWarning("exchange-api endpoint https://latest.currency-api.pages.dev/v1/currencies/usd.min.json");
     exchangeRateLogs.expectWarning("exchange rates from exchange-api");
 
-    const cached = JSON.parse(localStorage.getItem("exchange_rates_cache_v3") ?? "{}") as {
+    const cached = JSON.parse(localStorage.getItem(`${CACHE_KEY_PREFIX}:exchange-api`) ?? "{}") as {
       provider?: string;
       requestedProvider?: string;
     };
@@ -421,7 +429,7 @@ describe("useExchangeRates", () => {
   });
 
   it("refresh skips cache and can use the new requested provider immediately", async () => {
-    localStorage.setItem("exchange_rates_cache_v3", JSON.stringify({
+    localStorage.setItem(`${CACHE_KEY_PREFIX}:exchange-api`, JSON.stringify({
       base: "USD",
       date: "2026-01-01",
       rates: { ...supportedRates, EUR: 0.9, CNY: 7, USD: 1 },
@@ -444,7 +452,7 @@ describe("useExchangeRates", () => {
     expect(requestPath(0)).toBe("https://www.floatrates.com/daily/usd.json");
     expect(result.current.activeProvider).toBe("floatrates");
 
-    const cached = JSON.parse(localStorage.getItem("exchange_rates_cache_v3") ?? "{}") as {
+    const cached = JSON.parse(localStorage.getItem(`${CACHE_KEY_PREFIX}:floatrates`) ?? "{}") as {
       provider?: string;
       requestedProvider?: string;
     };
@@ -479,17 +487,40 @@ describe("useExchangeRates", () => {
     expect(result.current.rates["USD"]).toBe(1);
   });
 
-  it("aborts an in-flight request when the requested provider changes", async () => {
+  it("shares one in-flight request across hook instances for the same requested provider", async () => {
+    let resolveFetch: ((response: Response) => void) | undefined;
+    vi.mocked(fetch).mockImplementation(() => new Promise<Response>((resolve) => {
+      resolveFetch = resolve;
+    }));
+
+    const first = renderHook(() => useExchangeRates("floatrates"));
+    const second = renderHook(() => useExchangeRates("floatrates"));
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+
+    await act(async () => {
+      resolveFetch?.(jsonResponse(makeFloatRatesResponse()));
+    });
+
+    await waitFor(() => expect(first.result.current.loading).toBe(false));
+    await waitFor(() => expect(second.result.current.loading).toBe(false));
+    expect(first.result.current.activeProvider).toBe("floatrates");
+    expect(second.result.current.activeProvider).toBe("floatrates");
+  });
+
+  it("does not abort shared in-flight requests when one hook switches provider", async () => {
     const signals: AbortSignal[] = [];
-    vi.mocked(fetch).mockImplementation((_input, init) => new Promise<Response>((_resolve, reject) => {
+    const resolvers: Array<(response: Response) => void> = [];
+    vi.mocked(fetch).mockImplementation((_input, init) => new Promise<Response>((resolve, reject) => {
       const signal = (init as RequestInit).signal;
       if (signal) {
         signals.push(signal);
         signal.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
       }
+      resolvers.push(resolve);
     }));
 
-    const { result, unmount } = renderHook(() => useExchangeRates("exchange-api"));
+    const { result } = renderHook(() => useExchangeRates("exchange-api"));
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
 
@@ -499,10 +530,19 @@ describe("useExchangeRates", () => {
     });
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
-    expect(signals[0]?.aborted).toBe(true);
+    expect(signals[0]?.aborted).toBe(false);
     expect(signals[1]?.aborted).toBe(false);
 
-    unmount();
+    await act(async () => {
+      resolvers[1]?.(jsonResponse(makeFloatRatesResponse()));
+    });
+    await waitFor(() => expect(result.current.activeProvider).toBe("floatrates"));
+
+    await act(async () => {
+      resolvers[0]?.(jsonResponse(makeExchangeApiUsdResponse()));
+      await Promise.resolve();
+    });
+    expect(result.current.activeProvider).toBe("floatrates");
   });
 
   it("does not start a request for the fake StrictMode mount", async () => {
@@ -518,7 +558,7 @@ describe("useExchangeRates", () => {
     expect(requestPath(0)).toBe("https://www.floatrates.com/daily/usd.json");
   });
 
-  it("aborts in-flight requests on unmount", async () => {
+  it("keeps shared in-flight requests alive on unmount", async () => {
     let signal: AbortSignal | undefined;
     vi.mocked(fetch).mockImplementation((_input, init) => new Promise((_resolve, reject) => {
       signal = (init as RequestInit).signal ?? undefined;
@@ -530,6 +570,6 @@ describe("useExchangeRates", () => {
     expect(signal?.aborted).toBe(false);
 
     unmount();
-    expect(signal?.aborted).toBe(true);
+    expect(signal?.aborted).toBe(false);
   });
 });

@@ -1,5 +1,6 @@
 // Worker 手动续订测试保护 owner 过滤和状态推进，避免 Cloudflare API 与 Go/PocketBase route 分叉。
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { readSuccessData } from "./api-test-helpers";
 import { renewSubscription } from "./subscriptions";
 import type { Env, SubscriptionRow } from "./types";
 
@@ -116,7 +117,7 @@ describe("Cloudflare subscription renewal route", () => {
     const fixture = envFixture(subscriptionRow());
 
     const response = await renewSubscription(requestFixture(), fixture.env, "sub_manual");
-    const json = await response.json() as { subscription: { autoRenew: boolean; nextBillingDate: string; status: string } };
+    const json = await readSuccessData<{ subscription: { autoRenew: boolean; nextBillingDate: string; status: string } }>(response);
 
     expect(response.status).toBe(200);
     expect(fixture.subscriptionLookupParams).toEqual(["usr_owner", "sub_manual"]);
@@ -151,7 +152,7 @@ describe("Cloudflare subscription renewal route", () => {
     }));
 
     const response = await renewSubscription(requestFixture({}), fixture.env, "sub_manual");
-    const json = await response.json() as { subscription: { startDate: string | null; nextBillingDate: string } };
+    const json = await readSuccessData<{ subscription: { startDate: string | null; nextBillingDate: string } }>(response);
 
     expect(response.status).toBe(200);
     expect(fixture.updateParams?.[0]).toBe("2026-02-28");

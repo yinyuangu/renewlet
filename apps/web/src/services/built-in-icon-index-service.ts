@@ -2,7 +2,7 @@ import { apiFetch } from "@/lib/api-client";
 import {
   builtInIconIndexProviderCheckResponseSchema,
   builtInIconIndexProviderRefreshResponseSchema,
-  builtInIconIndexStatusSchema,
+  builtInIconIndexStatusResponseSchema,
   type BuiltInIconIndexProviderCheckResponse,
   type BuiltInIconIndexProviderRefreshResponse,
   type BuiltInIconIndexStatus,
@@ -12,7 +12,7 @@ import type { BuiltInIconProvider } from "@renewlet/shared/built-in-icons";
 /** 管理员内置图标索引服务；provider 版本状态不进入用户 settings 草稿。 */
 export const builtInIconIndexService = {
   async status(signal?: AbortSignal): Promise<BuiltInIconIndexStatus> {
-    return await apiFetch("/api/app/admin/media/icon-index", builtInIconIndexStatusSchema, signal ? { signal } : undefined);
+    return await apiFetch("/api/app/admin/media/icon-index", builtInIconIndexStatusResponseSchema, signal ? { signal } : undefined);
   },
 
   async check(provider: BuiltInIconProvider): Promise<BuiltInIconIndexProviderCheckResponse> {

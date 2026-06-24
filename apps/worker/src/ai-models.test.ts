@@ -1,5 +1,6 @@
 // Worker AI 模型列表测试保护认证代理、provider 形状归一和原始错误回显，避免请求 API key 进入响应 headers。
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { readSuccessData } from "./api-test-helpers";
 import { listAIModels } from "./ai-models";
 import type { Env } from "./types";
 
@@ -67,7 +68,7 @@ describe("Cloudflare AI model list proxy", () => {
       baseUrl: "",
       apiKey: "sk-test-secret",
     }), envFixture());
-    const body = await response.json() as { models: Array<{ id: string; ownedBy: string | null }>; truncated: boolean };
+    const body = await readSuccessData<{ models: Array<{ id: string; ownedBy: string | null }>; truncated: boolean }>(response);
 
     expect(fetchMock).toHaveBeenCalledWith("https://api.openai.com/v1/models", expect.objectContaining({
       method: "GET",
@@ -102,7 +103,7 @@ describe("Cloudflare AI model list proxy", () => {
       baseUrl: "",
       apiKey: "AIza-test-secret",
     }), envFixture());
-    const body = await response.json() as { models: Array<{ id: string; displayName: string | null; inputTokenLimit: number | null; capabilities: { thinking: boolean | null } }> };
+    const body = await readSuccessData<{ models: Array<{ id: string; displayName: string | null; inputTokenLimit: number | null; capabilities: { thinking: boolean | null } }> }>(response);
 
     expect(body.models).toEqual([expect.objectContaining({
       id: "gemini-2.5-pro",
@@ -123,7 +124,7 @@ describe("Cloudflare AI model list proxy", () => {
       baseUrl: "",
       apiKey: "sk-ant-test-secret",
     }), envFixture());
-    const body = await response.json() as { models: Array<{ id: string; displayName: string | null }> };
+    const body = await readSuccessData<{ models: Array<{ id: string; displayName: string | null }> }>(response);
     const headers = (fetchMock.mock.calls[0]?.[1] as { headers: Headers }).headers;
 
     expect(fetchMock.mock.calls[0]?.[0]).toBe("https://api.anthropic.com/v1/models");
@@ -143,7 +144,7 @@ describe("Cloudflare AI model list proxy", () => {
       baseUrl: "https://llm.example.com/v1/",
       apiKey: "",
     }), envFixture());
-    const body = await response.json() as { models: Array<{ id: string }> };
+    const body = await readSuccessData<{ models: Array<{ id: string }> }>(response);
 
     expect(fetchMock.mock.calls[0]?.[0]).toBe("https://llm.example.com/v1/models");
     expect((fetchMock.mock.calls[0]?.[1] as { headers: Headers }).headers.get("authorization")).toBeNull();

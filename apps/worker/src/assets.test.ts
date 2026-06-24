@@ -1,5 +1,6 @@
 // Worker 私有资产测试保护 D1 owner 索引、订阅引用阻止和 R2/D1 删除顺序。
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { readSuccessData } from "./api-test-helpers";
 import { deleteAsset, uploadAsset } from "./assets";
 import worker from "./index";
 import type { AssetRow, Env, SubscriptionRow } from "./types";
@@ -157,10 +158,10 @@ describe("Cloudflare uploaded assets", () => {
     const fixture = createEnv({ assets: [assetRow()] });
 
     const response = await deleteAsset(requestFixture(), fixture.env, "asset_logo");
-    const json = await response.json() as { ok: boolean };
+    const data = await readSuccessData<Record<string, never>>(response);
 
     expect(response.status).toBe(200);
-    expect(json).toEqual({ ok: true });
+    expect(data).toEqual({});
     expect(fixture.r2Delete).toHaveBeenCalledWith("usr_asset_owner/logo/asset_logo/logo.png");
     expect(fixture.state.deletedMetadata).toEqual([{ userId: USER_ID, id: "asset_logo" }]);
     expect(fixture.state.assets).toEqual([]);
@@ -272,7 +273,7 @@ describe("Cloudflare uploaded assets", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ ok: true });
+    expect(await readSuccessData<Record<string, never>>(response)).toEqual({});
     expect(fixture.r2Delete).toHaveBeenCalledWith("usr_asset_owner/logo/asset_logo/logo.png");
   });
 });

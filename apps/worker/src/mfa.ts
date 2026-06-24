@@ -16,7 +16,7 @@ import {
   type PasskeyWebAuthnOptionsResponse,
   type SessionResponse,
 } from "@renewlet/shared/schemas/auth";
-import { json, type AppLocale } from "./http";
+import { successJson, type AppLocale } from "./http";
 import { serverText } from "./server-i18n";
 import { newId, nowIso } from "./db";
 import { randomToken, sha256 } from "./crypto";
@@ -479,7 +479,7 @@ async function verifyMfaLoginUnsafe(env: Env, body: MfaVerifyBody, locale: AppLo
   }
   // MFA ticket 成功后单次消费；session 重新签发，前端只持有新的产品 token。
   await env.DB.prepare("DELETE FROM mfa_auth_tickets WHERE id = ?").bind(ticket.id).run();
-  return json(await createSessionResponse(env, user));
+  return successJson(await createSessionResponse(env, user));
 }
 
 async function consumeTotp(env: Env, userId: string, code: string): Promise<boolean> {

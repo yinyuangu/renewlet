@@ -1,6 +1,6 @@
-import { uploadKindSchema } from "@renewlet/shared/schemas/media";
+import { uploadImagePayloadSchema, uploadKindSchema, uploadedAssetsPageSchema } from "@renewlet/shared/schemas/media";
 import { countAssetReferences, deleteAssetMetadata, getAsset, listAssets, newId, nowIso } from "./db";
-import { HttpError, json, ok, requestLocale } from "./http";
+import { HttpError, ok, requestLocale, successJson } from "./http";
 import { serverText } from "./server-i18n";
 import { requireAuth } from "./auth";
 import type { AssetRow, Env } from "./types";
@@ -44,7 +44,7 @@ export async function uploadAsset(request: Request, env: Env): Promise<Response>
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).bind(id, auth.user.id, kind, key, file.name, contentType, file.size, timestamp, timestamp).run();
 
-  return json({ url: `/api/app/assets/${id}` }, { status: 201 });
+  return successJson(uploadImagePayloadSchema.parse({ url: `/api/app/assets/${id}` }), { status: 201 });
 }
 
 function assertAssetUploadContentLength(request: Request, locale: ReturnType<typeof requestLocale>): void {
@@ -98,11 +98,11 @@ export async function listUploadedAssets(request: Request, env: Env): Promise<Re
   // perPage 上限保护 D1/R2 列表页，不让 Logo 选择器变成无界资产枚举接口。
   const perPage = clamp(positiveInt(url.searchParams.get("perPage"), 48), 1, 96);
   const result = await listAssets(env, auth.user.id, kind, page, perPage);
-  return json({
+  return successJson(uploadedAssetsPageSchema.parse({
     items: result.items.map(toAssetItem),
     page,
     totalPages: Math.ceil(result.total / perPage),
-  });
+  }));
 }
 
 /**

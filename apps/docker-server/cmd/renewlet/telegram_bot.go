@@ -111,7 +111,7 @@ func handleTelegramBotCommandsStatus(app core.App, e *core.RequestEvent) error {
 		return e.InternalServerError(serverText(locale, "common.internalError"), err)
 	}
 	setPublicAPIHeaders(e.Response.Header())
-	return e.JSON(http.StatusOK, telegramBotCommandsDTO(settings, binding))
+	return apiSuccessJSON(e, http.StatusOK, telegramBotCommandsDTO(settings, binding))
 }
 
 func handleTelegramBotCommandsInstall(app core.App, e *core.RequestEvent) error {
@@ -177,7 +177,7 @@ func handleTelegramBotCommandsInstall(app core.App, e *core.RequestEvent) error 
 	}
 	reloaded, _ := findTelegramBotBindingForUser(app, e.Auth.Id)
 	setPublicAPIHeaders(e.Response.Header())
-	return e.JSON(http.StatusOK, telegramBotCommandsDTO(settings, reloaded))
+	return apiSuccessJSON(e, http.StatusOK, telegramBotCommandsDTO(settings, reloaded))
 }
 
 func handleTelegramBotCommandsDelete(app core.App, e *core.RequestEvent) error {
@@ -204,7 +204,7 @@ func handleTelegramBotCommandsDelete(app core.App, e *core.RequestEvent) error {
 		return e.InternalServerError(serverText(locale, "common.internalError"), err)
 	}
 	setPublicAPIHeaders(e.Response.Header())
-	return e.JSON(http.StatusOK, newOKResponse())
+	return apiEmptySuccessJSON(e, http.StatusOK)
 }
 
 func handleTelegramWebhook(app core.App, e *core.RequestEvent) error {
@@ -781,5 +781,5 @@ func telegramBotUpstreamError(e *core.RequestEvent, err error) error {
 
 func telegramWebhookOK(e *core.RequestEvent) error {
 	setPublicAPIHeaders(e.Response.Header())
-	return e.JSON(http.StatusOK, newOKResponse())
+	return e.JSON(http.StatusOK, map[string]bool{"ok": true})
 }

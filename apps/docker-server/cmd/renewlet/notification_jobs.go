@@ -255,7 +255,6 @@ func decodeJSONRecordField(record *core.Record, field string, target interface{}
 // summarizeCronResult 汇总单次 cron 执行结果。
 func summarizeCronResult(options notificationCronOptions, results []notificationCronUserResult) notificationCronResult {
 	out := notificationCronResult{
-		OK:        true,
 		NowUTC:    options.Now.UTC().Format(time.RFC3339),
 		Force:     options.Force,
 		DryRun:    options.DryRun,

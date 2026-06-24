@@ -25,10 +25,7 @@ func TestSettingsReadCreatesEnglishDefaultsWithoutHeader(t *testing.T) {
 	if read.Code != http.StatusOK {
 		t.Fatalf("expected settings read 200, got %d: %s", read.Code, read.Body.String())
 	}
-	var body settingsResponse
-	if err := json.Unmarshal(read.Body.Bytes(), &body); err != nil {
-		t.Fatal(err)
-	}
+	body := decodeAPISuccessDataForTest[settingsResponse](t, read.Body.Bytes())
 	if body.Settings.Locale != string(localeEnUS) {
 		t.Fatalf("expected default locale en-US, got %q", body.Settings.Locale)
 	}
@@ -54,10 +51,7 @@ func TestSettingsReadCreatesRequestLocaleOnce(t *testing.T) {
 	if first.Code != http.StatusOK {
 		t.Fatalf("expected first settings read 200, got %d: %s", first.Code, first.Body.String())
 	}
-	var firstBody settingsResponse
-	if err := json.Unmarshal(first.Body.Bytes(), &firstBody); err != nil {
-		t.Fatal(err)
-	}
+	firstBody := decodeAPISuccessDataForTest[settingsResponse](t, first.Body.Bytes())
 	if firstBody.Settings.Locale != string(localeZhCN) {
 		t.Fatalf("expected first settings locale zh-CN, got %q", firstBody.Settings.Locale)
 	}
@@ -68,10 +62,7 @@ func TestSettingsReadCreatesRequestLocaleOnce(t *testing.T) {
 	if second.Code != http.StatusOK {
 		t.Fatalf("expected second settings read 200, got %d: %s", second.Code, second.Body.String())
 	}
-	var secondBody settingsResponse
-	if err := json.Unmarshal(second.Body.Bytes(), &secondBody); err != nil {
-		t.Fatal(err)
-	}
+	secondBody := decodeAPISuccessDataForTest[settingsResponse](t, second.Body.Bytes())
 	if secondBody.Settings.Locale != string(localeZhCN) || settingsRecordLocale(t, app, user.Id) != string(localeZhCN) {
 		t.Fatalf("expected existing settings to keep zh-CN, got response=%q persisted=%q", secondBody.Settings.Locale, settingsRecordLocale(t, app, user.Id))
 	}
@@ -91,10 +82,7 @@ func TestSettingsUpdateCreatesDefaultsFromRequestLocale(t *testing.T) {
 	if update.Code != http.StatusOK {
 		t.Fatalf("expected settings update 200, got %d: %s", update.Code, update.Body.String())
 	}
-	var body settingsResponse
-	if err := json.Unmarshal(update.Body.Bytes(), &body); err != nil {
-		t.Fatal(err)
-	}
+	body := decodeAPISuccessDataForTest[settingsResponse](t, update.Body.Bytes())
 	if body.Settings.Locale != string(localeZhCN) || body.Settings.MonthlyBudget != 2333 {
 		t.Fatalf("expected update to create zh-CN settings with monthly budget, got %#v", body.Settings)
 	}
@@ -134,10 +122,7 @@ func TestSettingsProductAPIRoundTripAndStrictJSON(t *testing.T) {
 	if update.Code != http.StatusOK {
 		t.Fatalf("expected settings update 200, got %d: %s", update.Code, update.Body.String())
 	}
-	var updateBody settingsResponse
-	if err := json.Unmarshal(update.Body.Bytes(), &updateBody); err != nil {
-		t.Fatal(err)
-	}
+	updateBody := decodeAPISuccessDataForTest[settingsResponse](t, update.Body.Bytes())
 	if updateBody.Settings.MonthlyBudget != 2333 || updateBody.Settings.Timezone != "Asia/Shanghai" {
 		t.Fatalf("unexpected settings response: %#v", updateBody.Settings)
 	}
@@ -146,10 +131,7 @@ func TestSettingsProductAPIRoundTripAndStrictJSON(t *testing.T) {
 	if read.Code != http.StatusOK {
 		t.Fatalf("expected settings read 200, got %d: %s", read.Code, read.Body.String())
 	}
-	var readBody settingsResponse
-	if err := json.Unmarshal(read.Body.Bytes(), &readBody); err != nil {
-		t.Fatal(err)
-	}
+	readBody := decodeAPISuccessDataForTest[settingsResponse](t, read.Body.Bytes())
 	if readBody.Settings.MonthlyBudget != 2333 || readBody.Settings.Timezone != "Asia/Shanghai" {
 		t.Fatalf("expected persisted settings, got %#v", readBody.Settings)
 	}
@@ -187,10 +169,7 @@ func TestCustomConfigProductAPIRoundTrip(t *testing.T) {
 	if read.Code != http.StatusOK {
 		t.Fatalf("expected custom config read 200, got %d: %s", read.Code, read.Body.String())
 	}
-	var response customConfigResponse
-	if err := json.Unmarshal(read.Body.Bytes(), &response); err != nil {
-		t.Fatal(err)
-	}
+	response := decodeAPISuccessDataForTest[customConfigResponse](t, read.Body.Bytes())
 	if len(response.Config.Categories) != 1 || response.Config.Categories[0].ID != "cat_ai" {
 		t.Fatalf("unexpected custom config: %#v", response.Config)
 	}
@@ -209,10 +188,7 @@ func TestSubscriptionsProductAPIUsesOwnerScopedCRUD(t *testing.T) {
 	if create.Code != http.StatusCreated {
 		t.Fatalf("expected subscription create 201, got %d: %s", create.Code, create.Body.String())
 	}
-	var created subscriptionResponse
-	if err := json.Unmarshal(create.Body.Bytes(), &created); err != nil {
-		t.Fatal(err)
-	}
+	created := decodeAPISuccessDataForTest[subscriptionResponse](t, create.Body.Bytes())
 	id, _ := created.Subscription["id"].(string)
 	if id == "" {
 		t.Fatalf("expected created subscription id, got %#v", created.Subscription)
@@ -222,10 +198,7 @@ func TestSubscriptionsProductAPIUsesOwnerScopedCRUD(t *testing.T) {
 	if list.Code != http.StatusOK {
 		t.Fatalf("expected subscription list 200, got %d: %s", list.Code, list.Body.String())
 	}
-	var listBody subscriptionsListResponse
-	if err := json.Unmarshal(list.Body.Bytes(), &listBody); err != nil {
-		t.Fatal(err)
-	}
+	listBody := decodeAPISuccessDataForTest[subscriptionsListResponse](t, list.Body.Bytes())
 	if len(listBody.Subscriptions) != 1 || listBody.Subscriptions[0]["name"] != "Route API" || listBody.Total != 1 {
 		t.Fatalf("unexpected subscription list: %#v", listBody)
 	}
@@ -242,10 +215,7 @@ func TestSubscriptionsProductAPIUsesOwnerScopedCRUD(t *testing.T) {
 	if patch.Code != http.StatusOK {
 		t.Fatalf("expected subscription patch 200, got %d: %s", patch.Code, patch.Body.String())
 	}
-	var patched subscriptionResponse
-	if err := json.Unmarshal(patch.Body.Bytes(), &patched); err != nil {
-		t.Fatal(err)
-	}
+	patched := decodeAPISuccessDataForTest[subscriptionResponse](t, patch.Body.Bytes())
 	if patched.Subscription["name"] != "Renamed API" || patched.Subscription["price"] != float64(20) {
 		t.Fatalf("unexpected patched subscription: %#v", patched.Subscription)
 	}
@@ -276,10 +246,7 @@ func TestSubscriptionsProductAPIAcceptsRecurringSubscriptionWithoutStartDate(t *
 	if create.Code != http.StatusCreated {
 		t.Fatalf("expected subscription create 201, got %d: %s", create.Code, create.Body.String())
 	}
-	var created subscriptionResponse
-	if err := json.Unmarshal(create.Body.Bytes(), &created); err != nil {
-		t.Fatal(err)
-	}
+	created := decodeAPISuccessDataForTest[subscriptionResponse](t, create.Body.Bytes())
 	if value, ok := created.Subscription["startDate"]; !ok || value != nil {
 		t.Fatalf("expected startDate JSON null, got %#v in %#v", value, created.Subscription)
 	}
@@ -310,10 +277,7 @@ func TestSubscriptionsProductAPICursorAdvancesWithoutRepeatingRows(t *testing.T)
 		if res.Code != http.StatusOK {
 			t.Fatalf("expected subscription page %d to return 200, got %d: %s", page+1, res.Code, res.Body.String())
 		}
-		var body subscriptionsListResponse
-		if err := json.Unmarshal(res.Body.Bytes(), &body); err != nil {
-			t.Fatal(err)
-		}
+		body := decodeAPISuccessDataForTest[subscriptionsListResponse](t, res.Body.Bytes())
 		if len(body.Subscriptions) != 1 {
 			t.Fatalf("expected one subscription on page %d, got %#v", page+1, body.Subscriptions)
 		}
@@ -357,10 +321,7 @@ func TestAssetsProductAPIUploadListAndRead(t *testing.T) {
 	if upload.Code != http.StatusCreated {
 		t.Fatalf("expected asset upload 201, got %d: %s", upload.Code, upload.Body.String())
 	}
-	var uploaded uploadAssetResponse
-	if err := json.Unmarshal(upload.Body.Bytes(), &uploaded); err != nil {
-		t.Fatal(err)
-	}
+	uploaded := decodeAPISuccessDataForTest[uploadAssetResponse](t, upload.Body.Bytes())
 	if !strings.HasPrefix(uploaded.URL, "/api/app/assets/") {
 		t.Fatalf("expected product asset URL, got %#v", uploaded)
 	}
@@ -370,10 +331,7 @@ func TestAssetsProductAPIUploadListAndRead(t *testing.T) {
 	if list.Code != http.StatusOK {
 		t.Fatalf("expected asset list 200, got %d: %s", list.Code, list.Body.String())
 	}
-	var page uploadedAssetsPageResponse
-	if err := json.Unmarshal(list.Body.Bytes(), &page); err != nil {
-		t.Fatal(err)
-	}
+	page := decodeAPISuccessDataForTest[uploadedAssetsPageResponse](t, list.Body.Bytes())
 	if len(page.Items) != 1 || page.Items[0].URL != uploaded.URL || page.Items[0].Kind != "logo" {
 		t.Fatalf("unexpected asset page: %#v", page)
 	}
@@ -394,10 +352,7 @@ func TestAssetsProductAPIUploadListAndRead(t *testing.T) {
 	if afterDeleteList.Code != http.StatusOK {
 		t.Fatalf("expected asset list after delete 200, got %d: %s", afterDeleteList.Code, afterDeleteList.Body.String())
 	}
-	var afterDeletePage uploadedAssetsPageResponse
-	if err := json.Unmarshal(afterDeleteList.Body.Bytes(), &afterDeletePage); err != nil {
-		t.Fatal(err)
-	}
+	afterDeletePage := decodeAPISuccessDataForTest[uploadedAssetsPageResponse](t, afterDeleteList.Body.Bytes())
 	if len(afterDeletePage.Items) != 0 {
 		t.Fatalf("expected deleted asset to disappear from list: %#v", afterDeletePage)
 	}
@@ -434,10 +389,7 @@ func TestAssetProductAPIDeleteBlocksReferencedAndForeignAssets(t *testing.T) {
 	if upload.Code != http.StatusCreated {
 		t.Fatalf("expected asset upload 201, got %d: %s", upload.Code, upload.Body.String())
 	}
-	var uploaded uploadAssetResponse
-	if err := json.Unmarshal(upload.Body.Bytes(), &uploaded); err != nil {
-		t.Fatal(err)
-	}
+	uploaded := decodeAPISuccessDataForTest[uploadAssetResponse](t, upload.Body.Bytes())
 	id := strings.TrimPrefix(uploaded.URL, "/api/app/assets/")
 	createRouteTestSubscription(t, app, user.Id, map[string]interface{}{"logo": uploaded.URL})
 
@@ -490,10 +442,7 @@ func TestAssetProductAPIDeleteBlocksPaymentMethodIconReferences(t *testing.T) {
 	if upload.Code != http.StatusCreated {
 		t.Fatalf("expected icon upload 201, got %d: %s", upload.Code, upload.Body.String())
 	}
-	var uploaded uploadAssetResponse
-	if err := json.Unmarshal(upload.Body.Bytes(), &uploaded); err != nil {
-		t.Fatal(err)
-	}
+	uploaded := decodeAPISuccessDataForTest[uploadAssetResponse](t, upload.Body.Bytes())
 	id := strings.TrimPrefix(uploaded.URL, "/api/app/assets/")
 	createCalendarFeedTestCustomConfig(t, app, user.Id, func(config *customConfigPayload) {
 		config.PaymentMethods = []customConfigItem{{
@@ -549,10 +498,7 @@ func TestAssetProductAPIDeleteReportsMixedReferencesAndIgnoresForeignConfig(t *t
 	if upload.Code != http.StatusCreated {
 		t.Fatalf("expected mixed asset upload 201, got %d: %s", upload.Code, upload.Body.String())
 	}
-	var uploaded uploadAssetResponse
-	if err := json.Unmarshal(upload.Body.Bytes(), &uploaded); err != nil {
-		t.Fatal(err)
-	}
+	uploaded := decodeAPISuccessDataForTest[uploadAssetResponse](t, upload.Body.Bytes())
 	id := strings.TrimPrefix(uploaded.URL, "/api/app/assets/")
 	createRouteTestSubscription(t, app, user.Id, map[string]interface{}{"logo": uploaded.URL})
 	createCalendarFeedTestCustomConfig(t, app, user.Id, func(config *customConfigPayload) {
@@ -612,10 +558,7 @@ func TestAssetProductAPIDeleteIgnoresForeignCustomConfigReferences(t *testing.T)
 	if upload.Code != http.StatusCreated {
 		t.Fatalf("expected owner icon upload 201, got %d: %s", upload.Code, upload.Body.String())
 	}
-	var uploaded uploadAssetResponse
-	if err := json.Unmarshal(upload.Body.Bytes(), &uploaded); err != nil {
-		t.Fatal(err)
-	}
+	uploaded := decodeAPISuccessDataForTest[uploadAssetResponse](t, upload.Body.Bytes())
 	createCalendarFeedTestCustomConfig(t, app, foreignUser.Id, func(config *customConfigPayload) {
 		config.PaymentMethods = []customConfigItem{{
 			ID:     "foreign_card",
@@ -653,10 +596,7 @@ func TestAssetProductAPIDeleteRemovesMetadataWhenFileIsMissing(t *testing.T) {
 	if upload.Code != http.StatusCreated {
 		t.Fatalf("expected asset upload 201, got %d: %s", upload.Code, upload.Body.String())
 	}
-	var uploaded uploadAssetResponse
-	if err := json.Unmarshal(upload.Body.Bytes(), &uploaded); err != nil {
-		t.Fatal(err)
-	}
+	uploaded := decodeAPISuccessDataForTest[uploadAssetResponse](t, upload.Body.Bytes())
 	id := strings.TrimPrefix(uploaded.URL, "/api/app/assets/")
 	record, err := app.FindRecordById("assets", id)
 	if err != nil {

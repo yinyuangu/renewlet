@@ -20,6 +20,29 @@ import type { Env } from "./types";
 import type { AppLocale } from "./http";
 import type { Channel, SendSummary } from "./notification-jobs";
 
+interface NotificationSenderContext {
+  env: Env;
+  settings: ApiAppSettings;
+  message: NotificationEmailMessage;
+  locale: AppLocale;
+  appUrl?: string;
+}
+
+export type NotificationSender = (context: NotificationSenderContext) => Promise<void>;
+
+// 渠道 registry 是通知发送的唯一分发边界；调度幂等、失败重试和 raw details 剥离仍留在 job 层。
+export const notificationSenders = {
+  telegram: sendTelegramChannel,
+  notifyx: sendNotifyxChannel,
+  webhook: ({ settings, message, locale }) => sendWebhook(settings, message, locale),
+  wechat: sendWeChatChannel,
+  bark: sendBarkChannel,
+  email: ({ env, settings, message, locale, appUrl }) => sendEmail(env, settings, message, locale, appUrl),
+  serverchan: ({ settings, message, locale }) => sendServerChan(settings, message, locale),
+  discord: ({ settings, message, locale }) => sendDiscord(settings, message, locale),
+  pushplus: ({ settings, message, locale }) => sendPushPlus(settings, message, locale),
+} satisfies Record<Channel, NotificationSender>;
+
 // 这里是 Worker 通知渠道分发边界；真正 HTTP 外发统一收口到 notification-http，避免渠道绕过超时和脱敏策略。
 export async function sendChannels(
   env: Env,
@@ -55,63 +78,54 @@ export async function sendChannel(
   locale: AppLocale,
   appUrl?: string,
 ): Promise<void> {
-  switch (channel) {
-    case "telegram": {
-      const token = required(settings.telegramBotToken, serverText(locale, "service.telegramBotToken"), locale);
-      const chatId = required(settings.telegramChatId, serverText(locale, "service.telegramChatID"), locale);
-      // Telegram 样式只在 sendMessage 边界生效；其它渠道继续消费纯文本，避免跨渠道模板语义互相污染。
-      const telegramMessage = telegramNotificationMessage(message, settings.telegramMessageFormat);
-      await postJson(`https://api.telegram.org/bot${token}/sendMessage`, {
-        chat_id: chatId,
-        ...telegramMessage,
-        link_preview_options: { is_disabled: true },
-      }, "Telegram", locale, undefined, { secrets: [token, chatId] });
-      return;
-    }
-    case "notifyx": {
-      const apiKey = required(settings.notifyxApiKey, serverText(locale, "service.notifyxAPIKey"), locale);
-      await postJson(`https://www.notifyx.cn/api/v1/send/${encodeURIComponent(apiKey)}`, {
-        title: message.title,
-        content: message.content,
-        description: message.timestamp,
-      }, "NotifyX", locale, undefined, { secrets: [apiKey] });
-      return;
-    }
-    case "webhook":
-      await sendWebhook(settings, message, locale);
-      return;
-    case "wechat": {
-      const rawUrl = required(settings.wechatWebhookUrl, serverText(locale, "service.wechatWebhookURL"), locale);
-      await postJson(await safeHttpsUrl(rawUrl, locale), {
-        msgtype: settings.wechatMessageType,
-        [settings.wechatMessageType]: settings.wechatMessageType === "markdown"
-          ? { content: plainNotificationMessage(message) }
-          : {
-              content: plainNotificationMessage(message),
-              mentioned_mobile_list: settings.wechatAtAll ? ["@all"] : splitList(settings.wechatAtPhones),
-            },
-      }, "WeCom", locale, undefined, { secrets: [rawUrl] });
-      return;
-    }
-    case "bark": {
-      const deviceKey = required(settings.barkDeviceKey, serverText(locale, "service.barkDeviceKey"), locale);
-      const response = await sendNotificationRequest(await barkUrl(settings, message, locale), { method: "GET" }, "Bark", locale, { secrets: [deviceKey, settings.barkServerUrl] });
-      await requireNotificationHttpOk(response, "Bark", locale, { secrets: [deviceKey, settings.barkServerUrl] });
-      return;
-    }
-    case "email":
-      await sendEmail(env, settings, message, locale, appUrl);
-      return;
-    case "serverchan":
-      await sendServerChan(settings, message, locale);
-      return;
-    case "discord":
-      await sendDiscord(settings, message, locale);
-      return;
-    case "pushplus":
-      await sendPushPlus(settings, message, locale);
-      return;
-  }
+  const context: NotificationSenderContext = {
+    env,
+    settings,
+    message,
+    locale,
+    ...(appUrl ? { appUrl } : {}),
+  };
+  await notificationSenders[channel](context);
+}
+
+async function sendTelegramChannel({ settings, message, locale }: NotificationSenderContext): Promise<void> {
+  const token = required(settings.telegramBotToken, serverText(locale, "service.telegramBotToken"), locale);
+  const chatId = required(settings.telegramChatId, serverText(locale, "service.telegramChatID"), locale);
+  // Telegram 样式只在 sendMessage 边界生效；其它渠道继续消费纯文本，避免跨渠道模板语义互相污染。
+  const telegramMessage = telegramNotificationMessage(message, settings.telegramMessageFormat);
+  await postJson(`https://api.telegram.org/bot${token}/sendMessage`, {
+    chat_id: chatId,
+    ...telegramMessage,
+    link_preview_options: { is_disabled: true },
+  }, "Telegram", locale, undefined, { secrets: [token, chatId] });
+}
+
+async function sendNotifyxChannel({ settings, message, locale }: NotificationSenderContext): Promise<void> {
+  const apiKey = required(settings.notifyxApiKey, serverText(locale, "service.notifyxAPIKey"), locale);
+  await postJson(`https://www.notifyx.cn/api/v1/send/${encodeURIComponent(apiKey)}`, {
+    title: message.title,
+    content: message.content,
+    description: message.timestamp,
+  }, "NotifyX", locale, undefined, { secrets: [apiKey] });
+}
+
+async function sendWeChatChannel({ settings, message, locale }: NotificationSenderContext): Promise<void> {
+  const rawUrl = required(settings.wechatWebhookUrl, serverText(locale, "service.wechatWebhookURL"), locale);
+  await postJson(await safeHttpsUrl(rawUrl, locale), {
+    msgtype: settings.wechatMessageType,
+    [settings.wechatMessageType]: settings.wechatMessageType === "markdown"
+      ? { content: plainNotificationMessage(message) }
+      : {
+          content: plainNotificationMessage(message),
+          mentioned_mobile_list: settings.wechatAtAll ? ["@all"] : splitList(settings.wechatAtPhones),
+        },
+  }, "WeCom", locale, undefined, { secrets: [rawUrl] });
+}
+
+async function sendBarkChannel({ settings, message, locale }: NotificationSenderContext): Promise<void> {
+  const deviceKey = required(settings.barkDeviceKey, serverText(locale, "service.barkDeviceKey"), locale);
+  const response = await sendNotificationRequest(await barkUrl(settings, message, locale), { method: "GET" }, "Bark", locale, { secrets: [deviceKey, settings.barkServerUrl] });
+  await requireNotificationHttpOk(response, "Bark", locale, { secrets: [deviceKey, settings.barkServerUrl] });
 }
 
 async function sendWebhook(settings: ApiAppSettings, message: NotificationEmailMessage, locale: AppLocale): Promise<void> {

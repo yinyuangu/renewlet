@@ -1,4 +1,4 @@
-import { sessionResponseSchema, type SessionResponse } from "@renewlet/shared/schemas/auth";
+import { sessionPayloadSchema, type SessionResponse } from "@renewlet/shared/schemas/auth";
 
 /**
  * 产品 session 是浏览器唯一持久登录态；MFA ticket、Passkey challenge 和恢复码明文都不能进入这里。
@@ -25,7 +25,7 @@ function parseSessionRecord(value: string | null): ProductSessionRecord | null {
     if (record["version"] !== STORAGE_VERSION) return null;
     const verifiedAt = record["verifiedAt"];
     if (typeof verifiedAt !== "number" || !Number.isFinite(verifiedAt) || verifiedAt <= 0) return null;
-    const parsed = sessionResponseSchema.safeParse(record["value"]);
+    const parsed = sessionPayloadSchema.safeParse(record["value"]);
     return parsed.success ? { value: parsed.data, verifiedAt } : null;
   } catch {
     return null;

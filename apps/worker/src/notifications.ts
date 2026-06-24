@@ -4,7 +4,8 @@ import {
   type NotificationEmailMessage,
 } from "@renewlet/shared/email-template";
 import {
-  notificationHistoryResponseSchema,
+  notificationHistoryPayloadSchema,
+  notificationRunPayloadSchema,
   notificationsRunBodySchema,
   notificationsTestBodySchema,
   type NotificationHistoryStatusFilter,
@@ -24,7 +25,7 @@ import {
 } from "./db";
 import { renewAutoSubscriptionsForUserInTimezone } from "./subscription-renewal";
 import { getSubscriptionSchedulerState } from "./subscription-scheduler-state";
-import { HttpError, json, ok, readOptionalJson, readJson, requestLocale, type AppLocale } from "./http";
+import { HttpError, ok, readOptionalJson, readJson, requestLocale, successJson, type AppLocale } from "./http";
 import { DEFAULT_SERVER_I18N_LOCALE, serverFormat, serverText } from "./server-i18n";
 import { requireAuth } from "./auth";
 import { notificationChannelErrorDetails } from "./notification-errors";
@@ -99,8 +100,8 @@ export async function notificationRun(request: Request, env: Env): Promise<Respo
   const auth = await requireAuth(request, env);
   const body = await readOptionalJson(request, notificationsRunBodySchema, locale);
   const result = await runManualForUser(env, auth.user.id, body.force === true, body.settings, locale, { appUrl: requestAppUrl(request) });
-  if (!result.sent) return json({ ok: true, sent: false, reason: "no_due_items" });
-  return json({ ok: true, sent: true, summary: result.summary });
+  if (!result.sent) return successJson(notificationRunPayloadSchema.parse({ sent: false, reason: "no_due_items" }));
+  return successJson(notificationRunPayloadSchema.parse({ sent: true, summary: result.summary }));
 }
 
 /** 返回当前用户通知概览和历史审计；分页与状态过滤都在 user_id 约束内完成。 */
@@ -128,7 +129,7 @@ export async function notificationHistory(request: Request, env: Env): Promise<R
   const jobs = rows.results.slice(0, limit).map(toHistoryJob);
   const latestJob = await latestJobForUser(env, auth.user.id);
   const latestFailedJob = await latestJobForUser(env, auth.user.id, "failed");
-  return json(notificationHistoryResponseSchema.parse({
+  return successJson(notificationHistoryPayloadSchema.parse({
     summary: {
       ...overview.summary,
       latestJob: latestJob ? toHistoryJob(latestJob) : null,

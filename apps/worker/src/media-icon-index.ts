@@ -16,9 +16,9 @@ import {
 } from "@renewlet/shared/media-resolver";
 import { mediaResolverConfig } from "@renewlet/shared/media-resolver-config";
 import {
-  builtInIconIndexProviderCheckResponseSchema,
+  builtInIconIndexProviderCheckPayloadSchema,
   builtInIconIndexProviderCountsSchema,
-  builtInIconIndexProviderRefreshResponseSchema,
+  builtInIconIndexProviderRefreshPayloadSchema,
   builtInIconSeedMetadataSchema,
   builtInIconIndexStatusSchema,
   type BuiltInIconIndexProviderStatus,
@@ -28,7 +28,7 @@ import {
 } from "@renewlet/shared/schemas/media";
 import { requireAdmin } from "./auth";
 import { nowIso } from "./db";
-import { HttpError, json, requireEmptyBody, requestLocale } from "./http";
+import { errorResponse, HttpError, requireEmptyBody, requestLocale, successJson } from "./http";
 import type { Env, MediaIconIndexRow } from "./types";
 import {
   createUpstreamHTTPError,
@@ -100,7 +100,7 @@ async function getSeedBuiltInMediaResolver(env: Env): Promise<MediaResolver> {
 
 export async function builtInIconIndexStatus(request: Request, env: Env): Promise<Response> {
   await requireAdmin(request, env);
-  return json(builtInIconIndexStatusSchema.parse(await readBuiltInIconIndexStatus(env)));
+  return successJson(builtInIconIndexStatusSchema.parse(await readBuiltInIconIndexStatus(env)));
 }
 
 export async function checkBuiltInIconIndexProvider(request: Request, env: Env, provider: string): Promise<Response> {
@@ -110,8 +110,7 @@ export async function checkBuiltInIconIndexProvider(request: Request, env: Env, 
   const parsedProvider = parseBuiltInIconProvider(provider);
   if (!parsedProvider) throw new HttpError(400, "Invalid built-in icon provider", "INVALID_PROVIDER");
   if (refreshingProviderInCurrentIsolate || !(await acquireRefreshLock(env))) {
-    const status = markProviderRefreshing(await readBuiltInIconIndexStatus(env), parsedProvider);
-    return json(builtInIconIndexProviderCheckResponseSchema.parse({ status, provider: providerStatus(status, parsedProvider) }), { status: 409 });
+    return errorResponse(409, "Built-in icon index refresh is already running", "MEDIA_ICON_INDEX_REFRESHING");
   }
 
   refreshingProviderInCurrentIsolate = parsedProvider;
@@ -123,7 +122,7 @@ export async function checkBuiltInIconIndexProvider(request: Request, env: Env, 
     await finishRefreshOperation(env);
     operationActive = false;
     const status = await readBuiltInIconIndexStatus(env);
-    return json(builtInIconIndexProviderCheckResponseSchema.parse({ status, provider: providerStatus(status, parsedProvider) }));
+    return successJson(builtInIconIndexProviderCheckPayloadSchema.parse({ status, provider: providerStatus(status, parsedProvider) }));
   } catch (error) {
     const message = providerFailureMessage(error);
     const errorDetails = upstreamErrorDetailsFromError(error);
@@ -132,7 +131,7 @@ export async function checkBuiltInIconIndexProvider(request: Request, env: Env, 
     operationActive = false;
     const status = await readBuiltInIconIndexStatus(env);
     // check 只是更新 provider 可见状态；GitHub 限流/断网时仍返回同形状 body，让前端展示失败 badge 而不是把弹层流程打断。
-    return json(builtInIconIndexProviderCheckResponseSchema.parse({
+    return successJson(builtInIconIndexProviderCheckPayloadSchema.parse({
       status,
       provider: providerStatus(status, parsedProvider),
       ...(errorDetails ? { errorDetails } : {}),
@@ -149,8 +148,7 @@ export async function refreshBuiltInIconIndexProvider(request: Request, env: Env
   const parsedProvider = parseBuiltInIconProvider(provider);
   if (!parsedProvider) throw new HttpError(400, "Invalid built-in icon provider", "INVALID_PROVIDER");
   if (refreshingProviderInCurrentIsolate || !(await acquireRefreshLock(env))) {
-    const status = markProviderRefreshing(await readBuiltInIconIndexStatus(env), parsedProvider);
-    return json(builtInIconIndexProviderRefreshResponseSchema.parse({ status, provider: providerStatus(status, parsedProvider) }), { status: 409 });
+    return errorResponse(409, "Built-in icon index refresh is already running", "MEDIA_ICON_INDEX_REFRESHING");
   }
 
   refreshingProviderInCurrentIsolate = parsedProvider;
@@ -193,7 +191,7 @@ export async function refreshBuiltInIconIndexProvider(request: Request, env: Env
     await finishRefreshOperation(env);
     operationActive = false;
     const status = await readBuiltInIconIndexStatus(env);
-    return json(builtInIconIndexProviderRefreshResponseSchema.parse({ status, provider: providerStatus(status, parsedProvider) }));
+    return successJson(builtInIconIndexProviderRefreshPayloadSchema.parse({ status, provider: providerStatus(status, parsedProvider) }));
   } catch (error) {
     const message = providerFailureMessage(error);
     const errorDetails = upstreamErrorDetailsFromError(error);
@@ -201,11 +199,8 @@ export async function refreshBuiltInIconIndexProvider(request: Request, env: Env
     await finishRefreshOperation(env);
     operationActive = false;
     const status = await readBuiltInIconIndexStatus(env);
-    return json(builtInIconIndexProviderRefreshResponseSchema.parse({
-      status,
-      provider: providerStatus(status, parsedProvider),
-      ...(errorDetails ? { errorDetails } : {}),
-    }), { status: 502 });
+    void status;
+    throw new HttpError(502, "Built-in icon index refresh failed", "MEDIA_ICON_INDEX_REFRESH_FAILED", errorDetails);
   } finally {
     if (operationActive) await finishRefreshOperation(env);
   }
@@ -650,14 +645,6 @@ function providerStatus(status: BuiltInIconIndexStatus, provider: BuiltInIconPro
     lastError: null,
     refreshing: false,
     updateAvailable: false,
-  };
-}
-
-function markProviderRefreshing(status: BuiltInIconIndexStatus, provider: BuiltInIconProvider): BuiltInIconIndexStatus {
-  return {
-    ...status,
-    refreshing: true,
-    providers: status.providers.map((item) => item.provider === provider ? { ...item, refreshing: true } : item),
   };
 }
 

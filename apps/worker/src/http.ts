@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { apiEmptySuccess, apiSuccess } from "@renewlet/shared/schemas/api";
 import { apiErrorResponseSchema } from "@renewlet/shared/schemas/errors";
 import { DEFAULT_SERVER_I18N_LOCALE, requestLocale, serverText, type AppLocale } from "./server-i18n";
 
@@ -19,9 +20,18 @@ export function json(value: unknown, init: ResponseInit = {}): Response {
   return new Response(JSON.stringify(value), { ...init, headers });
 }
 
-/** ok 是无额外字段的成功响应；需要业务状态时应使用专用 response schema。 */
+/**
+ * successJson 是产品 JSON API 成功响应的唯一出口。
+ *
+ * json() 仍保持裸 JSON，供错误 envelope、SSE/ICS/blob 例外和第三方 webhook adapter 使用。
+ */
+export function successJson(value: unknown, init: ResponseInit = {}): Response {
+  return json(apiSuccess(value), init);
+}
+
+/** ok 是无额外字段的产品成功响应；需要业务状态时应使用 successJson(payload)。 */
 export function ok(status = 200): Response {
-  return json({ ok: true }, { status });
+  return json(apiEmptySuccess(), { status });
 }
 
 /** errorResponse 是 Worker 错误 wire contract 的唯一出口；不要在 handler 里手写扁平 message/code。 */

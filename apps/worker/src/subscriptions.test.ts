@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { subscriptionNormalizationFixtures } from "@renewlet/shared/contract-fixtures";
+import { readSuccessData } from "./api-test-helpers";
 import { toApiSubscription } from "./db";
 import { normalizeSubscriptionBodyForStorage, toSubscriptionRow, updateSubscription, type SubscriptionBody } from "./subscriptions";
 import type { Env, SubscriptionRow } from "./types";
@@ -251,7 +252,7 @@ describe("Cloudflare subscription mapper", () => {
       headers: { "content-type": "application/json", authorization: "Bearer test" },
       body: JSON.stringify({ notes: "updated" }),
     }), env, "sub_dirty_tags");
-    const body = await response.json() as { subscription: { tags: string[] } };
+    const body = await readSuccessData<{ subscription: { tags: string[] } }>(response);
 
     expect(response.status).toBe(200);
     expect(body.subscription.tags).toEqual([]);

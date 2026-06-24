@@ -1,5 +1,6 @@
 // Worker 导入测试保护 preview/apply 写入契约，避免 Cloudflare D1 到写库阶段才发现订阅字段错误。
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { readSuccessData } from "./api-test-helpers";
 import { applyImport, previewImport } from "./import-export";
 import { HttpError } from "./http";
 import type { Env, SubscriptionRow } from "./types";
@@ -140,7 +141,7 @@ describe("Cloudflare import", () => {
     const response = await previewImport(requestFor("/api/app/import/preview", importPayload([
       importSubscription({ startDate: "2026-07-01", nextBillingDate: "2026-06-01" }),
     ])), env);
-    const json = await response.json() as { summary: { errors: number }; items: Array<{ action: string; errors: string[] }> };
+    const json = await readSuccessData<{ summary: { errors: number }; items: Array<{ action: string; errors: string[] }> }>(response);
 
     expect(response.status).toBe(200);
     expect(json.summary.errors).toBe(1);
@@ -326,7 +327,7 @@ describe("Cloudflare import", () => {
     const response = await previewImport(requestFor("/api/app/import/preview", importPayload([
       importSubscription(),
     ])), env);
-    const json = await response.json() as { summary: { skips: number; replaces: number }; items: Array<{ action: string; existingId?: string }> };
+    const json = await readSuccessData<{ summary: { skips: number; replaces: number }; items: Array<{ action: string; existingId?: string }> }>(response);
 
     expect(json.summary.skips).toBe(1);
     expect(json.summary.replaces).toBe(0);

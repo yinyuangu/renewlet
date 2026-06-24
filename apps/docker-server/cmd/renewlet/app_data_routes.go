@@ -122,7 +122,7 @@ func handleSettingsRead(app core.App, e *core.RequestEvent) error {
 	if err != nil {
 		return e.InternalServerError(serverText(locale, "common.internalError"), err)
 	}
-	return e.JSON(http.StatusOK, settingsResponse{Settings: settings})
+	return apiSuccessJSON(e, http.StatusOK, settingsResponse{Settings: settings})
 }
 
 func handleSettingsUpdate(app core.App, e *core.RequestEvent) error {
@@ -156,13 +156,13 @@ func handleSettingsUpdate(app core.App, e *core.RequestEvent) error {
 		if err != nil {
 			return e.InternalServerError(serverText(locale, "common.internalError"), err)
 		}
-		return e.JSON(http.StatusOK, settingsResponse{Settings: settingsFromRecord(record)})
+		return apiSuccessJSON(e, http.StatusOK, settingsResponse{Settings: settingsFromRecord(record)})
 	}
 	record.Set("settings", next)
 	if err := app.Save(record); err != nil {
 		return e.BadRequestError(validationErrorMessage(locale, "common.invalidRequestBody", err), err)
 	}
-	return e.JSON(http.StatusOK, settingsResponse{Settings: settingsFromRecord(record)})
+	return apiSuccessJSON(e, http.StatusOK, settingsResponse{Settings: settingsFromRecord(record)})
 }
 
 func handleCustomConfigRead(app core.App, e *core.RequestEvent) error {
@@ -185,7 +185,7 @@ func handleCustomConfigRead(app core.App, e *core.RequestEvent) error {
 	} else if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return e.InternalServerError(serverText(locale, "common.internalError"), err)
 	}
-	return e.JSON(http.StatusOK, customConfigResponse{Config: config})
+	return apiSuccessJSON(e, http.StatusOK, customConfigResponse{Config: config})
 }
 
 func handleCustomConfigUpdate(app core.App, e *core.RequestEvent) error {
@@ -214,7 +214,7 @@ func handleCustomConfigUpdate(app core.App, e *core.RequestEvent) error {
 	if err := app.Save(record); err != nil {
 		return e.BadRequestError(validationErrorMessage(locale, "common.invalidRequestBody", err), err)
 	}
-	return e.JSON(http.StatusOK, customConfigResponse{Config: body.Config})
+	return apiSuccessJSON(e, http.StatusOK, customConfigResponse{Config: body.Config})
 }
 
 func handleSubscriptionsList(app core.App, e *core.RequestEvent) error {
@@ -255,7 +255,7 @@ func handleSubscriptionsList(app core.App, e *core.RequestEvent) error {
 	if err != nil {
 		return e.InternalServerError(serverText(locale, "common.internalError"), err)
 	}
-	return e.JSON(http.StatusOK, subscriptionsListResponse{
+	return apiSuccessJSON(e, http.StatusOK, subscriptionsListResponse{
 		Subscriptions: subscriptions,
 		NextCursor:    nextCursor,
 		Total:         total,
@@ -280,7 +280,7 @@ func handleSubscriptionCreate(app core.App, e *core.RequestEvent) error {
 	if err := app.Save(record); err != nil {
 		return e.BadRequestError(validationErrorMessage(locale, "common.invalidRequestBody", err), err)
 	}
-	return e.JSON(http.StatusCreated, subscriptionResponse{Subscription: subscriptionAPIFromRecord(record)})
+	return apiSuccessJSON(e, http.StatusCreated, subscriptionResponse{Subscription: subscriptionAPIFromRecord(record)})
 }
 
 func handleSubscriptionUpdate(app core.App, e *core.RequestEvent) error {
@@ -302,7 +302,7 @@ func handleSubscriptionUpdate(app core.App, e *core.RequestEvent) error {
 	if err := app.Save(record); err != nil {
 		return e.BadRequestError(validationErrorMessage(locale, "common.invalidRequestBody", err), err)
 	}
-	return e.JSON(http.StatusOK, subscriptionResponse{Subscription: subscriptionAPIFromRecord(record)})
+	return apiSuccessJSON(e, http.StatusOK, subscriptionResponse{Subscription: subscriptionAPIFromRecord(record)})
 }
 
 func handleSubscriptionDelete(app core.App, e *core.RequestEvent) error {
@@ -313,7 +313,7 @@ func handleSubscriptionDelete(app core.App, e *core.RequestEvent) error {
 	if err := app.Delete(record); err != nil {
 		return e.BadRequestError(serverText(requestLocale(e.Request), "common.invalidRequestParameters"), err)
 	}
-	return e.JSON(http.StatusOK, newOKResponse())
+	return apiEmptySuccessJSON(e, http.StatusOK)
 }
 
 func handleAssetUpload(app core.App, e *core.RequestEvent) error {
@@ -344,7 +344,7 @@ func handleAssetUpload(app core.App, e *core.RequestEvent) error {
 	if err := app.Save(record); err != nil {
 		return e.BadRequestError(serverText(locale, "asset.invalidImageType"), err)
 	}
-	return e.JSON(http.StatusCreated, uploadAssetResponse{URL: "/api/app/assets/" + record.Id})
+	return apiSuccessJSON(e, http.StatusCreated, uploadAssetResponse{URL: "/api/app/assets/" + record.Id})
 }
 
 func handleAssetsList(app core.App, e *core.RequestEvent) error {
@@ -375,7 +375,7 @@ func handleAssetsList(app core.App, e *core.RequestEvent) error {
 	for _, record := range rows {
 		items = append(items, uploadedAssetItemFromRecord(record))
 	}
-	return e.JSON(http.StatusOK, uploadedAssetsPageResponse{
+	return apiSuccessJSON(e, http.StatusOK, uploadedAssetsPageResponse{
 		Items:      items,
 		Page:       page,
 		TotalPages: int((total + int64(perPage) - 1) / int64(perPage)),
@@ -406,7 +406,7 @@ func handleAssetDelete(app core.App, e *core.RequestEvent) error {
 	if err := app.Delete(record); err != nil {
 		return e.BadRequestError(serverText(locale, "common.invalidRequestParameters"), err)
 	}
-	return e.JSON(http.StatusOK, newOKResponse())
+	return apiEmptySuccessJSON(e, http.StatusOK)
 }
 
 func countAssetReferences(app core.App, userID string, assetID string) (assetInUseDetails, error) {

@@ -150,7 +150,7 @@ func handleAIModelsList(app core.App, e *core.RequestEvent) error {
 		}
 		return apiErrorJSON(e, http.StatusBadRequest, "AI_MODEL_LIST_FAILED", serverText(locale, "aiRecognition.modelListFailed"), aiModelListErrorDetails{RawResponseText: optionalUpstreamBody(err.Error())})
 	}
-	return e.JSON(http.StatusOK, response)
+	return apiSuccessJSON(e, http.StatusOK, response)
 }
 
 func listAIModels(ctx context.Context, input aiModelListRequest, locale appLocale) (aiModelListResponse, error) {

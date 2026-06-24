@@ -11,7 +11,7 @@ describe("cloudBackupService", () => {
     const requestedUrls: string[] = [];
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
       requestedUrls.push(input instanceof Request ? input.url : input.toString());
-      return new Response(JSON.stringify({ snapshots: [] }), {
+      return new Response(JSON.stringify({ ok: true, data: { snapshots: [] } }), {
         status: 200,
         headers: { "content-type": "application/json" },
       });

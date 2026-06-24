@@ -7,7 +7,7 @@
  *
  * PERF： 订阅量很大时，可把搜索字段预先标准化成索引，避免每次输入都遍历原始字符串。
  */
-import { useMemo, useState } from "react";
+import { useDeferredValue, useMemo, useState } from "react";
 import { DEFAULT_LOCALE, type Locale } from "@/i18n/locales";
 import { todayDateOnlyInTimeZone } from "@/lib/time/date-only";
 import type { Category, Subscription, SubscriptionStatus } from "@/types/subscription";
@@ -47,8 +47,13 @@ export function useSubscriptionFilters(
   const [renewalFilter, setRenewalFilter] = useState<SubscriptionRenewalFilter>("all");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [sortOption, setSortOption] = useState<SubscriptionSortOption>("default");
+  const deferredSearchQuery = useDeferredValue(searchQuery);
 
   const filters: SubscriptionFilterState = useMemo(
+    () => ({ searchQuery: deferredSearchQuery, selectedCategories, statusFilter, renewalFilter, selectedTags }),
+    [deferredSearchQuery, renewalFilter, selectedCategories, selectedTags, statusFilter],
+  );
+  const activeControlFilters: SubscriptionFilterState = useMemo(
     () => ({ searchQuery, selectedCategories, statusFilter, renewalFilter, selectedTags }),
     [renewalFilter, searchQuery, selectedCategories, selectedTags, statusFilter],
   );
@@ -62,8 +67,9 @@ export function useSubscriptionFilters(
     () => sortSubscriptions(filteredSubscriptions, { sortOption, defaultCurrency, convert, locale }),
     [convert, defaultCurrency, filteredSubscriptions, locale, sortOption],
   );
-  const hasActiveFilters = hasActiveSubscriptionFilters(filters);
-  const hasActiveControls = hasActiveSubscriptionControls(filters, sortOption);
+  // 搜索输入立即响应，列表筛选延后到 deferred query，避免大列表每个键入帧都重排虚拟行。
+  const hasActiveFilters = hasActiveSubscriptionFilters(activeControlFilters);
+  const hasActiveControls = hasActiveSubscriptionControls(activeControlFilters, sortOption);
 
   const toggleTag = (tag: string) => {
     setSelectedTags((prev) =>

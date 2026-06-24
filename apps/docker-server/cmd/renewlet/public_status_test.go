@@ -3,7 +3,6 @@ package main
 // 公开展示页测试保护公开 token 生命周期、最小字段投影和私有资产代理，防止 Go 后端与 Worker 行为分叉。
 
 import (
-	"encoding/json"
 	"net/http"
 	"net/url"
 	"strings"
@@ -89,10 +88,7 @@ func TestPublicStatusPageLifecycleAndPublicRoute(t *testing.T) {
 	if createRes.Code != http.StatusOK {
 		t.Fatalf("expected public status create 200, got %d: %s", createRes.Code, createRes.Body.String())
 	}
-	var createBody publicStatusPageCreateResponse
-	if err := json.Unmarshal(createRes.Body.Bytes(), &createBody); err != nil {
-		t.Fatal(err)
-	}
+	createBody := decodeAPISuccessDataForTest[publicStatusPageCreateResponse](t, createRes.Body.Bytes())
 	if !createBody.PublicStatusPage.Enabled || createBody.PublicStatusPage.PageURL == "" || createBody.PublicStatusPage.ShowPrices {
 		t.Fatalf("unexpected create response: %#v", createBody.PublicStatusPage)
 	}
@@ -106,10 +102,7 @@ func TestPublicStatusPageLifecycleAndPublicRoute(t *testing.T) {
 	if publicRes.Header().Get("Cache-Control") != "no-store" || publicRes.Header().Get("X-Robots-Tag") != "noindex, nofollow" {
 		t.Fatalf("expected no-store/noindex headers, got %#v", publicRes.Header())
 	}
-	var publicBody map[string]any
-	if err := json.Unmarshal(publicRes.Body.Bytes(), &publicBody); err != nil {
-		t.Fatal(err)
-	}
+	publicBody := decodeAPISuccessDataForTest[map[string]any](t, publicRes.Body.Bytes())
 	subscriptions := publicBody["subscriptions"].([]any)
 	if len(subscriptions) != 3 {
 		t.Fatalf("expected exactly three visible subscriptions, got %#v", subscriptions)
@@ -145,10 +138,7 @@ func TestPublicStatusPageLifecycleAndPublicRoute(t *testing.T) {
 	if !strings.Contains(pricedRes.Body.String(), `"price":12`) || !strings.Contains(pricedRes.Body.String(), `"currency":"USD"`) {
 		t.Fatalf("expected showPrices to expose amount fields, got %s", pricedRes.Body.String())
 	}
-	var pricedBody map[string]any
-	if err := json.Unmarshal(pricedRes.Body.Bytes(), &pricedBody); err != nil {
-		t.Fatal(err)
-	}
+	pricedBody := decodeAPISuccessDataForTest[map[string]any](t, pricedRes.Body.Bytes())
 	if page, ok := pricedBody["page"].(map[string]any); !ok || page["currency"] != "USD" {
 		t.Fatalf("expected explicit public status currency, got %#v", pricedBody["page"])
 	}
@@ -198,10 +188,7 @@ func createPublicStatusTestAsset(t *testing.T, app core.App, token string, filen
 	if res.Code != http.StatusCreated {
 		t.Fatalf("expected SVG asset create 201, got %d: %s", res.Code, res.Body.String())
 	}
-	var body uploadAssetResponse
-	if err := json.Unmarshal(res.Body.Bytes(), &body); err != nil {
-		t.Fatal(err)
-	}
+	body := decodeAPISuccessDataForTest[uploadAssetResponse](t, res.Body.Bytes())
 	if !strings.HasPrefix(body.URL, "/api/app/assets/") {
 		t.Fatalf("expected uploaded asset URL, got %s", res.Body.String())
 	}

@@ -3,7 +3,6 @@ package main
 // 外部 cron route 测试保护 CRON_SECRET Bearer 边界；dryRun 不能落库，且该入口不依赖登录态。
 
 import (
-	"encoding/json"
 	"net/http"
 	"strings"
 	"testing"
@@ -85,11 +84,8 @@ func TestNotificationCronRouteRunsDryRunWithoutCreatingJobs(t *testing.T) {
 	if res.Code != http.StatusOK {
 		t.Fatalf("expected cron dry run 200, got %d: %s", res.Code, res.Body.String())
 	}
-	var body notificationCronResult
-	if err := json.Unmarshal(res.Body.Bytes(), &body); err != nil {
-		t.Fatal(err)
-	}
-	if !body.OK || !body.DryRun || !body.Force || body.Processed != 1 || body.Sent != 1 {
+	body := decodeAPISuccessDataForTest[notificationCronResult](t, res.Body.Bytes())
+	if !body.DryRun || !body.Force || body.Processed != 1 || body.Sent != 1 {
 		t.Fatalf("unexpected cron dry run response: %#v", body)
 	}
 	jobs, err := app.FindAllRecords("notification_jobs")

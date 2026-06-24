@@ -151,7 +151,7 @@ func handleCloudBackupConfigRead(app core.App, e *core.RequestEvent) error {
 	if err != nil {
 		return e.InternalServerError(serverText(requestLocale(e.Request), "common.internalError"), err)
 	}
-	return e.JSON(http.StatusOK, cloudBackupConfigResponse{Config: config.DTO()})
+	return apiSuccessJSON(e, http.StatusOK, cloudBackupConfigResponse{Config: config.DTO()})
 }
 
 func handleCloudBackupConfigUpdate(app core.App, e *core.RequestEvent) error {
@@ -170,7 +170,7 @@ func handleCloudBackupConfigUpdate(app core.App, e *core.RequestEvent) error {
 	if err != nil {
 		return e.BadRequestError(serverText(locale, "cloudBackup.saveFailed"), err)
 	}
-	return e.JSON(http.StatusOK, cloudBackupConfigResponse{Config: config.DTO()})
+	return apiSuccessJSON(e, http.StatusOK, cloudBackupConfigResponse{Config: config.DTO()})
 }
 
 func handleCloudBackupTest(app core.App, e *core.RequestEvent) error {
@@ -196,8 +196,7 @@ func handleCloudBackupTest(app core.App, e *core.RequestEvent) error {
 	if err := client.Test(ctx); err != nil {
 		return cloudBackupOperationError(e, locale, "cloudBackup.testFailed", "CLOUD_BACKUP_TEST_FAILED", err)
 	}
-	return e.JSON(http.StatusOK, cloudBackupTestResponse{
-		OK:        true,
+	return apiSuccessJSON(e, http.StatusOK, cloudBackupTestResponse{
 		CheckedAt: time.Now().UTC().Format(time.RFC3339Nano),
 	})
 }
@@ -225,7 +224,7 @@ func handleCloudBackupsList(app core.App, e *core.RequestEvent) error {
 	sort.Slice(snapshots, func(i, j int) bool {
 		return snapshots[i].CreatedAt > snapshots[j].CreatedAt
 	})
-	return e.JSON(http.StatusOK, cloudBackupSnapshotsResponse{Snapshots: snapshots})
+	return apiSuccessJSON(e, http.StatusOK, cloudBackupSnapshotsResponse{Snapshots: snapshots})
 }
 
 func handleCloudBackupsCreate(app core.App, e *core.RequestEvent) error {
@@ -242,7 +241,7 @@ func handleCloudBackupsCreate(app core.App, e *core.RequestEvent) error {
 		markCloudBackupStatus(app, e.Auth.Id, body.Provider, cloudBackupStatusFailed, persistedCloudBackupErrorMessage(err))
 		return cloudBackupOperationError(e, locale, "cloudBackup.createFailed", "CLOUD_BACKUP_CREATE_FAILED", err)
 	}
-	return e.JSON(http.StatusCreated, cloudBackupCreateSnapshotResponse{Snapshots: snapshots})
+	return apiSuccessJSON(e, http.StatusCreated, cloudBackupCreateSnapshotResponse{Snapshots: snapshots})
 }
 
 func handleCloudBackupsDownload(app core.App, e *core.RequestEvent) error {
@@ -314,7 +313,7 @@ func handleCloudBackupsDelete(app core.App, e *core.RequestEvent) error {
 		}
 		return cloudBackupOperationError(e, locale, messageKey, "CLOUD_BACKUP_DELETE_FAILED", err)
 	}
-	return e.JSON(http.StatusOK, cloudBackupDeleteSnapshotResponse{OK: true})
+	return apiEmptySuccessJSON(e, http.StatusOK)
 }
 
 func configuredCloudBackupTargets(app core.App, userID string) (cloudBackupResolvedConfig, []cloudBackupTarget, error) {

@@ -4,12 +4,29 @@ package main
 
 import (
 	"encoding/json"
+	"maps"
 	"sort"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 )
+
+func TestNotificationSenderRegistryMatchesKnownChannels(t *testing.T) {
+	known := make([]string, 0, len(knownChannels))
+	for channel := range maps.Keys(knownChannels) {
+		known = append(known, channel)
+	}
+	registered := make([]string, 0, len(notificationSenders))
+	for channel := range maps.Keys(notificationSenders) {
+		registered = append(registered, channel)
+	}
+	sort.Strings(known)
+	sort.Strings(registered)
+	if strings.Join(registered, ",") != strings.Join(known, ",") {
+		t.Fatalf("notification sender registry mismatch: registered=%v known=%v", registered, known)
+	}
+}
 
 func TestBuildDueNotificationForLocalDate(t *testing.T) {
 	settings := defaultAppSettings()

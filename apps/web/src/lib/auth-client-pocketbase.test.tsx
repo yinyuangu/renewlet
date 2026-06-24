@@ -62,7 +62,7 @@ function createWrapper() {
 }
 
 function sessionResponse(session: SessionData) {
-  return new Response(JSON.stringify(session), { status: 200 });
+  return new Response(JSON.stringify({ ok: true, data: session }), { status: 200 });
 }
 
 describe("authClient in PocketBase runtime", () => {
@@ -112,10 +112,13 @@ describe("authClient in PocketBase runtime", () => {
 
   it("keeps MFA tickets in memory by not writing mfa_required responses to product session storage", async () => {
     mocks.fetch.mockResolvedValue(new Response(JSON.stringify({
-      type: "mfa_required",
-      ticketId: "ticket-1",
-      expiresAt: "2026-06-03T00:05:00.000Z",
-      methods: ["totp", "recovery_code"],
+      ok: true,
+      data: {
+        type: "mfa_required",
+        ticketId: "ticket-1",
+        expiresAt: "2026-06-03T00:05:00.000Z",
+        methods: ["totp", "recovery_code"],
+      },
     }), { status: 200 }));
     const { authClient } = await import("./auth-client");
 
@@ -141,7 +144,7 @@ describe("authClient in PocketBase runtime", () => {
 
   it("logs out through the product API and clears product session storage", async () => {
     writeProductSession(sessionFixture);
-    mocks.fetch.mockResolvedValue(new Response("{}", { status: 200 }));
+    mocks.fetch.mockResolvedValue(new Response(JSON.stringify({ ok: true, data: {} }), { status: 200 }));
     const { authClient } = await import("./auth-client");
 
     await authClient.signOut();

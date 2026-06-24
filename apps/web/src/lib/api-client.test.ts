@@ -43,6 +43,10 @@ function errorResponseBody(code: string, message: string, details?: unknown): st
   });
 }
 
+function successResponseBody(data: Record<string, never> = {}): string {
+  return JSON.stringify({ ok: true, data });
+}
+
 describe("api-client", () => {
   beforeEach(() => {
     vi.stubGlobal("fetch", vi.fn());
@@ -57,9 +61,9 @@ describe("api-client", () => {
 
   it("parses successful JSON responses without content-type on bodyless GET requests", async () => {
     const fetchMock = vi.mocked(fetch);
-    fetchMock.mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+    fetchMock.mockResolvedValue(new Response(successResponseBody(), { status: 200 }));
 
-    await expect(apiFetch("/api/example", okResponseSchema)).resolves.toEqual({ ok: true });
+    await expect(apiFetch("/api/example", okResponseSchema)).resolves.toEqual({});
 
     expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/example");
     const init = fetchMock.mock.calls[0]?.[1] as RequestInit;
@@ -72,7 +76,7 @@ describe("api-client", () => {
 
   it("sends JSON content-type when a non-FormData body is present", async () => {
     const fetchMock = vi.mocked(fetch);
-    fetchMock.mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+    fetchMock.mockResolvedValue(new Response(successResponseBody(), { status: 200 }));
 
     await apiFetch("/api/example", okResponseSchema, {
       method: "POST",
@@ -85,7 +89,7 @@ describe("api-client", () => {
 
   it("does not set content-type for FormData bodies", async () => {
     const fetchMock = vi.mocked(fetch);
-    fetchMock.mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+    fetchMock.mockResolvedValue(new Response(successResponseBody(), { status: 200 }));
     const form = new FormData();
     form.append("file", new Blob(["x"], { type: "image/png" }), "logo.png");
 
@@ -100,11 +104,22 @@ describe("api-client", () => {
 
   it("does not rewrite legacy API paths", async () => {
     const fetchMock = vi.mocked(fetch);
-    fetchMock.mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+    fetchMock.mockResolvedValue(new Response(successResponseBody(), { status: 200 }));
 
     await apiFetch("/api/setup", okResponseSchema);
 
     expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/setup");
+  });
+
+  it("rejects old bare success responses", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+
+    await expect(apiFetch("/api/example", okResponseSchema)).rejects.toMatchObject({
+      name: "ApiError",
+      status: 200,
+      code: "invalid_response",
+    });
   });
 
   it("throws ApiError with backend message and status on non-2xx responses", async () => {

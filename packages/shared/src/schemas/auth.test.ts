@@ -17,83 +17,86 @@ import {
   passkeyWebAuthnOptionsResponseSchema,
 } from "./auth";
 
+const success = <T>(data: T) => ({ ok: true, data });
+
 describe("auth schemas", () => {
   it("accepts direct session login responses", () => {
-    const parsed = loginResponseSchema.parse({
+    const parsed = loginResponseSchema.parse(success({
       type: "session",
       session: { id: "session-token", expiresAt: "2026-07-01T00:00:00.000Z" },
       user: { id: "usr_1", email: "admin@example.com", name: "Admin", role: "admin", banned: false },
-    });
+    })).data;
 
     expect(parsed.type).toBe("session");
   });
 
   it("accepts MFA-required login responses with authenticator methods only", () => {
-    const parsed = loginResponseSchema.parse({
+    const parsed = loginResponseSchema.parse(success({
       type: "mfa_required",
       ticketId: "ticket-token",
       expiresAt: "2026-07-01T00:00:00.000Z",
       methods: ["totp", "recovery_code"],
-    });
+    })).data;
 
     expect(parsed.type).toBe("mfa_required");
     if (parsed.type !== "mfa_required") {
       throw new Error("expected MFA-required login response");
     }
     expect(parsed.methods).toEqual(["totp", "recovery_code"]);
-    expect(loginResponseSchema.safeParse({
+    expect(loginResponseSchema.safeParse(success({
       type: "mfa_required",
       ticketId: "ticket-token",
       expiresAt: "2026-07-01T00:00:00.000Z",
       methods: ["passkey"],
-    }).success).toBe(false);
+    })).success).toBe(false);
   });
 
   it("rejects unknown login response variants", () => {
     expect(loginResponseSchema.safeParse({ type: "password_ok" }).success).toBe(false);
+    expect(loginResponseSchema.safeParse(success({ type: "password_ok" })).success).toBe(false);
   });
 
   it("parses MFA setup, status and WebAuthn management payloads", () => {
-    expect(mfaStatusResponseSchema.parse({
+    expect(mfaStatusResponseSchema.parse(success({
       enabled: true,
       methods: ["totp", "recovery_code"],
       recoveryCodesRemaining: 9,
       passkeyCount: 1,
-    }).passkeyCount).toBe(1);
-    expect(mfaStatusResponseSchema.safeParse({
+    })).data.passkeyCount).toBe(1);
+    expect(mfaStatusResponseSchema.safeParse(success({
       enabled: true,
       methods: ["passkey"],
       recoveryCodesRemaining: 0,
       passkeyCount: 1,
-    }).success).toBe(false);
-    expect(mfaTotpSetupResponseSchema.parse({
+    })).success).toBe(false);
+    expect(mfaTotpSetupResponseSchema.parse(success({
       setupId: "setup-token",
       secret: "BASE32SECRET",
       otpauthUrl: "otpauth://totp/Renewlet:admin@example.com",
       expiresAt: "2026-07-01T00:00:00.000Z",
-    }).setupId).toBe("setup-token");
+    })).data.setupId).toBe("setup-token");
     expect(mfaTotpEnableBodySchema.parse({
       setupId: "setup-token",
       code: "123456",
       currentPassword: "password123",
     }).code).toBe("123456");
-    expect(mfaRecoveryCodesResponseSchema.parse({
+    expect(mfaRecoveryCodesResponseSchema.parse(success({
       type: "session",
       session: { id: "renewed-session", expiresAt: "2026-07-01T00:00:00.000Z" },
       user: { id: "usr_1", email: "admin@example.com", name: "Admin", role: "admin", banned: false },
       recoveryCodes: ["ABCD-EFGH-IJKL"],
-    }).recoveryCodes).toHaveLength(1);
-    expect(mfaRecoveryCodesResponseSchema.safeParse({
+    })).data.recoveryCodes).toHaveLength(1);
+    expect(mfaRecoveryCodesResponseSchema.safeParse(success({
       recoveryCodes: ["ABCD-EFGH-IJKL"],
-    }).success).toBe(false);
-    expect(passkeysResponseSchema.parse({
+    })).success).toBe(false);
+    expect(passkeysResponseSchema.parse(success({
       passkeys: [{ id: "pkey_1", name: "MacBook Touch ID", createdAt: "2026-07-01T00:00:00.000Z" }],
-    }).passkeys).toHaveLength(1);
-    expect(passkeyWebAuthnOptionsResponseSchema.parse({
+    })).data.passkeys).toHaveLength(1);
+    expect(passkeyWebAuthnOptionsResponseSchema.parse(success({
       challengeId: "challenge-token",
       expiresAt: "2026-07-01T00:00:00.000Z",
       options: { challenge: "abc" },
-    }).challengeId).toBe("challenge-token");
+    })).data.challengeId).toBe("challenge-token");
   });
 
   it("parses MFA verify and passkey lifecycle requests", () => {
@@ -113,7 +116,8 @@ describe("auth schemas", () => {
   });
 
   it("keeps admin reset MFA as an ok-only response", () => {
-    expect(adminResetUserMfaResponseSchema.parse({ ok: true })).toEqual({ ok: true });
-    expect(adminResetUserPasskeysResponseSchema.parse({ ok: true })).toEqual({ ok: true });
+    expect(adminResetUserMfaResponseSchema.parse(success({}))).toEqual(success({}));
+    expect(adminResetUserPasskeysResponseSchema.parse(success({}))).toEqual(success({}));
+    expect(adminResetUserMfaResponseSchema.safeParse({ ok: true }).success).toBe(false);
   });
 });

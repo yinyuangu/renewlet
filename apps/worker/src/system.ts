@@ -3,11 +3,11 @@
  *
  * Worker 不能执行 Docker 式下载、替换二进制或重启；这里仍检查 GitHub Release，让前端能提示用户同步部署。
  */
-import { systemVersionResponseSchema } from "@renewlet/shared/schemas/app";
+import { systemVersionPayloadSchema } from "@renewlet/shared/schemas/app";
 import { XMLParser } from "fast-xml-parser";
 import rootPackageJson from "../../../package.json";
 import { requireAdmin, requireAuth } from "./auth";
-import { HttpError, json, requestLocale } from "./http";
+import { HttpError, requestLocale, successJson } from "./http";
 import { serverText } from "./server-i18n";
 import type { Env } from "./types";
 import {
@@ -91,7 +91,7 @@ export async function systemVersion(request: Request, env: Env): Promise<Respons
   const version = resolveCloudflareVersion(env.RENEWLET_VERSION);
   const releaseCheck = await checkLatestStableRelease(version, locale, env);
   const isAdmin = auth.user.role === "admin";
-  return json(systemVersionResponseSchema.parse({
+  return successJson(systemVersionPayloadSchema.parse({
     currentVersion: version,
     latestVersion: releaseCheck.latestVersion,
     hasUpdate: releaseCheck.hasUpdate,

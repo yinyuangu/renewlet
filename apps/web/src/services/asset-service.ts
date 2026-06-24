@@ -2,7 +2,7 @@ import { apiFetch } from "@/lib/api-client";
 import { okResponseSchema } from "@/lib/api/schemas/common";
 import {
   uploadImageResponseSchema,
-  uploadedAssetsPageSchema,
+  uploadedAssetsPageResponseSchema,
   type ApiUploadImageResponse,
   type UploadedAsset,
   type UploadedAssetsPage,
@@ -60,7 +60,7 @@ export const assetService = {
    */
   async listLogos(page: number): Promise<UploadedAssetsPage> {
     const params = new URLSearchParams({ kind: "logo", page: String(page), perPage: String(UPLOADED_LOGOS_PAGE_SIZE) });
-    return await apiFetch(`/api/app/assets?${params.toString()}`, uploadedAssetsPageSchema);
+    return await apiFetch(`/api/app/assets?${params.toString()}`, uploadedAssetsPageResponseSchema);
   },
 
   /**
@@ -68,7 +68,7 @@ export const assetService = {
    */
   async list(kind: UploadKind, page: number): Promise<UploadedAssetsPage> {
     const params = new URLSearchParams({ kind, page: String(page), perPage: String(UPLOADED_ASSETS_PAGE_SIZE) });
-    return await apiFetch(`/api/app/assets?${params.toString()}`, uploadedAssetsPageSchema);
+    return await apiFetch(`/api/app/assets?${params.toString()}`, uploadedAssetsPageResponseSchema);
   },
 
   /**

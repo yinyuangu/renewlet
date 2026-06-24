@@ -218,7 +218,6 @@ type notificationCronUserResult struct {
 }
 
 type notificationCronResult struct {
-	OK        bool                         `json:"ok"`
 	NowUTC    string                       `json:"nowUtc"`
 	Force     bool                         `json:"force"`
 	DryRun    bool                         `json:"dryRun"`
@@ -261,13 +260,11 @@ func (r *notificationRunRequest) Validate(locale appLocale) error {
 }
 
 type notificationRunSkippedResponse struct {
-	OK     bool   `json:"ok"`
 	Sent   bool   `json:"sent"`
 	Reason string `json:"reason"`
 }
 
 type notificationRunSentResponse struct {
-	OK      bool        `json:"ok"`
 	Sent    bool        `json:"sent"`
 	Summary sendSummary `json:"summary"`
 }

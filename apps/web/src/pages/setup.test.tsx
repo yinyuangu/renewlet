@@ -80,7 +80,7 @@ describe("Setup page", () => {
   });
 
   it("submits the display name together with the login email", async () => {
-    mocks.apiFetch.mockResolvedValue({ ok: true });
+    mocks.apiFetch.mockResolvedValue({});
     const user = userEvent.setup();
     renderSetup();
 

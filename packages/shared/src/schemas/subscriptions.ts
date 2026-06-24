@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { COST_SHARING_SPLIT_MODES, costSharingCustomAmountsAreValid } from "../cost-sharing";
+import { apiSuccessResponseSchema } from "./api";
+import { okResponseSchema } from "./common";
 import {
   BILLING_CYCLES,
   CUSTOM_CYCLE_UNITS,
@@ -245,19 +247,22 @@ export const subscriptionsListQuerySchema = z.object({
   cursor: z.string().trim().min(1).max(512).optional(),
 }).strict();
 
-export const subscriptionsListResponseSchema = z.object({
+export const subscriptionsListPayloadSchema = z.object({
   subscriptions: z.array(apiSubscriptionSchema),
   nextCursor: z.string().nullable(),
   total: z.number().int().nonnegative().optional(),
 }).strict();
+export const subscriptionsListResponseSchema = apiSuccessResponseSchema(subscriptionsListPayloadSchema);
 
-export const subscriptionResponseSchema = z.object({
+export const subscriptionPayloadSchema = z.object({
   subscription: apiSubscriptionSchema,
 }).strict();
+export const subscriptionResponseSchema = apiSuccessResponseSchema(subscriptionPayloadSchema);
 
-export const subscriptionDeleteResponseSchema = z.object({
-  ok: z.literal(true),
-}).strict();
+export const subscriptionDeleteResponseSchema = okResponseSchema;
+
+export type SubscriptionsListResponse = z.infer<typeof subscriptionsListPayloadSchema>;
+export type SubscriptionResponse = z.infer<typeof subscriptionPayloadSchema>;
 
 export type ApiSubscription = z.infer<typeof apiSubscriptionSchema> & {
   billingCycle: BillingCycle;

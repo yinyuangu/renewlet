@@ -85,7 +85,6 @@ type importPreviewResponse struct {
 }
 
 type importApplyResponse struct {
-	OK bool `json:"ok"`
 	importPreviewResponse
 }
 
@@ -140,7 +139,7 @@ func handleImportPreview(app core.App, e *core.RequestEvent) error {
 	if err != nil {
 		return e.BadRequestError(serverText(locale, "import.invalid"), err)
 	}
-	return e.JSON(http.StatusOK, response)
+	return apiSuccessJSON(e, http.StatusOK, response)
 }
 
 func handleImportApply(app core.App, e *core.RequestEvent) error {
@@ -160,7 +159,7 @@ func handleImportApply(app core.App, e *core.RequestEvent) error {
 	if err := applyImportPayload(app, e.Auth, body.Payload, body.ConflictMode, body.SkipIndexes); err != nil {
 		return e.BadRequestError(serverText(locale, "import.applyFailed"), err)
 	}
-	return e.JSON(http.StatusOK, importApplyResponse{OK: true, importPreviewResponse: preview})
+	return apiSuccessJSON(e, http.StatusOK, importApplyResponse{importPreviewResponse: preview})
 }
 
 func validateImportPayload(payload importPayload, conflictMode string, skipIndexes []int, maxSubscriptions int, _ appLocale) error {

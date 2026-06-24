@@ -5,7 +5,7 @@
  */
 import {
   AI_RECOGNITION_MAX_SUBSCRIPTIONS,
-  aiRecognizeResponseSchema,
+  aiRecognizePayloadSchema,
   type AiGeneratedRecognizeObject,
   type AiGeneratedSubscriptionDraft,
   type AiRecognizedSubscriptionDraft,
@@ -55,7 +55,7 @@ export function normalizeGeneratedAIRecognizeObject(
       warnings.push("AI_WARNING_EMPTY_SUBSCRIPTION_SKIPPED");
     }
   }
-  return aiRecognizeResponseSchema.parse({
+  return aiRecognizePayloadSchema.parse({
     providerType,
     transportProtocol,
     model,
@@ -130,7 +130,7 @@ export function fillMissingNotesWithDynamicFallback(
       warnings: compactAIWarnings(draft.warnings.filter((warning) => warning !== "AI_WARNING_NOTES_MISSING"), 12),
     };
   });
-  return aiRecognizeResponseSchema.parse({ ...response, subscriptions });
+  return aiRecognizePayloadSchema.parse({ ...response, subscriptions });
 }
 
 function buildDynamicFallbackNote(

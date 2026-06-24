@@ -9,11 +9,11 @@ import {
 } from "@renewlet/shared/media-resolver";
 import { mediaResolverConfig } from "@renewlet/shared/media-resolver-config";
 import {
+  mediaCandidateResolvePayloadSchema,
   mediaCandidateResolveRequestSchema,
-  mediaCandidateResolveResponseSchema,
 } from "@renewlet/shared/schemas/media";
 import { getSettings } from "./db";
-import { json, privateShortCache, readJson, requestLocale } from "./http";
+import { errorResponse, privateShortCache, readJson, requestLocale, successJson } from "./http";
 import { serverText } from "./server-i18n";
 import { requireAuth } from "./auth";
 import { getActiveBuiltInMediaResolver } from "./media-icon-index";
@@ -27,10 +27,9 @@ export async function mediaCandidates(request: Request, env: Env): Promise<Respo
   const locale = requestLocale(request);
   const retryAfter = checkMediaCandidateRateLimit(auth.user.id, request);
   if (retryAfter > 0) {
-    return json({
-      code: "RATE_LIMITED",
-      message: serverText(locale, "rateLimit.tooManyRequests"),
-    }, { status: 429, headers: { "retry-after": String(retryAfter) } });
+    const response = errorResponse(429, serverText(locale, "rateLimit.tooManyRequests"), "RATE_LIMITED");
+    response.headers.set("retry-after", String(retryAfter));
+    return response;
   }
   const body = await readJson(request, mediaCandidateResolveRequestSchema, locale);
   const settings = await getSettings(env, auth.user.id);
@@ -45,7 +44,7 @@ export async function mediaCandidates(request: Request, env: Env): Promise<Respo
     { sources: settings.builtInIconSources },
   ));
   // Worker 只做运行面边界；候选生成和来源过滤规则在 shared resolver 中，响应再经 Zod 校验防止两端契约漂移。
-  return privateShortCache(json(mediaCandidateResolveResponseSchema.parse({ items })));
+  return privateShortCache(successJson(mediaCandidateResolvePayloadSchema.parse({ items })));
 }
 
 function checkMediaCandidateRateLimit(userId: string, request: Request): number {

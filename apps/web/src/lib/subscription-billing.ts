@@ -13,9 +13,20 @@ import { localizedLabel, type Locale } from "@/i18n/locales";
 import { translate } from "@/i18n/messages";
 import { CYCLE_LABELS } from "@/types/subscription";
 import {
-  addBillingCycles,
   calculateNextBillingDate as calculateSharedNextBillingDate,
-} from "@renewlet/shared/subscription-renewal";
+  calculateOneTimeTermEndDate as calculateSharedOneTimeTermEndDate,
+  isOneTimeBuyout,
+  isOneTimeFixedTerm,
+  toMonthlyAmount,
+  toSubscriptionMonthlyAmount,
+} from "@renewlet/shared/subscription-billing";
+
+export {
+  isOneTimeBuyout,
+  isOneTimeFixedTerm,
+  toMonthlyAmount,
+  toSubscriptionMonthlyAmount,
+};
 
 /**
  * 根据开始日期 + 周期计算“下一次扣费日期”。
@@ -40,72 +51,12 @@ export function calculateNextBillingDate(
   return calculateSharedNextBillingDate(startDate, cycle, customDays, referenceDate, customCycleUnit) as DateOnly;
 }
 
-/**
- * 将“单次扣费金额”折算为“月度金额”（不含汇率换算）。
- *
- * 说明：
- * - 该函数只做周期折算，不关心货币；如果需要统一口径，请先做汇率换算再折算（月度是线性变换，顺序无关）
- * - 目前项目里多个页面（仪表盘/统计/饼图）都需要这套折算规则，集中到这里便于统一维护
- *
- * 注意： weekly 使用 4.33 是产品口径近似值，不等同于精确自然月账单。
- */
-export function toMonthlyAmount(
-  amount: number,
-  cycle: BillingCycle,
-  customDays?: number,
-  customCycleUnit: CustomCycleUnit = "day",
-  oneTimeTermCount?: number,
-  oneTimeTermUnit: CustomCycleUnit = "day",
-): number {
-  switch (cycle) {
-    case "weekly":
-      return amount * 4.33;
-    case "monthly":
-      return amount;
-    case "quarterly":
-      return amount / 3;
-    case "semi-annual":
-      return amount / 6;
-    case "annual":
-      return amount / 12;
-    case "custom":
-      return customDays ? customCycleToMonthlyAmount(amount, customDays, customCycleUnit) : amount;
-    case "one-time":
-      // one-time 无服务期是买断，不进入月均；有服务期时 price 表示整段预付权益总价。
-      return oneTimeTermCount ? customCycleToMonthlyAmount(amount, oneTimeTermCount, oneTimeTermUnit) : 0;
-    default:
-      return amount;
-  }
-}
-
-function customCycleToMonthlyAmount(amount: number, count: number, unit: CustomCycleUnit): number {
-  switch (unit) {
-    case "week":
-      return (amount / count) * 4.33;
-    case "month":
-      return amount / count;
-    case "year":
-      return amount / count / 12;
-    case "day":
-    default:
-      return (amount / count) * 30;
-  }
-}
-
-export function isOneTimeFixedTerm(subscription: Pick<Subscription, "billingCycle" | "oneTimeTermCount" | "oneTimeTermUnit">): boolean {
-  return subscription.billingCycle === "one-time" && Boolean(subscription.oneTimeTermCount && subscription.oneTimeTermUnit);
-}
-
-export function isOneTimeBuyout(subscription: Pick<Subscription, "billingCycle" | "oneTimeTermCount" | "oneTimeTermUnit">): boolean {
-  return subscription.billingCycle === "one-time" && !isOneTimeFixedTerm(subscription);
-}
-
 export function calculateOneTimeTermEndDate(
   startDate: DateOnly,
   count: number,
   unit: CustomCycleUnit,
 ): DateOnly {
-  return addBillingCycles(startDate, "custom", 1, count, unit) as DateOnly;
+  return calculateSharedOneTimeTermEndDate(startDate, count, unit) as DateOnly;
 }
 
 export function customCycleUnitLabelKey(unit: CustomCycleUnit): `subscription.customCycleUnit.${CustomCycleUnit}` {

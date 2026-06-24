@@ -93,7 +93,7 @@ func handleCalendarFeedStatus(app core.App, e *core.RequestEvent) error {
 	if err != nil {
 		return e.InternalServerError(serverText(requestLocale(e.Request), "calendarFeed.loadFailed"), err)
 	}
-	return e.JSON(http.StatusOK, calendarFeedStatusResponse{CalendarFeed: calendarFeedStatusFromRecord(e.Request, record)})
+	return apiSuccessJSON(e, http.StatusOK, calendarFeedStatusResponse{CalendarFeed: calendarFeedStatusFromRecord(e.Request, record)})
 }
 
 func handleCalendarFeedCreate(app core.App, e *core.RequestEvent) error {
@@ -105,7 +105,7 @@ func handleCalendarFeedCreate(app core.App, e *core.RequestEvent) error {
 	if err != nil {
 		return e.InternalServerError(serverText(locale, "calendarFeed.createFailed"), err)
 	}
-	return e.JSON(http.StatusOK, calendarFeedCreateResponse{CalendarFeed: calendarFeedCreateStatus{
+	return apiSuccessJSON(e, http.StatusOK, calendarFeedCreateResponse{CalendarFeed: calendarFeedCreateStatus{
 		Enabled:   true,
 		CreatedAt: record.GetDateTime("created").Time().UTC().Format(time.RFC3339),
 		UpdatedAt: record.GetDateTime("updated").Time().UTC().Format(time.RFC3339),
@@ -123,7 +123,7 @@ func handleCalendarFeedDelete(app core.App, e *core.RequestEvent) error {
 			return e.InternalServerError(serverText(requestLocale(e.Request), "calendarFeed.revokeFailed"), err)
 		}
 	}
-	return e.JSON(http.StatusOK, newOKResponse())
+	return apiEmptySuccessJSON(e, http.StatusOK)
 }
 
 func handleSubscriptionCalendarFeedStatus(app core.App, e *core.RequestEvent) error {
@@ -137,7 +137,7 @@ func handleSubscriptionCalendarFeedStatus(app core.App, e *core.RequestEvent) er
 	if err != nil {
 		return e.InternalServerError(serverText(locale, "calendarFeed.loadFailed"), err)
 	}
-	return e.JSON(http.StatusOK, calendarFeedStatusResponse{CalendarFeed: calendarFeedStatusFromRecord(e.Request, record)})
+	return apiSuccessJSON(e, http.StatusOK, calendarFeedStatusResponse{CalendarFeed: calendarFeedStatusFromRecord(e.Request, record)})
 }
 
 func handleSubscriptionCalendarFeedCreate(app core.App, e *core.RequestEvent) error {
@@ -154,7 +154,7 @@ func handleSubscriptionCalendarFeedCreate(app core.App, e *core.RequestEvent) er
 	if err != nil {
 		return e.InternalServerError(serverText(locale, "calendarFeed.createFailed"), err)
 	}
-	return e.JSON(http.StatusOK, calendarFeedCreateResponse{CalendarFeed: calendarFeedCreateStatus{
+	return apiSuccessJSON(e, http.StatusOK, calendarFeedCreateResponse{CalendarFeed: calendarFeedCreateStatus{
 		Enabled:   true,
 		CreatedAt: record.GetDateTime("created").Time().UTC().Format(time.RFC3339),
 		UpdatedAt: record.GetDateTime("updated").Time().UTC().Format(time.RFC3339),
@@ -171,7 +171,7 @@ func handleSubscriptionCalendarFeedDelete(app core.App, e *core.RequestEvent) er
 	if err := deleteSubscriptionCalendarFeeds(app, e.Auth.Id, subscriptionID); err != nil {
 		return e.InternalServerError(serverText(locale, "calendarFeed.revokeFailed"), err)
 	}
-	return e.JSON(http.StatusOK, newOKResponse())
+	return apiEmptySuccessJSON(e, http.StatusOK)
 }
 
 func handleSubscriptionCalendarICSDownload(app core.App, e *core.RequestEvent) error {

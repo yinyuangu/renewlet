@@ -74,7 +74,7 @@ describe("product API services", () => {
         page: 2,
         totalPages: 3,
       })
-      .mockResolvedValueOnce({ ok: true });
+      .mockResolvedValueOnce({});
 
     await assetService.create(new Blob(["logo"], { type: "image/png" }), "logo", "logo.png");
     await assetService.listLogos(1);

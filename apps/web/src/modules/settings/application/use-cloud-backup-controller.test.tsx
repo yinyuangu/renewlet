@@ -160,7 +160,7 @@ describe("useCloudBackupController provider drafts", () => {
       mocks.config = next;
       return next;
     });
-    mocks.testMutateAsync.mockResolvedValue({ ok: true, checkedAt: "2026-06-09T00:00:00.000Z" });
+    mocks.testMutateAsync.mockResolvedValue({ checkedAt: "2026-06-09T00:00:00.000Z" });
     mocks.createSnapshotMutateAsync.mockResolvedValue([]);
   });
 

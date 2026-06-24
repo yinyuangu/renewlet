@@ -5,18 +5,17 @@
  */
 import {
   publicStatusPageCreateRequestSchema,
-  publicStatusPageCreateResponseSchema,
-  publicStatusPageDeleteResponseSchema,
-  publicStatusPageResponseSchema,
+  publicStatusPageCreatePayloadSchema,
+  publicStatusPagePayloadSchema,
   publicStatusPageUpdateRequestSchema,
-  publicStatusResponseSchema,
+  publicStatusPayloadSchema,
 } from "@renewlet/shared/schemas/public-status";
 import { customConfigSchema, type ApiCustomConfig } from "@renewlet/shared/schemas/custom-config";
 import type { ApiSubscription } from "@renewlet/shared/schemas/subscriptions";
 import { getCustomConfig, getSettings, intToBool, newId, nowIso, SUBSCRIPTION_COLUMNS, toApiSubscription } from "./db";
 import { randomToken } from "./crypto";
 import { requireAuth } from "./auth";
-import { HttpError, json, readJson, requestLocale } from "./http";
+import { HttpError, ok, readJson, requestLocale, successJson } from "./http";
 import { serverText, type AppLocale } from "./server-i18n";
 import { calendarFeedBuiltInCategoryLabelKey } from "./calendar-feed-built-in-labels";
 import { requestOrigin } from "./request-origin";
@@ -35,7 +34,7 @@ type PublicStatusCategoryResolver = {
 export async function readPublicStatusPage(request: Request, env: Env): Promise<Response> {
   const auth = await requireAuth(request, env);
   const row = await getPublicStatusPage(env, auth.user.id);
-  return json(publicStatusPageResponseSchema.parse({ publicStatusPage: publicStatusPageStatus(row, request) }));
+  return successJson(publicStatusPagePayloadSchema.parse({ publicStatusPage: publicStatusPageStatus(row, request) }));
 }
 
 /** 创建或复用公开展示页；请求体必须为空对象，token 始终由 Worker 生成。 */
@@ -44,7 +43,7 @@ export async function createPublicStatusPage(request: Request, env: Env): Promis
   const auth = await requireAuth(request, env);
   await readJson(request, publicStatusPageCreateRequestSchema, locale);
   const row = await ensurePublicStatusPage(env, auth.user.id);
-  return json(publicStatusPageCreateResponseSchema.parse({
+  return successJson(publicStatusPageCreatePayloadSchema.parse({
     publicStatusPage: {
       ...publicStatusPageStatus(row, request),
       enabled: true,
@@ -68,14 +67,14 @@ export async function updatePublicStatusPage(request: Request, env: Env): Promis
   await env.DB.prepare("UPDATE public_status_pages SET show_prices = ?, updated_at = ? WHERE user_id = ?")
     .bind(row.show_prices, timestamp, auth.user.id)
     .run();
-  return json(publicStatusPageResponseSchema.parse({ publicStatusPage: publicStatusPageStatus(row, request) }));
+  return successJson(publicStatusPagePayloadSchema.parse({ publicStatusPage: publicStatusPageStatus(row, request) }));
 }
 
 export async function deletePublicStatusPage(request: Request, env: Env): Promise<Response> {
   const auth = await requireAuth(request, env);
   // 撤销只删除公开页 token，不改订阅 publicHidden；重新开启时用户原先的可见性选择仍然有效。
   await env.DB.prepare("DELETE FROM public_status_pages WHERE user_id = ?").bind(auth.user.id).run();
-  return json(publicStatusPageDeleteResponseSchema.parse({ ok: true }));
+  return ok();
 }
 
 export async function readPublicStatus(request: Request, env: Env, token: string): Promise<Response> {
@@ -87,7 +86,7 @@ export async function readPublicStatus(request: Request, env: Env, token: string
   const { rows, truncated } = await listPublicStatusSubscriptions(env, page.user_id);
   const today = todayDateOnly(settings.timezone);
   const showPrices = intToBool(page.show_prices);
-  const response = publicStatusResponseSchema.parse({
+  const response = publicStatusPayloadSchema.parse({
     page: {
       title: "Renewlet",
       showPrices,
@@ -97,7 +96,7 @@ export async function readPublicStatus(request: Request, env: Env, token: string
     },
     subscriptions: rows.map((row) => publicStatusSubscription(row, request, page, resolver, today)),
   });
-  return json(response, { headers: publicStatusHeaders() });
+  return successJson(response, { headers: publicStatusHeaders() });
 }
 
 export async function readPublicStatusAsset(request: Request, env: Env, token: string, assetId: string): Promise<Response> {

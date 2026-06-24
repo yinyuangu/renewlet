@@ -3,11 +3,17 @@
  *
  * Worker 没有 PocketBase hook，因此 create/update/import/renew 都必须在这里复用同一套字段归一和 owner 过滤。
  */
-import { subscriptionCreateBodySchema, subscriptionsListQuerySchema, subscriptionUpdateBodySchema } from "@renewlet/shared/schemas/subscriptions";
+import {
+  subscriptionCreateBodySchema,
+  subscriptionPayloadSchema,
+  subscriptionsListPayloadSchema,
+  subscriptionsListQuerySchema,
+  subscriptionUpdateBodySchema,
+} from "@renewlet/shared/schemas/subscriptions";
 import { boolToInt, countSubscriptions, getSettings, getSubscription, listSubscriptionsPage, newId, nowIso, parseJsonObject, parseStringArray, parseSubscriptionCursor, subscriptionCursor, toApiSubscription } from "./db";
 import { advanceSubscriptionRenewal, dateOnlyInZone } from "./subscription-renewal";
 import { refreshSubscriptionSchedulerState } from "./subscription-scheduler-state";
-import { HttpError, json, ok, readJson, readOptionalJson, requestLocale } from "./http";
+import { HttpError, ok, readJson, readOptionalJson, requestLocale, successJson } from "./http";
 import { serverText } from "./server-i18n";
 import { requireAuth } from "./auth";
 import type { Env, SubscriptionRow } from "./types";
@@ -33,11 +39,11 @@ export async function readSubscriptions(request: Request, env: Env): Promise<Res
   const rows = await listSubscriptionsPage(env, auth.user.id, { limit: parsed.limit + 1, cursor: parsed.cursor });
   const pageRows = rows.slice(0, parsed.limit);
   const nextCursor = rows.length > parsed.limit ? subscriptionCursor(pageRows[pageRows.length - 1]!) : null;
-  return json({
+  return successJson(subscriptionsListPayloadSchema.parse({
     subscriptions: pageRows.map(toApiSubscription),
     nextCursor,
     total: await countSubscriptions(env, auth.user.id),
-  });
+  }));
 }
 
 /** 新建订阅走 shared create schema，确保 D1 写入边界与 Go/PocketBase API 保持同形。 */
@@ -56,7 +62,7 @@ export async function createSubscription(request: Request, env: Env): Promise<Re
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).bind(...subscriptionRowValues(row)).run();
   await refreshSubscriptionSchedulerState(env, auth.user.id, { resetAutoRenewCheck: true });
-  return json({ subscription: toApiSubscription(row) }, { status: 201 });
+  return successJson(subscriptionPayloadSchema.parse({ subscription: toApiSubscription(row) }), { status: 201 });
 }
 
 /** 更新订阅先合并为完整 create body，再转换为 D1 row，模拟 PocketBase hook 的最终规范化效果。 */
@@ -112,7 +118,7 @@ export async function updateSubscription(request: Request, env: Env, id: string)
     id,
   ).run();
   await refreshSubscriptionSchedulerState(env, auth.user.id, { resetAutoRenewCheck: true });
-  return json({ subscription: toApiSubscription(merged) });
+  return successJson(subscriptionPayloadSchema.parse({ subscription: toApiSubscription(merged) }));
 }
 
 export async function deleteSubscription(request: Request, env: Env, id: string): Promise<Response> {
@@ -142,7 +148,7 @@ export async function renewSubscription(request: Request, env: Env, id: string):
     UPDATE subscriptions SET next_billing_date = ?, status = ?, updated_at = ?
     WHERE user_id = ? AND id = ?
   `).bind(merged.next_billing_date, merged.status, timestamp, auth.user.id, id).run();
-  return json({ subscription: toApiSubscription(merged) });
+  return successJson(subscriptionPayloadSchema.parse({ subscription: toApiSubscription(merged) }));
 }
 
 export type SubscriptionBody = ReturnType<typeof subscriptionCreateBodySchema.parse>;

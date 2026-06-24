@@ -3,8 +3,8 @@ package main
 // MFA 测试锁住产品 session 与二阶段登录边界；这些断言防止 Docker 前端或 PB 原生 API 绕过二因子。
 
 import (
-	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -97,10 +97,11 @@ func totpCodeForSecret(t *testing.T, secret string) string {
 
 func parseSessionToken(t *testing.T, res *http.Response) string {
 	t.Helper()
-	var body sessionResponse
-	if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
+	data, err := io.ReadAll(res.Body)
+	if err != nil {
 		t.Fatal(err)
 	}
+	body := decodeAPISuccessDataForTest[sessionResponse](t, data)
 	if body.Type != "session" || body.Session.ID == "" {
 		t.Fatalf("expected session response, got %#v", body)
 	}
@@ -109,14 +110,11 @@ func parseSessionToken(t *testing.T, res *http.Response) string {
 
 func parseMFATicket(t *testing.T, res *http.Response) string {
 	t.Helper()
-	var body struct {
-		Type     string   `json:"type"`
-		TicketID string   `json:"ticketId"`
-		Methods  []string `json:"methods"`
-	}
-	if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
+	data, err := io.ReadAll(res.Body)
+	if err != nil {
 		t.Fatal(err)
 	}
+	body := decodeAPISuccessDataForTest[mfaRequiredResponse](t, data)
 	if body.Type != "mfa_required" || body.TicketID == "" {
 		t.Fatalf("expected MFA-required response, got %#v", body)
 	}
@@ -152,15 +150,7 @@ func TestProductAuthLoginWithoutMFAIssuesSession(t *testing.T) {
 	if res.Code != http.StatusOK {
 		t.Fatalf("expected login 200, got %d: %s", res.Code, res.Body.String())
 	}
-	var body struct {
-		Type    string `json:"type"`
-		Session struct {
-			ID string `json:"id"`
-		} `json:"session"`
-	}
-	if err := json.Unmarshal(res.Body.Bytes(), &body); err != nil {
-		t.Fatal(err)
-	}
+	body := decodeAPISuccessDataForTest[sessionResponse](t, res.Body.Bytes())
 	if body.Type != "session" || body.Session.ID == "" {
 		t.Fatalf("expected product session response, got %#v", body)
 	}
@@ -190,10 +180,7 @@ func TestSelfServiceTOTPEnableRenewsProductSession(t *testing.T) {
 	if res.Code != http.StatusOK {
 		t.Fatalf("expected TOTP enable 200, got %d: %s", res.Code, res.Body.String())
 	}
-	var response mfaRecoveryCodesResponse
-	if err := json.Unmarshal(res.Body.Bytes(), &response); err != nil {
-		t.Fatal(err)
-	}
+	response := decodeAPISuccessDataForTest[mfaRecoveryCodesResponse](t, res.Body.Bytes())
 	if response.Type != "session" || response.Session.ID == "" || len(response.RecoveryCodes) != mfaRecoveryCodeCount {
 		t.Fatalf("expected renewed session with recovery codes, got %#v", response)
 	}
@@ -211,10 +198,7 @@ func TestSelfServiceTOTPEnableRenewsProductSession(t *testing.T) {
 	if statusRes.Code != http.StatusOK {
 		t.Fatalf("expected renewed token to read MFA status, got %d: %s", statusRes.Code, statusRes.Body.String())
 	}
-	var status mfaStatusResponse
-	if err := json.Unmarshal(statusRes.Body.Bytes(), &status); err != nil {
-		t.Fatal(err)
-	}
+	status := decodeAPISuccessDataForTest[mfaStatusResponse](t, statusRes.Body.Bytes())
 	if !status.Enabled || status.RecoveryCodesRemaining != mfaRecoveryCodeCount {
 		t.Fatalf("expected enabled MFA status after renewal, got %#v", status)
 	}
@@ -288,14 +272,7 @@ func TestProductAuthLoginWithMFAIssuesTicketOnly(t *testing.T) {
 	if res.Code != http.StatusOK {
 		t.Fatalf("expected login 200, got %d: %s", res.Code, res.Body.String())
 	}
-	var body struct {
-		Type     string   `json:"type"`
-		TicketID string   `json:"ticketId"`
-		Methods  []string `json:"methods"`
-	}
-	if err := json.Unmarshal(res.Body.Bytes(), &body); err != nil {
-		t.Fatal(err)
-	}
+	body := decodeAPISuccessDataForTest[mfaRequiredResponse](t, res.Body.Bytes())
 	if body.Type != "mfa_required" || body.TicketID == "" || !strings.Contains(strings.Join(body.Methods, ","), mfaMethodTOTP) {
 		t.Fatalf("expected MFA ticket with TOTP method, got %#v", body)
 	}
@@ -319,15 +296,7 @@ func TestProductAuthLoginWithPasskeyOnlyIssuesSession(t *testing.T) {
 	if res.Code != http.StatusOK {
 		t.Fatalf("expected passkey-only password login 200, got %d: %s", res.Code, res.Body.String())
 	}
-	var body struct {
-		Type    string `json:"type"`
-		Session struct {
-			ID string `json:"id"`
-		} `json:"session"`
-	}
-	if err := json.Unmarshal(res.Body.Bytes(), &body); err != nil {
-		t.Fatal(err)
-	}
+	body := decodeAPISuccessDataForTest[sessionResponse](t, res.Body.Bytes())
 	if body.Type != "session" || body.Session.ID == "" {
 		t.Fatalf("expected passkey-only password login to issue product session, got %#v", body)
 	}
@@ -347,10 +316,7 @@ func TestPasskeyAuthenticateOptionsIsPreAuthenticationChallenge(t *testing.T) {
 	if res.Code != http.StatusOK {
 		t.Fatalf("expected unauthenticated Passkey options 200, got %d: %s", res.Code, res.Body.String())
 	}
-	var body passkeyWebAuthnOptionsResponse
-	if err := json.Unmarshal(res.Body.Bytes(), &body); err != nil {
-		t.Fatal(err)
-	}
+	body := decodeAPISuccessDataForTest[passkeyWebAuthnOptionsResponse](t, res.Body.Bytes())
 	if body.ChallengeID == "" || body.ExpiresAt == "" || body.Options == nil {
 		t.Fatalf("expected Passkey options challenge response, got %#v", body)
 	}

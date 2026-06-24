@@ -557,8 +557,11 @@ func TestAIRecognitionPromptUsesSharedJSONContract(t *testing.T) {
 	}
 	userPrompt := buildAIRecognitionUserPrompt("sample service 15元 1个月", "Asia/Shanghai", "CNY", 2, localeZhCN, configContext)
 	for _, want := range []string{
-		"Return exactly one JSON object",
-		"Do not return Markdown",
+		"Return exactly one valid JSON object parseable by JSON.parse",
+		"no Markdown",
+		"no explanations",
+		"output null and add a warning code",
+		"Never invent price, currency, billing cycle, dates, status, payment method, or reminder fields",
 		"Do generate useful service and website metadata",
 		"Examples show output shape and decision patterns only",
 		"do not copy example natural-language output when it conflicts with User locale",
@@ -568,7 +571,7 @@ func TestAIRecognitionPromptUsesSharedJSONContract(t *testing.T) {
 		}
 	}
 	for _, want := range []string{
-		`Top-level JSON must be {"subscriptions": [], "warnings": []}.`,
+		`Top-level JSON must be exactly {"subscriptions": [], "warnings": []}.`,
 		"Runtime context:",
 		"- Attached image count: 2",
 		"- User locale: zh-CN",

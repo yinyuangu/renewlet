@@ -11,9 +11,12 @@ describe("useSetupStatus app status", () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
-        setupRequired: false,
-        setupEnabled: false,
-        demoMode: true,
+        ok: true,
+        data: {
+          setupRequired: false,
+          setupEnabled: false,
+          demoMode: true,
+        },
       }),
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -40,8 +43,11 @@ describe("useSetupStatus app status", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
-        setupRequired: true,
-        setupEnabled: false,
+        ok: true,
+        data: {
+          setupRequired: true,
+          setupEnabled: false,
+        },
       }),
     }));
 

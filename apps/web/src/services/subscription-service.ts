@@ -11,12 +11,6 @@ import {
   type ApiSubscription,
 } from "@renewlet/shared/schemas/subscriptions";
 import {
-  REPEAT_REMINDER_INTERVALS,
-  REPEAT_REMINDER_WINDOWS,
-  CUSTOM_CYCLE_UNITS,
-  type CustomCycleUnit,
-  type RepeatReminderInterval,
-  type RepeatReminderWindow,
   type Subscription,
   type SubscriptionDraft,
 } from "@/types/subscription";
@@ -50,7 +44,6 @@ type SubscriptionBaseForService = Pick<
   | "costSharing"
   | "extra"
 >;
-type LegacySubscriptionRecord = Record<string, unknown> & { id: string };
 
 export interface SubscriptionPage {
   subscriptions: Subscription[];
@@ -58,97 +51,18 @@ export interface SubscriptionPage {
   total?: number | undefined;
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function optionalNonEmptyString(value: unknown): string | undefined {
-  return typeof value === "string" && value.trim() !== "" ? value : undefined;
-}
-
 function normalizeSubscriptionPageLimit(value: number): number {
   if (!Number.isFinite(value)) return SUBSCRIPTION_PAGE_SIZE;
   return Math.max(1, Math.min(Math.trunc(value), 100));
 }
 
-function normalizeRepeatReminderInterval(value: unknown): RepeatReminderInterval {
-  return typeof value === "string" && REPEAT_REMINDER_INTERVALS.includes(value as RepeatReminderInterval)
-    ? value as RepeatReminderInterval
-    : "1h";
-}
-
-function normalizeRepeatReminderWindow(value: unknown): RepeatReminderWindow {
-  return typeof value === "string" && REPEAT_REMINDER_WINDOWS.includes(value as RepeatReminderWindow)
-    ? value as RepeatReminderWindow
-    : "72h";
-}
-
-function normalizeCustomCycleUnit(value: unknown): CustomCycleUnit {
-  return typeof value === "string" && CUSTOM_CYCLE_UNITS.includes(value as CustomCycleUnit)
-    ? value as CustomCycleUnit
-    : "day";
-}
-
-function normalizeSubscriptionRecord(row: unknown): unknown {
-  if (!isRecord(row)) return row;
-  // 旧 PocketBase record 与产品 API row 不完全同形；历史输入先收敛字段，再交给 shared schema。
-  const normalized: Record<string, unknown> = {
-    id: row["id"],
-    name: row["name"],
-    price: row["price"],
-    currency: row["currency"],
-    billingCycle: row["billingCycle"],
-    category: row["category"],
-    status: row["status"],
-    startDate: row["startDate"] ?? null,
-    nextBillingDate: row["nextBillingDate"],
-    // 旧 PocketBase 行可能没有 autoRenew；缺字段按手动续订读取，避免把历史沉默数据当作自动续订授权。
-    autoRenew: row["billingCycle"] === "one-time" ? false : row["autoRenew"] === true,
-    autoCalculateNextBillingDate: row["autoCalculateNextBillingDate"],
-    pinned: row["pinned"] === true,
-    publicHidden: row["publicHidden"] === true,
-    reminderDays: row["reminderDays"],
-    repeatReminderEnabled: row["repeatReminderEnabled"] === true,
-    repeatReminderInterval: normalizeRepeatReminderInterval(row["repeatReminderInterval"]),
-    repeatReminderWindow: normalizeRepeatReminderWindow(row["repeatReminderWindow"]),
-  };
-  if (row["billingCycle"] === "custom") {
-    if (typeof row["customDays"] === "number") normalized["customDays"] = row["customDays"];
-    // PocketBase 旧行没有 customCycleUnit；custom 读取缺省按 day，固定周期的空字符串则不进入 shared enum。
-    normalized["customCycleUnit"] = normalizeCustomCycleUnit(row["customCycleUnit"]);
-  }
-  if (row["billingCycle"] === "one-time") {
-    if (typeof row["oneTimeTermCount"] === "number" && row["oneTimeTermCount"] > 0 && typeof row["oneTimeTermUnit"] === "string") {
-      normalized["oneTimeTermCount"] = row["oneTimeTermCount"];
-      normalized["oneTimeTermUnit"] = normalizeCustomCycleUnit(row["oneTimeTermUnit"]);
-    }
-  }
-  if (Array.isArray(row["tags"])) normalized["tags"] = row["tags"];
-  if (isRecord(row["costSharing"]) && Object.keys(row["costSharing"]).length > 0) {
-    normalized["costSharing"] = row["costSharing"];
-  }
-
-  for (const key of ["logo", "paymentMethod", "trialEndDate", "website", "notes"] as const) {
-    const value = optionalNonEmptyString(row[key]);
-    if (value !== undefined) normalized[key] = value;
-  }
-  const createdAt = optionalNonEmptyString(row["createdAt"]) ?? optionalNonEmptyString(row["created"]);
-  if (createdAt !== undefined) normalized["createdAt"] = createdAt;
-  const updatedAt = optionalNonEmptyString(row["updatedAt"]) ?? optionalNonEmptyString(row["updated"]);
-  if (updatedAt !== undefined) normalized["updatedAt"] = updatedAt;
-  if (isRecord(row["extra"])) normalized["extra"] = row["extra"];
-
-  return normalized;
-}
-
 /**
- * 将任一运行面返回的订阅记录收敛成前端 domain 对象。
+ * 将产品 API DTO 收敛成前端 domain 对象。
  *
- * PocketBase 原生 record 与 Cloudflare API response 都必须先通过 shared schema；
- * React 层只看到 `Subscription` union，避免表单和统计逻辑按运行面分叉。
+ * Docker 与 Cloudflare 都必须返回 shared `ApiSubscription`；前端不再承接 PocketBase record 兼容层。
  */
-export function fromApiSubscription(row: ApiSubscription | LegacySubscriptionRecord): Subscription {
-  const parsedRow: ApiSubscription = apiSubscriptionSchema.parse(normalizeSubscriptionRecord(row));
+export function fromApiSubscription(row: ApiSubscription): Subscription {
+  const parsedRow: ApiSubscription = apiSubscriptionSchema.parse(row);
   const startDate = parsedRow.startDate === null ? null : assertDateOnly(parsedRow.startDate);
   const nextBillingDate = assertDateOnly(parsedRow.nextBillingDate);
   const trialEndDate = parsedRow.trialEndDate ? assertDateOnly(parsedRow.trialEndDate) : undefined;
@@ -184,7 +98,7 @@ export function fromApiSubscription(row: ApiSubscription | LegacySubscriptionRec
       ...base,
       billingCycle: "custom",
       customDays: parsedRow.customDays ?? 1,
-      customCycleUnit: normalizeCustomCycleUnit(parsedRow.customCycleUnit),
+      customCycleUnit: parsedRow.customCycleUnit ?? "day",
       oneTimeTermCount: undefined,
       oneTimeTermUnit: undefined,
     };
@@ -196,7 +110,7 @@ export function fromApiSubscription(row: ApiSubscription | LegacySubscriptionRec
       customDays: undefined,
       customCycleUnit: undefined,
       oneTimeTermCount: parsedRow.oneTimeTermCount,
-      oneTimeTermUnit: parsedRow.oneTimeTermUnit ? normalizeCustomCycleUnit(parsedRow.oneTimeTermUnit) : undefined,
+      oneTimeTermUnit: parsedRow.oneTimeTermUnit,
     };
   }
   return {

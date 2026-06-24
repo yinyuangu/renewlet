@@ -2,6 +2,7 @@
 import { createDefaultAppSettings } from "@renewlet/shared/settings-defaults";
 import type { ApiAppSettings } from "@renewlet/shared/schemas/settings";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { readSuccessData } from "./api-test-helpers";
 import { ensureSettings } from "./db";
 import { readSettings, updateSettings } from "./settings";
 import type { Env } from "./types";
@@ -160,7 +161,7 @@ describe("Cloudflare settings initialization", () => {
     const response = await readSettings(settingsRequest("GET", "zh-CN"), env);
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({ settings: { locale: "zh-CN" } });
+    await expect(readSuccessData(response)).resolves.toMatchObject({ settings: { locale: "zh-CN" } });
     expect(JSON.parse(state.rows.get(USER_ID) ?? "{}")).toMatchObject({ locale: "zh-CN" });
   });
 
@@ -170,7 +171,7 @@ describe("Cloudflare settings initialization", () => {
     const response = await updateSettings(settingsRequest("PUT", "zh-CN", { monthlyBudget: 2333 }), env);
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({ settings: { locale: "zh-CN", monthlyBudget: 2333 } });
+    await expect(readSuccessData(response)).resolves.toMatchObject({ settings: { locale: "zh-CN", monthlyBudget: 2333 } });
     expect(JSON.parse(state.rows.get(USER_ID) ?? "{}")).toMatchObject({ locale: "zh-CN", monthlyBudget: 2333 });
   });
 
@@ -188,7 +189,7 @@ describe("Cloudflare settings initialization", () => {
 
     const response = await updateSettings(settingsRequest("PUT", "en-US", { telegramMessageFormat: "html" }), env);
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({ settings: { telegramMessageFormat: "html" } });
+    await expect(readSuccessData(response)).resolves.toMatchObject({ settings: { telegramMessageFormat: "html" } });
 
     await expect(updateSettings(settingsRequest("PUT", "en-US", { telegramMessageFormat: "markdown" }), env))
       .rejects.toMatchObject({ status: 400, code: "INVALID_PAYLOAD" });

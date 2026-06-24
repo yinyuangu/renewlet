@@ -10,7 +10,7 @@
  * 需要把 label/color view model 从上层传入。
  */
 
-import { useState, type ReactNode } from 'react';
+import { memo, useState, type ReactNode } from 'react';
 import type { ConfigItem } from '@/types/config';
 import {
   DEFAULT_NOTIFICATION_REMINDER_DAYS,
@@ -123,7 +123,7 @@ function SubscriptionCardMetaFlow({ items }: { items: readonly SubscriptionCardM
 }
 
 /** 订阅卡片。 */
-export function SubscriptionCard({
+function SubscriptionCardComponent({
   subscription,
   viewMode = 'grid',
   onEdit,
@@ -444,3 +444,24 @@ export function SubscriptionCard({
     </>
   );
 }
+
+function areSubscriptionCardPropsEqual(prev: SubscriptionCardProps, next: SubscriptionCardProps): boolean {
+  return (
+    prev.subscription === next.subscription &&
+    (prev.viewMode ?? "grid") === (next.viewMode ?? "grid") &&
+    prev.timeZone === next.timeZone &&
+    prev.inheritedReminderDays === next.inheritedReminderDays &&
+    prev.categoryByValue === next.categoryByValue &&
+    prev.paymentMethodByValue === next.paymentMethodByValue &&
+    prev.costSharingCurrencyConvert === next.costSharingCurrencyConvert &&
+    prev.onEdit === next.onEdit &&
+    prev.onDelete === next.onDelete &&
+    prev.onTogglePinned === next.onTogglePinned &&
+    prev.onTogglePublicHidden === next.onTogglePublicHidden &&
+    prev.onRenew === next.onRenew &&
+    prev.onViewDetails === next.onViewDetails
+  );
+}
+
+export const SubscriptionCard = memo(SubscriptionCardComponent, areSubscriptionCardPropsEqual);
+SubscriptionCard.displayName = "SubscriptionCard";

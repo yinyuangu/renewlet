@@ -5,9 +5,8 @@
  */
 import {
   calendarFeedCreateRequestSchema,
-  calendarFeedCreateResponseSchema,
-  calendarFeedStatusResponseSchema,
-  subscriptionCalendarFeedCreateResponseSchema,
+  calendarFeedCreatePayloadSchema,
+  calendarFeedStatusPayloadSchema,
 } from "@renewlet/shared/schemas/calendar-feed";
 import { buildRenewalCalendarIcs } from "@renewlet/shared/ics";
 import { buildRenewalCalendarEvent, type RenewalCalendarEvent } from "@renewlet/shared/calendar-events";
@@ -18,7 +17,7 @@ import type { ApiSubscription } from "@renewlet/shared/schemas/subscriptions";
 import { getCustomConfig, getSettings, getSubscription, listSubscriptions, newId, nowIso, toApiSubscription } from "./db";
 import { randomToken } from "./crypto";
 import { requireAuth } from "./auth";
-import { HttpError, json, ok, readJson, requestLocale } from "./http";
+import { HttpError, ok, readJson, requestLocale, successJson } from "./http";
 import { serverFormat, serverText } from "./server-i18n";
 import { calendarFeedBuiltInCategoryLabelKey, calendarFeedBuiltInPaymentMethodLabelKey } from "./calendar-feed-built-in-labels";
 import { requestOrigin } from "./request-origin";
@@ -39,7 +38,7 @@ export async function readCalendarFeed(request: Request, env: Env): Promise<Resp
   const auth = await requireAuth(request, env);
   await ensureCalendarFeedSchema(env, locale);
   const row = await getCalendarFeed(env, auth.user.id, "all", null);
-  return json(calendarFeedStatusResponseSchema.parse({ calendarFeed: calendarFeedStatus(row, request) }));
+  return successJson(calendarFeedStatusPayloadSchema.parse({ calendarFeed: calendarFeedStatus(row, request) }));
 }
 
 /** 创建或复用全局 feed；请求体必须为空对象，token 始终由服务端生成。 */
@@ -54,7 +53,7 @@ export async function createCalendarFeed(request: Request, env: Env): Promise<Re
     subscriptionId: null,
     userId: auth.user.id,
   });
-  return json(calendarFeedCreateResponseSchema.parse({
+  return successJson(calendarFeedCreatePayloadSchema.parse({
     calendarFeed: {
       ...calendarFeedStatus(row, request),
       enabled: true,
@@ -78,7 +77,7 @@ export async function readSubscriptionCalendarFeed(request: Request, env: Env, s
   if (!subscription) throw new HttpError(404, serverText(locale, "subscription.notFound"), "NOT_FOUND");
   if (isOneTimeBuyout(toApiSubscription(subscription))) throw new HttpError(404, serverText(locale, "subscription.notFound"), "NOT_FOUND");
   const row = await getCalendarFeed(env, auth.user.id, "subscription", subscriptionId);
-  return json(calendarFeedStatusResponseSchema.parse({ calendarFeed: calendarFeedStatus(row, request) }));
+  return successJson(calendarFeedStatusPayloadSchema.parse({ calendarFeed: calendarFeedStatus(row, request) }));
 }
 
 /** 创建单订阅 feed 前先确认订阅属于当前用户，避免用 feed URL 探测他人订阅 ID。 */
@@ -96,7 +95,7 @@ export async function createSubscriptionCalendarFeed(request: Request, env: Env,
     subscriptionId,
     userId: auth.user.id,
   });
-  return json(subscriptionCalendarFeedCreateResponseSchema.parse({
+  return successJson(calendarFeedCreatePayloadSchema.parse({
     calendarFeed: {
       ...calendarFeedStatus(row, request),
       enabled: true,

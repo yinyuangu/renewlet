@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createDefaultAppSettings } from "@renewlet/shared/settings-defaults";
 import { describe, expect, it, vi } from "vitest";
+import { readSuccessData } from "./api-test-helpers";
 import { dateOnlyInZone } from "./subscription-renewal";
 import { sha256 } from "./crypto";
 import {
@@ -334,7 +335,7 @@ describe("Cloudflare Public API", () => {
     }), env);
     expect(createResponse.status).toBe(201);
     expect(createResponse.headers.get("cache-control")).toBe("no-store");
-    const created = await createResponse.json() as { token: { id: string; tokenPrefix: string }; plainToken: string };
+    const created = await readSuccessData<{ token: { id: string; tokenPrefix: string }; plainToken: string }>(createResponse);
     expect(created.plainToken).toBe(PLAIN_TOKEN);
     expect(created.token.tokenPrefix).toBe(PLAIN_TOKEN.slice(0, 12));
     expect(env.__state.apiTokens).toHaveLength(1);
@@ -356,34 +357,34 @@ describe("Cloudflare Public API", () => {
     expect(meResponse.status).toBe(200);
     expect(meResponse.headers.get("cache-control")).toBe("no-store");
     expect(env.__state.apiTokens[0]?.last_used_at).toBeTruthy();
-    expect(await meResponse.json()).toEqual({ ok: true, scopes: ["read"] });
+    expect(await readSuccessData<{ scopes: string[] }>(meResponse)).toEqual({ scopes: ["read"] });
 
     const subscriptionsResponse = await publicApiSubscriptions(publicRequest("/api/public/v1/subscriptions?limit=1"), env);
-    const subscriptionsBody = await subscriptionsResponse.json() as { subscriptions: Array<Record<string, unknown>>; nextCursor: string | null; total: number };
+    const subscriptionsBody = await readSuccessData<{ subscriptions: Array<Record<string, unknown>>; nextCursor: string | null; total: number }>(subscriptionsResponse);
     expect(subscriptionsBody.total).toBe(3);
     expect(subscriptionsBody.subscriptions).toHaveLength(1);
     expect(subscriptionsBody.nextCursor).toEqual(expect.any(String));
     expect(subscriptionsBody.subscriptions[0]).not.toHaveProperty("user");
 
     const allSubscriptionsResponse = await publicApiSubscriptions(publicRequest("/api/public/v1/subscriptions?limit=3"), env);
-    const allSubscriptionsBody = await allSubscriptionsResponse.json() as { subscriptions: Array<Record<string, unknown>> };
+    const allSubscriptionsBody = await readSuccessData<{ subscriptions: Array<Record<string, unknown>> }>(allSubscriptionsResponse);
     expect(allSubscriptionsBody.subscriptions.find((item) => item["id"] === "sub_renewal")).toMatchObject({ startDate: null });
 
     const detailResponse = await publicApiSubscription(publicRequest("/api/public/v1/subscriptions/sub_renewal"), env, "sub_renewal");
-    expect(await detailResponse.json()).toMatchObject({
+    expect(await readSuccessData<{ subscription: Record<string, unknown> }>(detailResponse)).toMatchObject({
       subscription: { id: "sub_renewal", name: "Renewal Plan", startDate: null },
     });
     await expect(publicApiSubscription(publicRequest("/api/public/v1/subscriptions/sub_other"), env, "sub_other"))
       .rejects.toMatchObject({ status: 404 });
 
     const statusResponse = await publicApiStatus(publicRequest("/api/public/v1/status"), env);
-    expect(await statusResponse.json()).toMatchObject({
+    expect(await readSuccessData<Record<string, unknown>>(statusResponse)).toMatchObject({
       total: 3,
       byStatus: { active: 2, trial: 1, expired: 0, paused: 0, cancelled: 0 },
     });
 
     const dueResponse = await publicApiDue(publicRequest("/api/public/v1/due?days=30"), env);
-    const dueBody = await dueResponse.json() as { items: Array<{ dueType: string; subscription: { id: string; startDate: string | null } }> };
+    const dueBody = await readSuccessData<{ items: Array<{ dueType: string; subscription: { id: string; startDate: string | null } }> }>(dueResponse);
     expect(dueBody.items.map((item) => [item.subscription.id, item.dueType])).toEqual(expect.arrayContaining([
       ["sub_renewal", "renewal"],
       ["sub_trial", "trial"],

@@ -134,7 +134,6 @@ func (r *aiRecognitionTestRequest) Validate(locale appLocale) error {
 }
 
 type aiRecognitionTestResponse struct {
-	OK                bool   `json:"ok"`
 	ProviderType      string `json:"providerType"`
 	TransportProtocol string `json:"transportProtocol"`
 	Model             string `json:"model"`
@@ -238,7 +237,7 @@ func handleAIRecognizeSubscriptions(app core.App, e *core.RequestEvent) error {
 		}
 		return e.BadRequestError(serverText(runContext.Locale, "aiRecognition.failed"), safeAIRecognitionError(err))
 	}
-	return e.JSON(http.StatusOK, response)
+	return apiSuccessJSON(e, http.StatusOK, response)
 }
 
 func handleAIRecognitionTestConnection(app core.App, e *core.RequestEvent) error {
@@ -262,7 +261,7 @@ func handleAIRecognitionTestConnection(app core.App, e *core.RequestEvent) error
 		// 连接测试只做一次最小文本生成；SDK 暴露的 provider body 只进入本次错误响应的 rawResponseText。
 		return aiRecognitionProviderResponseJSONError(e, http.StatusBadRequest, serverText(locale, "aiRecognition.testFailed"), "AI_RECOGNITION_TEST_FAILED", "provider_failed", err, aiProviderResponseFromError(err))
 	}
-	return e.JSON(http.StatusOK, aiRecognitionTestResponse{OK: true, ProviderType: settings.ProviderType, TransportProtocol: settings.TransportProtocol, Model: settings.Model})
+	return apiSuccessJSON(e, http.StatusOK, aiRecognitionTestResponse{ProviderType: settings.ProviderType, TransportProtocol: settings.TransportProtocol, Model: settings.Model})
 }
 
 func aiRecognitionConfigContextForUser(app core.App, userID string, locale appLocale) (aiRecognitionConfigContext, error) {

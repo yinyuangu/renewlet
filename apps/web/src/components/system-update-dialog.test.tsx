@@ -218,7 +218,7 @@ describe("SystemUpdateDialog", () => {
     mocks.apiFetch.mockImplementation((input: string, _schema: unknown, init?: RequestInit) => {
       if (input.startsWith("/api/app/system/version")) return Promise.resolve(versionFixture());
       if (input === "/api/app/admin/system/update" && init?.method === "POST") {
-        return Promise.resolve({ ok: true, currentVersion: "1.0.0", targetVersion: "1.1.0", needsRestart: true, message: "更新完成" });
+        return Promise.resolve({ currentVersion: "1.0.0", targetVersion: "1.1.0", needsRestart: true, message: "更新完成" });
       }
       return Promise.reject(new Error(`Unexpected request ${input}`));
     });
@@ -459,9 +459,9 @@ describe("SystemUpdateDialog", () => {
     mocks.apiFetch.mockImplementation((input: string, _schema: unknown, init?: RequestInit) => {
       if (input.startsWith("/api/app/system/version")) return Promise.resolve(versionFixture());
       if (input === "/api/app/admin/system/update" && init?.method === "POST") {
-        return Promise.resolve({ ok: true, currentVersion: "1.0.0", targetVersion: "1.1.0", needsRestart: true, message: "更新完成" });
+        return Promise.resolve({ currentVersion: "1.0.0", targetVersion: "1.1.0", needsRestart: true, message: "更新完成" });
       }
-      if (input === "/api/app/admin/system/restart" && init?.method === "POST") return Promise.resolve({ ok: true });
+      if (input === "/api/app/admin/system/restart" && init?.method === "POST") return Promise.resolve({});
       return Promise.reject(new Error(`Unexpected request ${input}`));
     });
 

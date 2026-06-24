@@ -2,11 +2,12 @@ import {
   AI_RECOGNITION_MAX_IMAGES,
   AI_RECOGNITION_MAX_IMAGE_BYTES,
   AI_RECOGNITION_MAX_TEXT_CHARS,
+  aiRecognizePayloadSchema,
+  aiRecognitionTestPayloadSchema,
   aiRecognitionErrorDetailsSchema,
   aiRecognitionSettingsSchema,
   aiRecognitionStreamEventSchema,
   aiRecognitionTestRequestSchema,
-  aiRecognitionTestResponseSchema,
   aiThinkingControlSchema,
   type AiRecognitionSettings,
   type AiRecognitionStreamEvent,
@@ -15,7 +16,7 @@ import {
 import { resolveAIProviderEndpoint } from "@renewlet/shared/ai-provider-endpoints";
 import type { AIRecognitionPromptConfigContext } from "@renewlet/shared/ai-recognition-prompt";
 import { getCustomConfig, getSettings, listSubscriptionTags } from "./db";
-import { HttpError, json, readJson, requestLocale } from "./http";
+import { HttpError, readJson, requestLocale, successJson } from "./http";
 import { serverText, type AppLocale } from "./server-i18n";
 import { requireAuth } from "./auth";
 import type { Env } from "./types";
@@ -89,7 +90,7 @@ export async function recognizeSubscriptions(request: Request, env: Env): Promis
     if (response.subscriptions.length === 0) {
       throw new HttpError(400, serverText(runContext.locale, "aiRecognition.noSubscriptions"), "AI_RECOGNITION_EMPTY", aiRecognitionErrorDetails("empty", null, response.diagnostics));
     }
-    return json(response);
+    return successJson(aiRecognizePayloadSchema.parse(response));
   } catch (error) {
     if (error instanceof HttpError) throw error;
     const diagnostics = aiRecognitionDiagnosticsFromError(error);
@@ -243,8 +244,7 @@ export async function testAIRecognitionConnection(request: Request, env: Env): P
   assertAIRecognitionSettings(settings, locale);
   try {
     await runAIRecognitionConnectionTest(settings, request.signal);
-    return json(aiRecognitionTestResponseSchema.parse({
-      ok: true,
+    return successJson(aiRecognitionTestPayloadSchema.parse({
       providerType: settings.providerType,
       transportProtocol: settings.transportProtocol,
       model: settings.model,

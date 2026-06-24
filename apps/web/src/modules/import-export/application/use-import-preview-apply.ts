@@ -12,7 +12,7 @@ import { invalidateUploadedAssetsQueries } from "@/hooks/use-uploaded-assets";
 import { useI18n } from "@/i18n/I18nProvider";
 import { getDisplayErrorMessage } from "@/lib/display-error";
 import {
-  importApplyResponseSchema,
+  importApplyPayloadSchema,
   importPayloadSchema,
   type ImportApplyResponse,
   type ImportConflictMode,
@@ -36,7 +36,7 @@ function parseApplyPayload(value: unknown): ImportPayload {
 }
 
 function parseApplyResult(value: unknown): ImportApplyResponse {
-  return importApplyResponseSchema.parse(value) as ImportApplyResponse;
+  return importApplyPayloadSchema.parse(value) as ImportApplyResponse;
 }
 
 class ImportAssetUploadError extends Error {

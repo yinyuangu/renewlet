@@ -25,26 +25,26 @@ func registerRoutes(app core.App, router *router.Router[*core.RequestEvent]) {
 
 	// 公共状态接口不要求认证，但响应仍使用命名 struct，避免前端在登录前信任松散 JSON。
 	api.GET("/api/app/health", func(e *core.RequestEvent) error {
-		return e.JSON(http.StatusOK, newHealthResponse())
+		return apiSuccessJSON(e, http.StatusOK, newHealthResponse())
 	})
 	api.GET("/api/app/ready", func(e *core.RequestEvent) error {
 		ready, err := newReadyResponse(app)
 		if err != nil {
 			return e.InternalServerError(serverText(requestLocale(e.Request), "common.internalError"), err)
 		}
-		return e.JSON(http.StatusOK, ready)
+		return apiSuccessJSON(e, http.StatusOK, ready)
 	})
 
 	api.GET("/api/app/status", func(e *core.RequestEvent) error {
 		// app status 是认证前 capability 源；前端置灰和 setup 可见性都只读这一处，不再从页面里猜部署模式。
-		return e.JSON(http.StatusOK, appStatusResponse{
+		return apiSuccessJSON(e, http.StatusOK, appStatusResponse{
 			SetupRequired: !hasEnabledAdmin(app),
 			SetupEnabled:  demoModePolicy.SetupEnabled(),
 			DemoMode:      demoModePolicy.Enabled(),
 		})
 	})
 	api.GET("/api/app/setup", func(e *core.RequestEvent) error {
-		return e.JSON(http.StatusOK, setupStatusResponse{
+		return apiSuccessJSON(e, http.StatusOK, setupStatusResponse{
 			SetupRequired: !hasEnabledAdmin(app),
 			SetupEnabled:  demoModePolicy.SetupEnabled(),
 		})
@@ -78,7 +78,7 @@ func registerRoutes(app core.App, router *router.Router[*core.RequestEvent]) {
 			}
 			return e.BadRequestError(serverText(locale, "admin.createFailed"), err)
 		}
-		return e.JSON(http.StatusCreated, newOKResponse())
+		return apiEmptySuccessJSON(e, http.StatusCreated)
 	})
 
 	api.POST("/api/app/auth/login", func(e *core.RequestEvent) error { return handleAuthLogin(app, e) })
@@ -106,7 +106,7 @@ func registerRoutes(app core.App, router *router.Router[*core.RequestEvent]) {
 		for _, user := range users {
 			out = append(out, toUserDTO(app, user))
 		}
-		return e.JSON(http.StatusOK, adminUsersResponse{Users: out})
+		return apiSuccessJSON(e, http.StatusOK, adminUsersResponse{Users: out})
 	})
 	admin.POST("/users", func(e *core.RequestEvent) error {
 		locale := requestLocale(e.Request)
@@ -119,7 +119,7 @@ func registerRoutes(app core.App, router *router.Router[*core.RequestEvent]) {
 		if err != nil {
 			return e.BadRequestError(serverText(locale, "admin.createUserFailed"), err)
 		}
-		return e.JSON(http.StatusCreated, adminUserResponse{User: toUserDTO(app, user)})
+		return apiSuccessJSON(e, http.StatusCreated, adminUserResponse{User: toUserDTO(app, user)})
 	})
 	admin.PATCH("/users/{id}", func(e *core.RequestEvent) error {
 		locale := requestLocale(e.Request)
@@ -166,7 +166,7 @@ func registerRoutes(app core.App, router *router.Router[*core.RequestEvent]) {
 				return e.InternalServerError(serverText(locale, "common.internalError"), err)
 			}
 		}
-		return e.JSON(http.StatusOK, newOKResponse())
+		return apiEmptySuccessJSON(e, http.StatusOK)
 	})
 	admin.POST("/users/{id}/mfa/reset", func(e *core.RequestEvent) error {
 		locale := requestLocale(e.Request)
@@ -184,7 +184,7 @@ func registerRoutes(app core.App, router *router.Router[*core.RequestEvent]) {
 		if err := disableAuthenticatorMFAForUser(app, user.Id); err != nil {
 			return e.InternalServerError(serverText(locale, "common.internalError"), err)
 		}
-		return e.JSON(http.StatusOK, newOKResponse())
+		return apiEmptySuccessJSON(e, http.StatusOK)
 	})
 	admin.POST("/users/{id}/passkeys/reset", func(e *core.RequestEvent) error {
 		locale := requestLocale(e.Request)
@@ -202,7 +202,7 @@ func registerRoutes(app core.App, router *router.Router[*core.RequestEvent]) {
 		if err := deletePasskeysForUser(app, user.Id); err != nil {
 			return e.InternalServerError(serverText(locale, "common.internalError"), err)
 		}
-		return e.JSON(http.StatusOK, newOKResponse())
+		return apiEmptySuccessJSON(e, http.StatusOK)
 	})
 	admin.DELETE("/users/{id}", func(e *core.RequestEvent) error {
 		locale := requestLocale(e.Request)
@@ -220,7 +220,7 @@ func registerRoutes(app core.App, router *router.Router[*core.RequestEvent]) {
 		if err := app.Delete(user); err != nil {
 			return e.BadRequestError(serverText(locale, "admin.deleteUserFailed"), err)
 		}
-		return e.JSON(http.StatusOK, newOKResponse())
+		return apiEmptySuccessJSON(e, http.StatusOK)
 	})
 	admin.POST("/system/update", func(e *core.RequestEvent) error {
 		locale := requestLocale(e.Request)
@@ -241,7 +241,7 @@ func registerRoutes(app core.App, router *router.Router[*core.RequestEvent]) {
 				return e.InternalServerError(serverText(locale, "system.updateFailed"), err)
 			}
 		}
-		if err := e.JSON(http.StatusOK, result); err != nil {
+		if err := apiSuccessJSON(e, http.StatusOK, result); err != nil {
 			return err
 		}
 		return nil
@@ -254,7 +254,7 @@ func registerRoutes(app core.App, router *router.Router[*core.RequestEvent]) {
 		if err := defaultSystemUpdateService.ConfirmRestart(locale); err != nil {
 			return e.BadRequestError(err.Error(), nil)
 		}
-		if err := e.JSON(http.StatusOK, newOKResponse()); err != nil {
+		if err := apiEmptySuccessJSON(e, http.StatusOK); err != nil {
 			return err
 		}
 		// 只在管理员显式确认后退出，确保前端能先展示“更新完成”并开始等待健康检查恢复。
@@ -298,7 +298,7 @@ func registerRoutes(app core.App, router *router.Router[*core.RequestEvent]) {
 		if err := deleteAppSessionsForUserExcept(app, e.Auth.Id, keepSessionID); err != nil {
 			return e.InternalServerError(serverText(locale, "common.internalError"), err)
 		}
-		return e.JSON(http.StatusOK, newOKResponse())
+		return apiEmptySuccessJSON(e, http.StatusOK)
 	})
 	auth.GET("/auth/mfa/status", func(e *core.RequestEvent) error { return handleMFAStatus(app, e) })
 	auth.POST("/auth/mfa/totp/setup", func(e *core.RequestEvent) error { return handleMFATOTPSetup(app, e) })
@@ -365,7 +365,7 @@ func registerRoutes(app core.App, router *router.Router[*core.RequestEvent]) {
 	auth.POST("/media/candidates", mediaCandidates)
 
 	api.GET("/api/app/account/password-reset/status", func(e *core.RequestEvent) error {
-		return e.JSON(http.StatusOK, passwordResetStatusResponse{Enabled: app.Settings().SMTP.Enabled})
+		return apiSuccessJSON(e, http.StatusOK, passwordResetStatusResponse{Enabled: app.Settings().SMTP.Enabled})
 	})
 
 	registerAPIFallbacks(api)
@@ -384,7 +384,7 @@ func handleSystemVersion(e *core.RequestEvent) error {
 	if !canPerformSystemUpdate(e.Auth) {
 		info = readOnlySystemVersionResponse(info, locale)
 	}
-	return e.JSON(http.StatusOK, info)
+	return apiSuccessJSON(e, http.StatusOK, info)
 }
 
 func canReadSystemVersion(user *core.Record) bool {

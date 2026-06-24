@@ -204,10 +204,7 @@ func TestSubscriptionRenewRouteAdvancesManualSubscription(t *testing.T) {
 	if res.Code != http.StatusOK {
 		t.Fatalf("expected renew 200, got %d: %s", res.Code, res.Body.String())
 	}
-	var body map[string]map[string]interface{}
-	if err := json.Unmarshal(res.Body.Bytes(), &body); err != nil {
-		t.Fatal(err)
-	}
+	body := decodeAPISuccessDataForTest[map[string]map[string]interface{}](t, res.Body.Bytes())
 	subscription := body["subscription"]
 	if subscription["status"] != "active" {
 		t.Fatalf("expected expired manual subscription to become active, got %#v", subscription["status"])
