@@ -25,6 +25,7 @@ import { ImportDataDialog } from '@/components/import-data-dialog';
 import { AIRecognizeSubscriptionDialog } from '@/components/ai-recognize-subscription-dialog';
 import { SubscriptionsPageSkeleton } from '@/components/loading-skeleton';
 import { SubscriptionCategoryFilter } from '@/components/subscription-category-filter';
+import { SubscriptionFilterFeedback } from '@/components/subscription-filter-feedback';
 import { VirtualizedList } from '@/components/ui/virtualized-list';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -55,12 +56,10 @@ import { useDeferredDialogCleanup } from '@/hooks/use-deferred-dialog-cleanup';
 import { createCurrencySelectOptions } from '@/lib/searchable-options';
 import { todayDateOnlyInTimeZone } from '@/lib/time/date-only';
 import {
-  SelectedTagScroller,
   SubscriptionTagFilterDrawer,
   SubscriptionTagFilterPopover,
 } from '@/components/subscription-tag-filter-drawer';
 import {
-  SelectedAdvancedFilterScroller,
   SubscriptionAdvancedFilter,
 } from '@/components/subscription-advanced-filter';
 
@@ -472,7 +471,7 @@ function SubscriptionGrid({
                 </Select>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3" data-testid="mobile-renewal-sort-row">
                 <Select value={renewalFilter} onValueChange={(v) => setRenewalFilter(v as SubscriptionRenewalFilter)}>
                   <SelectTrigger className="h-11 min-w-0 border-border bg-secondary" tooltipContent={renewalFilterLabel}>
                     <SelectValue placeholder={t("subscriptions.renewalFilter.label")} />
@@ -485,6 +484,29 @@ function SubscriptionGrid({
                   </SelectContent>
                 </Select>
 
+                <Select value={sortOption} onValueChange={(v) => setSortOption(v as SubscriptionSortOption)}>
+                  <SelectTrigger
+                    aria-label={t("subscriptions.sort.label")}
+                    className="h-11 border-border bg-secondary"
+                    tooltipContent={sortOptionLabel}
+                  >
+                    <SelectValue placeholder={t("subscriptions.sort.label")} />
+                  </SelectTrigger>
+                  <SelectContent mobileTitle={t("subscriptions.sort.label")}>
+                    <SelectItem value="default">{t("subscriptions.sort.default")}</SelectItem>
+                    <SelectItem value="renewal_asc">{t("subscriptions.sort.renewalAsc")}</SelectItem>
+                    <SelectItem value="renewal_desc">{t("subscriptions.sort.renewalDesc")}</SelectItem>
+                    <SelectItem value="monthly_cost_desc">{t("subscriptions.sort.monthlyCostDesc")}</SelectItem>
+                    <SelectItem value="monthly_cost_asc">{t("subscriptions.sort.monthlyCostAsc")}</SelectItem>
+                    <SelectItem value="price_desc">{t("subscriptions.sort.priceDesc")}</SelectItem>
+                    <SelectItem value="price_asc">{t("subscriptions.sort.priceAsc")}</SelectItem>
+                    <SelectItem value="name_asc">{t("subscriptions.sort.nameAsc")}</SelectItem>
+                    <SelectItem value="name_desc">{t("subscriptions.sort.nameDesc")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex min-w-0 items-center gap-3" data-testid="mobile-advanced-tag-row">
                 <SubscriptionAdvancedFilter
                   filters={advancedFilters}
                   onChange={setAdvancedFilters}
@@ -492,32 +514,8 @@ function SubscriptionGrid({
                   paymentMethodOptions={paymentMethodFilterOptions}
                   currencyOptions={currencyFilterOptions}
                   mode="mobileWorkspace"
+                  className="flex-1"
                 />
-              </div>
-
-              <div className="flex min-w-0 items-center gap-3" data-testid="mobile-sort-tag-row">
-                <div className="min-w-0 flex-1">
-                  <Select value={sortOption} onValueChange={(v) => setSortOption(v as SubscriptionSortOption)}>
-                    <SelectTrigger
-                      aria-label={t("subscriptions.sort.label")}
-                      className="h-11 border-border bg-secondary"
-                      tooltipContent={sortOptionLabel}
-                    >
-                      <SelectValue placeholder={t("subscriptions.sort.label")} />
-                    </SelectTrigger>
-                    <SelectContent mobileTitle={t("subscriptions.sort.label")}>
-                      <SelectItem value="default">{t("subscriptions.sort.default")}</SelectItem>
-                      <SelectItem value="renewal_asc">{t("subscriptions.sort.renewalAsc")}</SelectItem>
-                      <SelectItem value="renewal_desc">{t("subscriptions.sort.renewalDesc")}</SelectItem>
-                      <SelectItem value="monthly_cost_desc">{t("subscriptions.sort.monthlyCostDesc")}</SelectItem>
-                      <SelectItem value="monthly_cost_asc">{t("subscriptions.sort.monthlyCostAsc")}</SelectItem>
-                      <SelectItem value="price_desc">{t("subscriptions.sort.priceDesc")}</SelectItem>
-                      <SelectItem value="price_asc">{t("subscriptions.sort.priceAsc")}</SelectItem>
-                      <SelectItem value="name_asc">{t("subscriptions.sort.nameAsc")}</SelectItem>
-                      <SelectItem value="name_desc">{t("subscriptions.sort.nameDesc")}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
 
                 {allTags.length > 0 && (
                   <SubscriptionTagFilterDrawer
@@ -528,24 +526,24 @@ function SubscriptionGrid({
                 )}
               </div>
 
-              <SelectedTagScroller selectedTags={selectedTags} onRemoveTag={removeSelectedTag} />
-              <SelectedAdvancedFilterScroller
+              <SubscriptionFilterFeedback
+                selectedTags={selectedTags}
+                onRemoveTag={removeSelectedTag}
                 filters={advancedFilters}
-                onChange={setAdvancedFilters}
+                onChangeAdvancedFilters={setAdvancedFilters}
                 billingCycleOptions={billingCycleOptions}
                 paymentMethodOptions={paymentMethodFilterOptions}
                 currencyOptions={currencyFilterOptions}
+                hasActiveControls={hasActiveControls}
+                onClearFilters={clearFilters}
+                tagTestId="mobile-selected-tags"
+                advancedTestId="mobile-selected-advanced-filters"
+                testId="mobile-filter-feedback"
               />
-
-              {hasActiveControls && (
-                <Button variant="ghost" size="sm" onClick={clearFilters} className="w-fit text-muted-foreground">
-                  {t("subscriptions.clearFilters")}
-                </Button>
-              )}
             </>
           ) : (
             <>
-              <div className={subscriptionFilterLayout.desktopRow}>
+              <div className={subscriptionFilterLayout.desktopRow} data-testid="desktop-filter-toolbar">
                 <div className={subscriptionFilterLayout.desktopSearch}>
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
@@ -594,15 +592,6 @@ function SubscriptionGrid({
                   </SelectContent>
                 </Select>
 
-                <SubscriptionAdvancedFilter
-                  filters={advancedFilters}
-                  onChange={setAdvancedFilters}
-                  billingCycleOptions={billingCycleOptions}
-                  paymentMethodOptions={paymentMethodFilterOptions}
-                  currencyOptions={currencyFilterOptions}
-                  mode="desktopSidePanel"
-                />
-
                 <Select value={sortOption} onValueChange={(v) => setSortOption(v as SubscriptionSortOption)}>
                   <SelectTrigger
                     aria-label={t("subscriptions.sort.label")}
@@ -624,6 +613,15 @@ function SubscriptionGrid({
                   </SelectContent>
                 </Select>
 
+                <SubscriptionAdvancedFilter
+                  filters={advancedFilters}
+                  onChange={setAdvancedFilters}
+                  billingCycleOptions={billingCycleOptions}
+                  paymentMethodOptions={paymentMethodFilterOptions}
+                  currencyOptions={currencyFilterOptions}
+                  mode="desktopSidePanel"
+                />
+
                 {allTags.length > 0 && (
                   <SubscriptionTagFilterPopover
                     tags={allTags}
@@ -632,26 +630,21 @@ function SubscriptionGrid({
                     onClearTags={clearSelectedTags}
                   />
                 )}
-
-                {hasActiveControls && (
-                  <Button variant="ghost" size="sm" onClick={clearFilters} className="text-muted-foreground">
-                    {t("subscriptions.clearFilters")}
-                  </Button>
-                )}
               </div>
 
-              <SelectedTagScroller
+              <SubscriptionFilterFeedback
                 selectedTags={selectedTags}
                 onRemoveTag={removeSelectedTag}
-                testId="desktop-selected-tags"
-              />
-              <SelectedAdvancedFilterScroller
                 filters={advancedFilters}
-                onChange={setAdvancedFilters}
+                onChangeAdvancedFilters={setAdvancedFilters}
                 billingCycleOptions={billingCycleOptions}
                 paymentMethodOptions={paymentMethodFilterOptions}
                 currencyOptions={currencyFilterOptions}
-                testId="desktop-selected-advanced-filters"
+                hasActiveControls={hasActiveControls}
+                onClearFilters={clearFilters}
+                tagTestId="desktop-selected-tags"
+                advancedTestId="desktop-selected-advanced-filters"
+                testId="desktop-filter-feedback"
               />
             </>
           )}

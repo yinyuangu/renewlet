@@ -72,6 +72,12 @@ function visibleCalendarYearOptionName() {
   return new RegExp(`^${year}(?:年)?$`);
 }
 
+function optionRow(checkbox: HTMLElement): HTMLElement {
+  const row = checkbox.closest("[data-advanced-option-row]");
+  expect(row).not.toBeNull();
+  return row as HTMLElement;
+}
+
 describe("SubscriptionAdvancedFilter", () => {
   it("opens a dedicated desktop dialog for payment method selection and applies through the side panel", async () => {
     installPointerMocks();
@@ -97,9 +103,12 @@ describe("SubscriptionAdvancedFilter", () => {
     expect(within(paymentList).queryByTestId("advanced-payment-method-picker-selected-options")).not.toBeInTheDocument();
     const paypalRow = within(paymentOptions).getByRole("checkbox", { name: "PayPal" });
     expect(paypalRow).toHaveAttribute("aria-checked", "false");
+    expect(optionRow(paypalRow)).toHaveClass("border-border", "bg-secondary/30");
     await user.click(paypalRow);
 
     expect(paypalRow).toHaveAttribute("aria-checked", "true");
+    expect(optionRow(paypalRow)).toHaveClass("border-primary/60", "bg-primary/5");
+    expect(optionRow(paypalRow)).not.toHaveClass("bg-primary/10");
     expect(onChange).not.toHaveBeenCalled();
 
     await user.click(within(dialog).getByRole("button", { name: /Done|完成/ }));
@@ -191,6 +200,8 @@ describe("SubscriptionAdvancedFilter", () => {
     await user.click(usdRow);
 
     expect(usdRow).toHaveAttribute("aria-checked", "true");
+    expect(optionRow(usdRow)).toHaveClass("border-primary/60", "bg-primary/5");
+    expect(optionRow(usdRow)).not.toHaveClass("bg-primary/10");
     expect(within(currencyList).queryByTestId("advanced-currency-picker-selected-options")).not.toBeInTheDocument();
     expect(onChange).not.toHaveBeenCalled();
 

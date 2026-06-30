@@ -363,14 +363,14 @@ describe("Subscriptions page sorting", () => {
 
     await user.click(screen.getByRole("combobox", { name: "排序" }));
     await user.click(await screen.findByRole("option", { name: "月成本最高" }));
-
+    expect(screen.getByRole("combobox", { name: "排序" }).compareDocumentPosition(screen.getByRole("button", { name: "更多筛选" })) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(within(screen.getByTestId("desktop-filter-feedback")).getByRole("button", { name: "清除筛选" })).toBeInTheDocument();
+    expect(within(screen.getByTestId("desktop-filter-toolbar")).queryByRole("button", { name: "清除筛选" })).not.toBeInTheDocument();
     await waitFor(() => {
       expect(visibleSubscriptionNames()).toEqual(["Monthly CNY", "Annual USD", "Quarterly CNY"]);
     });
     expect(screen.queryByText(/从 3 个中筛选/)).not.toBeInTheDocument();
-
     await user.click(screen.getByRole("button", { name: "清除筛选" }));
-
     await waitFor(() => {
       expect(visibleSubscriptionNames()).toEqual(["Annual USD", "Monthly CNY", "Quarterly CNY"]);
     });
@@ -452,7 +452,7 @@ describe("Subscriptions page sorting", () => {
     expect(searchInput).toHaveAttribute("type", "search");
     expect(searchInput).toHaveAttribute("name", "subscription-search");
     expect(searchInput).toHaveAttribute("enterkeyhint", "search");
-    expect(screen.getByTestId("mobile-sort-tag-row")).toBeInTheDocument();
+    expect(within(screen.getByTestId("mobile-renewal-sort-row")).getByRole("combobox", { name: "排序" }).compareDocumentPosition(within(screen.getByTestId("mobile-advanced-tag-row")).getByRole("button", { name: "更多筛选" })) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 
   it("keeps the AI add shortcut accessible, compact, and wired to the recognition dialog", async () => {
@@ -627,22 +627,21 @@ describe("Subscriptions page mobile tag filters", () => {
     expect(screen.queryByTestId("desktop-tag-filter")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Security" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("mobile-selected-tags")).not.toBeInTheDocument();
-    const sortTagRow = screen.getByTestId("mobile-sort-tag-row");
+    const renewalSortRow = screen.getByTestId("mobile-renewal-sort-row");
+    const advancedTagRow = screen.getByTestId("mobile-advanced-tag-row");
     const mobileSelects = screen.getAllByRole("combobox");
     expect(mobileSelects[0]).toHaveTextContent("所有状态");
     expect(mobileSelects[1]).toHaveTextContent("所有续订");
-    expect(within(sortTagRow).getByRole("combobox", { name: "排序" })).toHaveTextContent("默认顺序");
-    expect(within(sortTagRow).getByRole("button", { name: "标签" })).toBeInTheDocument();
+    expect(within(renewalSortRow).getByRole("combobox", { name: "排序" })).toHaveTextContent("默认顺序");
+    expect(within(advancedTagRow).getByRole("button", { name: "标签" })).toBeInTheDocument();
     expect(visibleSubscriptionNames()).toEqual(["Tagged Cloud", "Docs Notes", "Design Suite", "Plain Service"]);
-
-    await user.click(within(sortTagRow).getByRole("button", { name: "标签" }));
+    await user.click(within(advancedTagRow).getByRole("button", { name: "标签" }));
     const drawer = await screen.findByRole("dialog", { name: "筛选标签" });
     expect(drawer).toHaveClass("h5-drawer-panel", "overflow-hidden");
     expect(drawer).not.toHaveClass("min-h-[52dvh]");
     expect(screen.queryByRole("button", { name: "清空标签" })).not.toBeInTheDocument();
     await user.type(screen.getByPlaceholderText("搜索标签..."), "Doc");
     await user.click(screen.getByRole("button", { name: "Docs" }));
-
     expect(visibleSubscriptionNames()).toEqual(["Tagged Cloud", "Docs Notes", "Design Suite", "Plain Service"]);
     await user.click(screen.getByRole("button", { name: "确定" }));
 
@@ -651,6 +650,8 @@ describe("Subscriptions page mobile tag filters", () => {
     });
     expect(screen.getByRole("button", { name: "标签(1)" })).toBeInTheDocument();
     expect(screen.getByTestId("mobile-selected-tags")).toBeInTheDocument();
+    expect(within(screen.getByTestId("mobile-filter-feedback")).getByRole("button", { name: "清除筛选" })).toBeInTheDocument();
+    expect(within(advancedTagRow).queryByRole("button", { name: "清除筛选" })).not.toBeInTheDocument();
     expect(visibleSubscriptionNames()).toEqual(["Docs Notes"]);
   });
 

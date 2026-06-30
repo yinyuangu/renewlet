@@ -1,7 +1,9 @@
-import { useMemo, useState } from "react";
-import { Check, Search, X } from "lucide-react";
+import { useId, useMemo, useState } from "react";
+import { Search, X } from "lucide-react";
 
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useI18n } from "@/i18n/I18nProvider";
 import { cn } from "@/lib/utils";
 import {
@@ -41,31 +43,32 @@ function AdvancedOptionRow<T extends string>({
   layout: AdvancedOptionListLayout;
   onToggle: () => void;
 }) {
+  const optionId = useId();
+
   return (
-    <button
-      type="button"
-      role="checkbox"
-      aria-checked={selected}
+    <div
+      data-advanced-option-row=""
       className={cn(
-        "flex w-full min-w-0 items-center gap-3 rounded-lg border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card",
-        layout === "mobile" ? "min-h-12" : "min-h-11",
+        "grid w-full min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 rounded-lg border border-border bg-secondary/30 px-3 py-2.5 text-left transition-colors hover:border-primary/40 hover:bg-secondary/50",
+        layout === "mobile" ? "min-h-12" : "min-h-10",
         selected
-          ? "border-primary bg-primary/10 text-foreground"
-          : "border-border bg-secondary/50 text-foreground hover:border-primary/50 hover:bg-secondary/70",
+          ? "border-primary/60 bg-primary/5"
+          : "text-foreground",
       )}
-      onClick={onToggle}
     >
-      <span
-        className={cn(
-          "flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border",
-          selected ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground/50 bg-background/40",
-        )}
-        aria-hidden="true"
-      >
-        {selected ? <Check className="h-3.5 w-3.5" /> : null}
-      </span>
-      <span className="min-w-0 flex-1 truncate text-sm font-medium">{option.label}</span>
-    </button>
+      <div className="flex h-5 items-center">
+        <Checkbox
+          id={optionId}
+          checked={selected}
+          aria-label={option.label}
+          className="border-muted-foreground/50 bg-background/40 data-[state=checked]:border-primary data-[state=checked]:bg-primary"
+          onCheckedChange={onToggle}
+        />
+      </div>
+      <Label htmlFor={optionId} className="min-w-0 cursor-pointer text-sm font-medium leading-5 text-foreground">
+        <span className="block truncate">{option.label}</span>
+      </Label>
+    </div>
   );
 }
 
@@ -87,9 +90,9 @@ function OptionSection<T extends string>({
   if (options.length === 0) return null;
 
   return (
-    <section className="space-y-2" data-testid={testId}>
-      {label ? <h3 className="px-1 text-xs font-medium text-muted-foreground">{label}</h3> : null}
-      <div className="flex flex-col gap-2">
+    <section className="space-y-1.5" data-testid={testId}>
+      {label ? <h3 className="px-1 text-[11px] font-medium leading-4 text-muted-foreground">{label}</h3> : null}
+      <div className="flex flex-col gap-1.5">
         {options.map((option) => (
           <AdvancedOptionRow
             key={option.value}
