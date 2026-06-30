@@ -25,7 +25,7 @@ It records renewal dates, prices, currencies, categories, payment methods, logos
 
 ## Demo
 
-Try the live demo: <https://renewlet-demo.olyq.org/>
+Try the live demo: <https://demo.renewlet.cc/>
 
 Sign in with `demo@renewlet.local` / `renewlet-demo`. The demo resets regularly, so please do not put real personal data or credentials there.
 
