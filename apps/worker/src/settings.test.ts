@@ -68,6 +68,12 @@ class SettingsTestStatement {
       const settingsJson = this.state.rows.get(userId);
       return settingsJson ? { settings_json: settingsJson } as T : null;
     }
+    if (this.sql.includes("FROM subscription_scheduler_state")) {
+      return null;
+    }
+    if (this.sql.includes("SUM(CASE WHEN auto_renew")) {
+      return { auto_renew_count: 0, repeat_reminder_count: 0 } as T;
+    }
     return null;
   }
 
@@ -82,6 +88,9 @@ class SettingsTestStatement {
       } else {
         this.state.rows.set(userId, settingsJson);
       }
+      return d1Result([]);
+    }
+    if (this.sql.includes("INSERT INTO subscription_scheduler_state")) {
       return d1Result([]);
     }
     throw new Error(`unexpected settings query: ${this.sql}`);

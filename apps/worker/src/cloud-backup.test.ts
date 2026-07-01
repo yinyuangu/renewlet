@@ -8,10 +8,10 @@ import {
   downloadCloudBackup,
   listCloudBackups,
   runDueCloudBackups,
-  sanitizeSettingsForCloudBackup,
   testCloudBackupConfig,
   updateCloudBackupConfig,
 } from "./cloud-backup";
+import { sanitizeSettingsForCloudBackup } from "./cloud-backup-sanitize";
 import { CloudBackupRemoteError, sha256Hex, type CloudBackupRemoteClient } from "./cloud-backup-remote";
 import { deleteCloudBackupFromTargets, type CloudBackupTarget } from "./cloud-backup-snapshot-resolve";
 import { readSuccessData } from "./api-test-helpers";
@@ -97,6 +97,7 @@ function fakeEnvForRows(rows: CloudBackupTargetRow[], onQuery?: (query: FakeD1Qu
     }
     if (method === "run" && sql.includes("SET locked_until")) return d1Run(1);
     if (method === "run" && sql.includes("SET last_backup_at")) return d1Run(1);
+    if (method === "run" && sql.includes("SET next_run_at_utc")) return d1Run(1);
     if (method === "run" && sql.includes("SET last_status")) return d1Run(1);
     throw new Error(`unexpected ${method} query: ${sql}`);
   });
@@ -170,6 +171,7 @@ function cloudBackupRow(provider: "webdav" | "s3", overrides: Partial<CloudBacku
     last_status: "idle",
     last_error: null,
     locked_until: null,
+    next_run_at_utc: null,
     created_at: "2026-06-09T00:00:00.000Z",
     updated_at: "2026-06-09T00:00:00.000Z",
     ...overrides,
@@ -209,10 +211,11 @@ function upsertTargetRow(rows: CloudBackupTargetRow[], params: unknown[]) {
     schedule_time: String(params[6]),
     schedule_weekday: params[7] as CloudBackupTargetRow["schedule_weekday"],
     retention: Number(params[8]),
+    next_run_at_utc: params[9] === null ? null : String(params[9]),
     last_status: previous.last_status || "idle",
     last_error: previous.last_error,
-    created_at: previous.created_at || String(params[9]),
-    updated_at: String(params[10]),
+    created_at: previous.created_at || String(params[10]),
+    updated_at: String(params[11]),
   };
   if (index >= 0) rows[index] = next;
   else rows.push(next);

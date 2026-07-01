@@ -21,6 +21,7 @@ const SUBSCRIPTIONS_QUERY_KEY = ["subscriptions"] as const;
 const SUBSCRIPTIONS_LIST_QUERY_KEY = [...SUBSCRIPTIONS_QUERY_KEY, "list"] as const;
 const SUBSCRIPTIONS_INFINITE_QUERY_KEY = [...SUBSCRIPTIONS_QUERY_KEY, "infinite"] as const;
 const SUBSCRIPTIONS_PAGE_QUERY_KEY = [...SUBSCRIPTIONS_QUERY_KEY, "page"] as const;
+const SUBSCRIPTIONS_STALE_TIME_MS = 60_000;
 
 interface UseSubscriptionsOptions {
   filters?: SubscriptionListFilters | undefined;
@@ -37,6 +38,7 @@ export function useSubscriptions(options: UseSubscriptionsOptions = {}) {
     queryKey: [...SUBSCRIPTIONS_LIST_QUERY_KEY, options.filters ?? null] as const,
     queryFn: () => subscriptionService.list(options.filters),
     enabled: options.enabled ?? true,
+    staleTime: SUBSCRIPTIONS_STALE_TIME_MS,
   });
 }
 
@@ -52,6 +54,7 @@ export function useInfiniteSubscriptions(options: UseInfiniteSubscriptionsOption
     queryFn: ({ pageParam }) => subscriptionService.listPage(pageParam),
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     enabled: options.enabled ?? true,
+    staleTime: SUBSCRIPTIONS_STALE_TIME_MS,
   });
   const subscriptions = useMemo(
     () => query.data?.pages.flatMap((page) => page.subscriptions) ?? [],
@@ -69,6 +72,7 @@ export function useSubscriptionsPage(cursor?: string | null, limit?: number) {
   return useQuery({
     queryKey: [...SUBSCRIPTIONS_PAGE_QUERY_KEY, cursor ?? null, limit ?? subscriptionService.pageSize] as const,
     queryFn: () => subscriptionService.listPage(cursor, limit),
+    staleTime: SUBSCRIPTIONS_STALE_TIME_MS,
   });
 }
 
