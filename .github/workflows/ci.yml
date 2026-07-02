@@ -1,6 +1,6 @@
 name: CI
 
-# 分支质量门只覆盖 dev/main push；release 分支靠 PR 和 tag workflow 守门，避免 prepare/RC 修复重复跑整套 CI。
+# 分支质量门只覆盖 dev push；main 稳定线靠 release PR 与 tag workflow 守门，避免合并后重复跑整套 CI。
 on:
   pull_request:
     branches:
@@ -10,7 +10,6 @@ on:
   push:
     branches:
       - dev
-      - main
 
 permissions:
   contents: read

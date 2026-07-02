@@ -51,6 +51,20 @@ jobs:
             echo "is-stable=true" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Validate stable tag source
+        if: ${{ github.repository == 'zhiyingzzhou/renewlet' && steps.version.outputs.is-stable == 'true' }}
+        run: |
+          set -euo pipefail
+          git fetch origin main:refs/remotes/origin/main
+          TAG_SHA="$(git rev-parse "${GITHUB_REF_NAME}^{commit}")"
+          MAIN_SHA="$(git rev-parse "origin/main^{commit}")"
+          # 稳定版 tag 必须来自 main 历史；允许重跑旧 tag，所以不要求等于 origin/main 当前 head。
+          if ! git merge-base --is-ancestor "$TAG_SHA" "$MAIN_SHA"; then
+            echo "Stable release tag ${GITHUB_REF_NAME} must point to a commit reachable from origin/main." >&2
+            echo "tag=${TAG_SHA} origin/main=${MAIN_SHA}" >&2
+            exit 1
+          fi
+
   docker:
     needs: metadata
     if: ${{ github.repository == 'zhiyingzzhou/renewlet' }}

@@ -1,6 +1,6 @@
 name: Build Smoke
 
-# 面向 fork、PR 和 dev/main 分支的无密钥构建冒烟；release 分支构建由 RC/stable tag 的 Release Publish 覆盖。
+# 面向 fork、PR 和 dev 分支的无密钥构建冒烟；main/release 发布构建由 PR 与 tag workflow 覆盖。
 on:
   pull_request:
     branches:
@@ -10,7 +10,6 @@ on:
   push:
     branches:
       - dev
-      - main
   workflow_dispatch:
 
 permissions:
