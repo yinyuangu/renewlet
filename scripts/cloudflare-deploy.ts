@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { readFileSync, readdirSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
@@ -22,6 +23,7 @@ import {
 } from "./cloudflare-wrangler-config";
 import { SUBSCRIPTION_DERIVED_BACKFILL_NAME } from "./cloudflare-derived-backfill-state";
 import { readActiveWorkerDeployment, type ActiveDeployment } from "./cloudflare-worker-deployment";
+import { parseDeployedWorkerVersion, waitForWorkerVersion } from "./cloudflare-deployment-confirmation";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const drainWindowMs = 15 * 60 * 1000;
@@ -407,10 +409,23 @@ function createOperations(options: DeployOptions): DeploymentOperations {
   };
 
   const deploy = async (configPath: string, message: string): Promise<ActiveDeployment> => {
-    await requirePnpm(["exec", "wrangler", "deploy", "--message", message, "--config", configPath]);
-    const active = await readActiveDeployment();
-    if (active === undefined) throw new Error("Worker deploy completed without an active deployment");
-    return active;
+    const outputDirectory = mkdtempSync(resolve(tmpdir(), "renewlet-deploy-"));
+    const outputPath = resolve(outputDirectory, "wrangler.ndjson");
+    try {
+      await requirePnpm(["exec", "wrangler", "deploy", "--message", message, "--config", configPath], {
+        ...environment,
+        WRANGLER_OUTPUT_FILE_PATH: outputPath,
+      });
+      const workerName = readWranglerConfig(configPath)["name"];
+      if (typeof workerName !== "string") throw new Error("Worker config requires a name");
+      const expectedVersion = parseDeployedWorkerVersion(readFileSync(outputPath, "utf8"), workerName);
+      console.log(`Waiting for Worker version ${expectedVersion} to serve 100% of traffic (up to 120 seconds).`);
+      const active = await waitForWorkerVersion(expectedVersion, readActiveDeployment);
+      console.log(`Confirmed active Worker version: ${active.versionId}`);
+      return active;
+    } finally {
+      rmSync(outputDirectory, { recursive: true, force: true });
+    }
   };
 
   return {

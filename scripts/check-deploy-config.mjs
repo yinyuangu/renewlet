@@ -607,7 +607,7 @@ function checkCloudflareWorkflowBuildMetadata() {
   }
   // 官方 main 是稳定发布线；自管分支部署不能绕过 Release Publish 的 production-cloudflare 审批门。
   for (const snippet of [
-    "if: ${{ github.repository != 'zhiyingzzhou/renewlet' || github.ref == 'refs/heads/dev' }}",
+    "if: ${{ (github.repository != 'zhiyingzzhou/renewlet' || github.ref == 'refs/heads/dev') && (github.event_name != 'workflow_dispatch' || inputs.expected_sha == '' || inputs.expected_sha == github.sha) }}",
     "      - dev",
     "      - main",
     "workflow_dispatch:",

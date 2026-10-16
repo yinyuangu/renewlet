@@ -235,6 +235,10 @@ https://<WORKER_NAME>.<workers-dev-subdomain>.workers.dev/setup
 
 手动部署用户：在你的 fork 里点击 `Sync fork` / `Update branch`，把 fork 更新到 Renewlet 最新版本。如果没有自动部署，进入 `Actions` 手动运行 `Cloudflare Worker`。
 
+本 fork（`yinyuangu/renewlet`）另有 `Cloudflare Deploy Fallback`：每小时第 17 分钟检查 `main` 当前提交是否存在 `Cloudflare Worker` 运行记录；如果因上游提交包含 `[skip ci]` 等原因完全没有触发，就通过 `workflow_dispatch` 补触发。已排队、运行中、成功或失败的提交均不重复触发；失败后需查看日志并手动重试。GitHub 定时任务可能延迟，也可能因仓库长期无活动而暂停，不是即时部署保证。可以手动运行该检查。
+
+部署确认使用 Wrangler 本次命令生成的结构化版本 ID，并等待 Cloudflare API 返回该版本占据 100% 流量，最多等待约两分钟；不会把刚发布后的旧状态直接判为失败，也不会接受无关的新版本。权限错误、无效响应及流量拆分仍会阻止后续迁移。
+
 ## D1 升级与恢复
 
 升级 schema 前，先创建一份可移植 SQL 导出。`pnpm deploy` 会在首次 D1 写入前自动捕获当前 Time Travel bookmark 和线上 Worker version，并写入 GitHub job summary 或本地输出。

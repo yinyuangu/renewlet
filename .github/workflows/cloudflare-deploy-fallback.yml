@@ -1,0 +1,28 @@
+name: Cloudflare Deploy Fallback
+
+# schedule/workflow_dispatch are not suppressed by upstream [skip ci] messages.
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: cloudflare-deploy-fallback-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  check:
+    if: github.repository == 'yinyuangu/renewlet' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/github-script@v9.0.0
+        with:
+          script: |
+            const fallback = require('./scripts/cloudflare-deploy-fallback.cjs');
+            await fallback({ github, context, core });

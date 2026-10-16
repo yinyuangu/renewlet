@@ -15,7 +15,7 @@ export function checkCloudflareD1DeployContract(repoRoot) {
   const packageJson = JSON.parse(readFileSync(join(repoRoot, "package.json"), "utf8"));
 
   for (const snippet of [
-    "group: production-cloudflare-${{ github.repository }}\n  cancel-in-progress: false",
+    "group: production-cloudflare-${{ github.repository }}\n      cancel-in-progress: false",
     "timeout-minutes: 60",
     "CI_WRANGLER_MAINTENANCE_CONFIG: wrangler.maintenance.generated.jsonc",
   ]) requireSnippet(selfHosted, snippet, selfHostedPath);
